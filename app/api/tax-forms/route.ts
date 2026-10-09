@@ -4,7 +4,14 @@ import { getDatabase } from '@/lib/server/db';
 
 export const dynamic = 'force-dynamic';
 
-type InvoiceRow = { id: string; invoice_number: string; invoice_date: string; payload_json: string; status: string };
+type InvoiceRow = {
+  id: string;
+  invoice_number: string;
+  invoice_date: string;
+  payload_json: string;
+  status: string;
+  approved_deductible_tax?: number;
+};
 
 function parseInvoice(row: InvoiceRow): Record<string, unknown> {
   try { return JSON.parse(row.payload_json) as Record<string, unknown>; } catch { return {}; }
@@ -18,6 +25,8 @@ function form01(rows: InvoiceRow[], period: string) {
   const invoices = rows.map(parseInvoice);
   const totalPreTax = invoices.reduce((sum, invoice) => sum + Number(invoice.preTaxAmount || 0), 0);
   const totalTax = invoices.reduce((sum, invoice) => sum + Number(invoice.taxAmount || 0), 0);
+  // P0-4: Chỉ tiêu 25 tính chính xác từ approved_deductible_tax thực tế được phê duyệt
+  const totalApprovedDeductibleTax = rows.reduce((sum, row) => sum + Number(row.approved_deductible_tax ?? 0), 0);
   return {
     formCode: '01/GTGT',
     templateVersion: 'TT89/2026-DRAFT-MAPPING',
@@ -31,7 +40,7 @@ function form01(rows: InvoiceRow[], period: string) {
       '22': { label: 'Thuế GTGT còn được khấu trừ kỳ trước chuyển sang', value: 0, source: 'not_stored_in_current_system' },
       '23': { label: 'Giá trị hàng hóa, dịch vụ mua vào', value: totalPreTax, source: 'approved_invoice_payloads' },
       '24': { label: 'Thuế GTGT của hàng hóa, dịch vụ mua vào', value: totalTax, source: 'approved_invoice_payloads' },
-      '25': { label: 'Thuế GTGT được khấu trừ kỳ này', value: totalTax, source: 'policy_approved_tax_only' },
+      '25': { label: 'Thuế GTGT được khấu trừ kỳ này', value: totalApprovedDeductibleTax, source: 'approved_deductible_tax' },
       '30': { label: 'Hàng hóa, dịch vụ bán ra thuế suất 0%', value: 0, source: 'sales_ledger_not_stored' },
       '32': { label: 'Hàng hóa, dịch vụ bán ra thuế suất 5%', value: 0, source: 'sales_ledger_not_stored' },
       '33': { label: 'Hàng hóa, dịch vụ bán ra thuế suất 10%', value: 0, source: 'sales_ledger_not_stored' },
@@ -73,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     if (form === '01/GTGT') {
       const rows = db.prepare(`
-        SELECT id, invoice_number, invoice_date, payload_json, status
+        SELECT id, invoice_number, invoice_date, payload_json, status, approved_deductible_tax
         FROM invoices
         WHERE status = 'APPROVED' AND substr(invoice_date, 1, 7) = ?
         ORDER BY invoice_date, id

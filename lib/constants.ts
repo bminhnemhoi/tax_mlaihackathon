@@ -4,16 +4,19 @@ export const JEV_API_CONFIG = {
   MODEL: 'jev-latest'
 };
 
-export const DEEPSEEK_API_CONFIG = {
-  ENDPOINT: process.env.DEEPSEEK_API_URL || 'http://127.0.0.1:8000/v1/chat/completions',
-  BASE_URL: process.env.DEEPSEEK_BASE_URL || 'http://127.0.0.1:8000',
-  MODEL: process.env.DEEPSEEK_MODEL || 'deepseek-chat'
+export const GEMINI_API_CONFIG = {
+  ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
+  BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
+  API_KEY: process.env.GEMINI_API_KEY || '',
+  MODEL: 'gemini-2.5-flash-lite'
 };
 
-export const GEMINI_API_CONFIG = {
-  ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',
-  API_KEY: process.env.GEMINI_API_KEY || '',
-  MODEL: 'gemini-3.5-flash-lite'
+export const QWEN_API_CONFIG = {
+  ENDPOINT: (process.env.QWEN_BASE_URL || 'https://ws-0shshb54xxvk987d.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1') + '/chat/completions',
+  BASE_URL: process.env.QWEN_BASE_URL || 'https://ws-0shshb54xxvk987d.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
+  API_KEY: process.env.QWEN_API_KEY || '',
+  MODEL: process.env.QWEN_MODEL || 'qwen-plus-character',
+  FAST_MODEL: 'qwen-flash-character'
 };
 
 export const MACRO_DEFAULTS = {
@@ -54,6 +57,11 @@ export const DEFAULT_POLICY_CONFIG = {
   vatReductionRate: 8,
   vatStandardRate: 10,
   allowStaffReimbursement: true,
+  companyTaxCode: '0100109106',
+  companyName: 'Công ty Cổ phần Thương mại & Công nghệ Fprinciples',
+  strictBuyerTaxCodeCheck: false,
+  strictSeriesYearCheck: true,
+  strictMccqtCheck: true,
   excludedVat8Categories: [
     'VIỄN THÔNG', 'TÀI CHÍNH', 'NGÂN HÀNG', 'CHỨNG KHOÁN', 'BẢO HIỂM',
     'BẤT ĐỘNG SẢN', 'KIM LOẠI', 'KHAI KHOÁNG', 'HÓA CHẤT', 'TIÊU THỤ ĐẶC BIỆT'

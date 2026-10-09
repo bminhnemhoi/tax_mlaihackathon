@@ -86,3 +86,68 @@ export function switchRole(targetRole: AppRole): { token: string; user: AppUser 
 export function logout(token?: string): void {
   if (token) getDatabase().prepare('DELETE FROM sessions WHERE id = ?').run(token);
 }
+
+export interface ApprovalCheckResult {
+  allowed: boolean;
+  reason?: string;
+  requiredRole?: AppRole;
+}
+
+/**
+ * Kiểm tra thẩm quyền phê duyệt hồ sơ và nguyên tắc bất kiêm nhiệm (Segregation of Duties)
+ * - ACCOUNTANT: Không có thẩm quyền phê duyệt.
+ * - CHIEF_ACCOUNTANT: Phê duyệt ROUTINE và hồ sơ ESCALATED < 200.000.000 VNĐ.
+ * - CFO: Thẩm quyền tối cao, phê duyệt hồ sơ >= 200.000.000 VNĐ và các ca rủi ro cao.
+ * - Anti-Self-Approval: Người tạo/nhập hồ sơ (createdByUserId) tuyệt đối không được tự phê duyệt hồ sơ của mình.
+ */
+export function canApproveInvoice(
+  user: AppUser,
+  invoice: {
+    id?: string;
+    totalAmount: number;
+    createdByUserId?: string | null;
+    status?: string;
+    requiresCFO?: boolean;
+  }
+): ApprovalCheckResult {
+  // 1. Chặn tự duyệt (Anti-Self-Approval / Segregation of Duties)
+  if (invoice.createdByUserId && invoice.createdByUserId === user.id) {
+    return {
+      allowed: false,
+      reason: 'Nguyên tắc Segregation of Duties: Người tạo/nhập hồ sơ không được phép tự phê duyệt hồ sơ của chính mình'
+    };
+  }
+
+  // 2. Kiểm tra thứ bậc phân quyền theo vai trò
+  if (user.role === 'ACCOUNTANT') {
+    return {
+      allowed: false,
+      reason: 'Kế toán viên không có thẩm quyền phê duyệt hồ sơ (chỉ Kế toán trưởng hoặc Giám đốc tài chính)',
+      requiredRole: 'CHIEF_ACCOUNTANT'
+    };
+  }
+
+  const isExceedAuthority = Math.abs(invoice.totalAmount) >= 200_000_000 || invoice.requiresCFO === true;
+
+  if (isExceedAuthority) {
+    if (user.role !== 'CFO') {
+      return {
+        allowed: false,
+        reason: 'Hồ sơ vượt hạn mức thẩm quyền (>= 200.000.000 VNĐ hoặc thuộc diện rủi ro cao), bắt buộc Giám đốc tài chính (CFO) phê duyệt',
+        requiredRole: 'CFO'
+      };
+    }
+    return { allowed: true };
+  }
+
+  // Dưới 200 triệu: Kế toán trưởng và CFO đều có thẩm quyền
+  if (user.role === 'CHIEF_ACCOUNTANT' || user.role === 'CFO') {
+    return { allowed: true };
+  }
+
+  return {
+    allowed: false,
+    reason: 'Không đủ thẩm quyền phê duyệt'
+  };
+}
+

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const rows = db.prepare(`
       SELECT
         i.id, i.invoice_number, i.supplier_tax_code, i.invoice_date,
-        i.payload_json, i.status AS invoice_status,
+        i.payload_json, i.status AS invoice_status, i.approved_deductible_tax,
         e.decision_json
       FROM invoices i
       LEFT JOIN evaluations e ON e.id = (
@@ -48,7 +48,8 @@ export async function GET(request: NextRequest) {
       if (!invoice) continue;
 
       const decision = parseJson<RefereeDecision | null>(row.decision_json, null);
-      const voucher = generateCanonicalVoucher(invoice, decision, voucherCounter++, regime);
+      const explicitTax = typeof row.approved_deductible_tax === 'number' ? Number(row.approved_deductible_tax) : undefined;
+      const voucher = generateCanonicalVoucher(invoice, decision, voucherCounter++, regime, explicitTax);
       vouchers.push(voucher);
     }
 
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     const rows = db.prepare(`
       SELECT
         i.id, i.invoice_number, i.supplier_tax_code, i.invoice_date,
-        i.payload_json, i.status AS invoice_status,
+        i.payload_json, i.status AS invoice_status, i.approved_deductible_tax,
         e.decision_json
       FROM invoices i
       LEFT JOIN evaluations e ON e.id = (
@@ -105,7 +106,8 @@ export async function POST(request: NextRequest) {
       const invoice = parseJson<InvoiceInput | null>(row.payload_json, null);
       if (!invoice) continue;
       const decision = parseJson<RefereeDecision | null>(row.decision_json, null);
-      const voucher = generateCanonicalVoucher(invoice, decision, counter++, regime);
+      const explicitTax = typeof row.approved_deductible_tax === 'number' ? Number(row.approved_deductible_tax) : undefined;
+      const voucher = generateCanonicalVoucher(invoice, decision, counter++, regime, explicitTax);
 
       if (!voucherIds || voucherIds.length === 0 || voucherIds.includes(voucher.id)) {
         vouchers.push(voucher);

@@ -33,7 +33,7 @@ import {
   getApplicableRegulations,
   RegulatoryDocument
 } from '@/data/regulatoryRegistry';
-import { LEGAL_CONSTANTS_2026 } from '@/lib/constants';
+import { LEGAL_CONSTANTS_2026, DEFAULT_POLICY_CONFIG } from '@/lib/constants';
 import { CorporatePrecedent, LegalUpdateCandidate, SystemPolicyConfig, SystemPolicyConfigSchema } from '@/lib/schemas';
 import { formatVND } from '@/lib/utils';
 import {
@@ -53,19 +53,7 @@ interface PolicyViewerModalProps {
   onConfigUpdated?: (config: SystemPolicyConfig) => void;
 }
 
-const DEFAULT_CONFIG: SystemPolicyConfig = {
-  nonCashThreshold: 5_000_000,
-  kttApprovalLimit: 200_000_000,
-  kFactorSafeMin: 1.05,
-  kFactorSafeMax: 1.25,
-  vatReductionRate: 8,
-  vatStandardRate: 10,
-  allowStaffReimbursement: true,
-  excludedVat8Categories: [
-    'VIỄN THÔNG', 'TÀI CHÍNH', 'NGÂN HÀNG', 'CHỨNG KHOÁN', 'BẢO HIỂM',
-    'BẤT ĐỘNG SẢN', 'KIM LOẠI', 'KHAI KHOÁNG', 'HÓA CHẤT', 'TIÊU THỤ ĐẶC BIỆT'
-  ]
-};
+const DEFAULT_CONFIG: SystemPolicyConfig = DEFAULT_POLICY_CONFIG;
 
 export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
   isOpen,

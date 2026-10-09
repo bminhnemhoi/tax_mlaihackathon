@@ -1,14 +1,32 @@
 import { getDatabase, jsonNow } from '@/lib/server/db';
 import { CorporatePrecedent, CorporatePrecedentSchema, InvoiceInput } from '@/lib/schemas';
 
+export const STATUTORY_PATTERNS = new Set([
+  'RULE_NON_CASH_5M',
+  'RULE_VAT_8_EXCLUDED',
+  'RULE_SELLER_CLOSED',
+  'RULE_DUPLICATE_INVOICE',
+  'RULE_LINE_ITEM_MISMATCH',
+  'OUT_OF_POLICY_STATUTORY',
+  'STATUTORY_LAW_48_CASH_PAYMENT',
+  'STATUTORY_RES_204_VAT_8_EXCLUDED',
+  'STATUTORY_DECREE_254_CLOSED_SELLER'
+]);
+
 /**
  * Tìm tiền lệ hợp lệ của CFO cho nhà cung cấp và mẫu rủi ro (IMP-12)
+ * Nghiêm cấm áp dụng tiền lệ cho các quy định Luật Thuế định chế cứng (Statutory Law)
  */
 export function findPrecedentForInvoice(
   invoice: InvoiceInput,
   riskPattern: string
 ): CorporatePrecedent | null {
   try {
+    // Tường lửa pháp lý: Luật cứng tuyệt đối không có tiền lệ
+    if (STATUTORY_PATTERNS.has(riskPattern) || riskPattern.startsWith('STATUTORY_')) {
+      return null;
+    }
+
     const db = getDatabase();
     const currentDate = invoice.invoiceDate || new Date().toISOString().slice(0, 10);
 
@@ -28,12 +46,8 @@ export function findPrecedentForInvoice(
     `).all(invoice.supplierTaxCode, currentDate, currentDate) as any[];
 
     for (const row of rows) {
-      // Khớp chính xác pattern hoặc khớp bao quát
-      if (
-        row.riskPattern === riskPattern ||
-        row.riskPattern === 'ALL_EXCEPTIONS' ||
-        (riskPattern.includes('OUT_OF_POLICY') && row.riskPattern.includes('OUT_OF_POLICY'))
-      ) {
+      // Khớp chính xác riskPattern cụ thể, loại bỏ khớp bao quát để tránh bypass sai luật
+      if (row.riskPattern === riskPattern) {
         return CorporatePrecedentSchema.parse(row);
       }
     }
@@ -58,6 +72,23 @@ export function createPrecedent(params: {
   approvedBy: string;
   effectiveMonths?: number;
 }): CorporatePrecedent {
+  // 1. Chỉ CFO mới có quyền tạo tiền lệ quy chế nội bộ
+  const isCfo = params.approvedBy === 'CFO' || params.approvedBy.includes('(CFO)') || params.approvedBy.toUpperCase().includes('CFO');
+  if (!isCfo) {
+    throw new Error('Chỉ CFO mới có quyền tạo tiền lệ quy chế nội bộ');
+  }
+
+  // 2. Chặn tạo tiền lệ cho các vi phạm luật định chế cứng
+  if (
+    STATUTORY_PATTERNS.has(params.riskPattern) ||
+    params.riskPattern?.startsWith('STATUTORY_') ||
+    /5M|NQ\s*204|8%|tiền\s*mặt|đóng\s*mst|chấm\s*dứt\s*mst|luật\s*48/i.test(
+      `${params.sopClause || ''} ${params.rationale || ''} ${params.riskPattern || ''}`
+    )
+  ) {
+    throw new Error('Vi phạm Tường lửa Pháp lý: Tuyệt đối không được phép tạo tiền lệ cho quy định Luật thuế định chế cứng (Statutory Tax Law)');
+  }
+
   const db = getDatabase();
   const id = `PREC-${Date.now().toString(36).toUpperCase()}`;
   const now = jsonNow();

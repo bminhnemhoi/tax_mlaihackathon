@@ -1,0 +1,306 @@
+{
+  "summary": {
+    "avgLocalTime": 1895,
+    "avgDsTime": 6120,
+    "localSuccess": 10,
+    "dsSuccess": 10,
+    "localDetectedBlur": 6,
+    "dsDetectedBlur": 0
+  },
+  "details": [
+    {
+      "id": 1,
+      "fileName": "19_edge_case_blurred_unreadable.jpg",
+      "category": "Ảnh mờ cực đoan (Edge Case Blur)",
+      "localOcr": {
+        "timeMs": 3199,
+        "success": true,
+        "invoiceDate": "2019-09-17",
+        "supplierName": "CHI NHÁNH - CÔNG TY TNHH MỘT THÀNH VIÊN THỰC PHẨM SAIGON CO.OP - CO.OP FOOD MIỀN BẮC",
+        "supplierTaxCode": "0309129418-115",
+        "isImageBlurry": false,
+        "blurScore": 1012.39,
+        "averageConfidence": 1,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": []
+      },
+      "deepseek": {
+        "timeMs": 6283,
+        "success": true,
+        "invoiceNumber": "07653",
+        "invoiceDate": "2019-09-17",
+        "supplierName": "Saigon Co.op - Co.op Food HN THE K-PARK",
+        "supplierTaxCode": "0309129418-115",
+        "totalAmount": 22391,
+        "isImageBlurry": false,
+        "detectedBlurryLines": []
+      }
+    },
+    {
+      "id": 2,
+      "fileName": "01_vat_einvoice_abeco_hardware.jpg",
+      "category": "Hóa đơn GTGT linh kiện Abeco",
+      "localOcr": {
+        "timeMs": 1860,
+        "success": true,
+        "invoiceNumber": "48",
+        "invoiceDate": "2016-08-26",
+        "supplierName": "TNHH Điện Từ ABECO Việt Nam",
+        "isImageBlurry": false,
+        "blurScore": 5124.26,
+        "averageConfidence": 1,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": []
+      },
+      "deepseek": {
+        "timeMs": 6280,
+        "success": true,
+        "invoiceNumber": "PN 017",
+        "invoiceDate": "2022-11-27",
+        "supplierName": "Công Ty TNHH Điện Tử ABECO Việt Nam",
+        "supplierTaxCode": "",
+        "totalAmount": 766600000,
+        "isImageBlurry": false,
+        "detectedBlurryLines": []
+      }
+    },
+    {
+      "id": 3,
+      "fileName": "02_vat_einvoice_telecom_service.jpg",
+      "category": "Hóa đơn GTGT cước viễn thông",
+      "localOcr": {
+        "timeMs": 2542,
+        "success": true,
+        "invoiceNumber": "02",
+        "invoiceDate": "2021-01-04",
+        "supplierName": "Văn phòng phẩm ĐỒ RÊ MÍ",
+        "isImageBlurry": true,
+        "blurScore": 4499.31,
+        "averageConfidence": 0.978,
+        "lowConfidenceCount": 3,
+        "detectedBlurryLines": [
+          "Cày",
+          "Cái",
+          "Sốừng từm......... ..."
+        ]
+      },
+      "deepseek": {
+        "timeMs": 6507,
+        "success": true,
+        "invoiceNumber": "AP003",
+        "invoiceDate": "2021-01-04",
+        "supplierName": "Công Ty TNHH Văn phòng phẩm Đỗ Nét",
+        "supplierTaxCode": "",
+        "totalAmount": 38216000,
+        "isImageBlurry": false,
+        "detectedBlurryLines": []
+      }
+    },
+    {
+      "id": 4,
+      "fileName": "03_vat_einvoice_office_supplies.jpg",
+      "category": "Hóa đơn GTGT văn phòng phẩm",
+      "localOcr": {
+        "timeMs": 5934,
+        "success": true,
+        "invoiceNumber": "LB142",
+        "supplierTaxCode": "2299500009",
+        "isImageBlurry": true,
+        "blurScore": 5693.38,
+        "averageConfidence": 0.874,
+        "lowConfidenceCount": 13,
+        "detectedBlurryLines": [
+          "(Ban naon theo Long tr co 10/2001711-:BTC",
+          "•Ngợn l5 thóng ó nườn 2023.",
+          "- Hịp rà hn pn pio Ngo ia Vàa Thiem"
+        ]
+      },
+      "deepseek": {
+        "timeMs": 6021,
+        "success": true,
+        "invoiceNumber": "LB142",
+        "invoiceDate": "2023-06-13",
+        "supplierName": "Công ty An Phát Computer",
+        "supplierTaxCode": "",
+        "totalAmount": 921328000,
+        "isImageBlurry": false,
+        "detectedBlurryLines": []
+      }
+    },
+    {
+      "id": 5,
+      "fileName": "04_vat_einvoice_material_procurement.jpg",
+      "category": "Hóa đơn GTGT vật tư xây dựng",
+      "localOcr": {
+        "timeMs": 1140,
+        "success": true,
+        "invoiceNumber": "LB142",
+        "supplierName": "Aa Phit Computer",
+        "isImageBlurry": true,
+        "blurScore": 5967.33,
+        "averageConfidence": 0.962,
+        "lowConfidenceCount": 4,
+        "detectedBlurryLines": [
+          "Nig 1 tiog, min 10013.",
+          "NBLN0763",
+          "(0, họ tếng"
+        ]
+      },
+      "deepseek": {
+        "timeMs": 6462,
+        "success": true,
+        "invoiceNumber": "LB142",
+        "invoiceDate": "2023-06-15",
+        "supplierName": "Công ty An Phát Computer",
+        "supplierTaxCode": "0107107775",
+        "totalAmount": 2540265000,
+        "isImageBlurry": false,
+        "detectedBlurryLines": []
+      }
+    },
+    {
+      "id": 6,
+      "fileName": "14_mcocr_milano_coffee_vietnam.jpg",
+      "category": "Bill in nhiệt Milano Coffee",
+      "localOcr": {
+        "timeMs": 781,
+        "success": true,
+        "invoiceNumber": "01",
+        "invoiceDate": "2020-10-02",
+        "isImageBlurry": false,
+        "blurScore": 1837.27,
+        "averageConfidence": 0.984,
+        "lowConfidenceCount": 1,
+        "detectedBlurryLines": [
+          ":: www.milanocoffee.com.vn"
+        ]
+      },
+      "deepseek": {
+        "timeMs": 4886,
+        "success": true,
+        "invoiceNumber": "00199",
+        "invoiceDate": "2020-10-02",
+        "supplierName": "Milano Coffee Vietnam",
+        "supplierTaxCode": "",
+        "totalAmount": 15000,
+        "isImageBlurry": false,
+        "detectedBlurryLines": []
+      }
+    },
+    {
+      "id": 7,
+      "fileName": "16_mcocr_supermarket_winmart_retail.jpg",
+      "category": "Bill bán lẻ siêu thị WinMart",
+      "localOcr": {
+        "timeMs": 866,
+        "success": true,
+        "invoiceNumber": "00032031",
+        "invoiceDate": "2020-08-09",
+        "isImageBlurry": true,
+        "blurScore": 2375.66,
+        "averageConfidence": 0.808,
+        "lowConfidenceCount": 20,
+        "detectedBlurryLines": [
+          "VM+ QNH Tô 7, Khu Minh Tiền A",
+          "HOA ƠN BÁN HÀNG",
+          "Mặt hàng"
+        ]
+      },
+      "deepseek": {
+        "timeMs": 6383,
+        "success": true,
+        "invoiceNumber": "00032031",
+        "invoiceDate": "2020-08-09",
+        "supplierName": "VinCommerce",
+        "supplierTaxCode": "",
+        "totalAmount": 70400,
+        "isImageBlurry": false,
+        "detectedBlurryLines": []
+      }
+    },
+    {
+      "id": 8,
+      "fileName": "15_mcocr_supermarket_saigon_coop.jpg",
+      "category": "Bill bán lẻ siêu thị Saigon Co.op",
+      "localOcr": {
+        "timeMs": 939,
+        "success": true,
+        "invoiceDate": "2019-09-23",
+        "supplierName": "CHI NHÁNH - CÔNG TY TNHH MỘT THÀNH VIÊN THỰC PHẨM SAIGON CO.OP - CO.OP FOOD MIỀN BẮC",
+        "supplierTaxCode": "0309129418-115",
+        "isImageBlurry": false,
+        "blurScore": 2474.81,
+        "averageConfidence": 1,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": []
+      },
+      "deepseek": {
+        "timeMs": 5822,
+        "success": true,
+        "invoiceNumber": "09340",
+        "invoiceDate": "2019-09-23",
+        "supplierName": "Saigon Co.op",
+        "supplierTaxCode": "0309129418-115",
+        "totalAmount": 67462,
+        "isImageBlurry": false,
+        "detectedBlurryLines": []
+      }
+    },
+    {
+      "id": 9,
+      "fileName": "12_mcocr_restaurant_cukcuk_bbq.jpg",
+      "category": "Bill tính tiền nhà hàng nướng BBQ",
+      "localOcr": {
+        "timeMs": 903,
+        "success": true,
+        "invoiceNumber": "B",
+        "invoiceDate": "2020-08-15",
+        "totalAmount": 1,
+        "isImageBlurry": false,
+        "blurScore": 1372.82,
+        "averageConfidence": 1,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": []
+      },
+      "deepseek": {
+        "timeMs": 7648,
+        "success": true,
+        "invoiceDate": "2020-08-15",
+        "supplierName": "CUK CUK BUFFET BBQ & HOT POT",
+        "supplierTaxCode": "",
+        "totalAmount": 1144000,
+        "isImageBlurry": false,
+        "detectedBlurryLines": []
+      }
+    },
+    {
+      "id": 10,
+      "fileName": "17_mcocr_vietcombank_pos_slip.jpg",
+      "category": "Biên lai thanh toán thẻ POS VCB",
+      "localOcr": {
+        "timeMs": 790,
+        "success": true,
+        "invoiceNumber": "29902504",
+        "invoiceDate": "2020-04-30",
+        "isImageBlurry": false,
+        "blurScore": 1428.91,
+        "averageConfidence": 0.988,
+        "lowConfidenceCount": 1,
+        "detectedBlurryLines": [
+          "UGR_VINMART_4987_UMQNH"
+        ]
+      },
+      "deepseek": {
+        "timeMs": 4904,
+        "success": true,
+        "invoiceNumber": "000099",
+        "invoiceDate": "2020-04-30",
+        "supplierName": "VINMART",
+        "supplierTaxCode": "",
+        "totalAmount": 341100,
+        "isImageBlurry": false,
+        "detectedBlurryLines": []
+      }
+    }
+  ]
+}

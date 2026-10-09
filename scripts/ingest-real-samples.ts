@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { getDatabase, jsonNow, hashPayload, getActivePolicy, getMacroState } from '../lib/server/db';
-import { extractInvoiceWithDeepSeek } from '../services/deepseekService';
+import { extractInvoiceWithUnifiedAI } from '../services/aiCoordinator';
 import { queryJevReferee } from '../services/jevService';
 import { InvoiceInput, InvoiceInputSchema } from '../lib/schemas';
 
@@ -34,7 +34,30 @@ function numberValue(value?: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function parseRealXml(xmlContent: string, fileName: string): InvoiceInput {
+function parseTaxRateString(value?: unknown): 0 | 5 | 8 | 10 | undefined {
+  if (value === undefined || value === null) return undefined;
+  const str = String(value).trim().toUpperCase();
+  if (!str) return undefined;
+  if (
+    str.includes('KCT') ||
+    str.includes('KKKNT') ||
+    str.includes('KHONG CHIU THUE') ||
+    str.includes('KHÔNG CHỊU THUẾ') ||
+    str.includes('MIEN') ||
+    str.includes('MIỄN')
+  ) {
+    return 0;
+  }
+  const num = numberValue(str);
+  if (num === undefined) return undefined;
+  if (num === 0 || num <= 2) return 0;
+  if (num >= 4 && num <= 6) return 5;
+  if (num >= 7 && num <= 9) return 8;
+  if (num >= 9.5 && num <= 11) return 10;
+  return [0, 5, 8, 10].includes(num as any) ? (num as 0 | 5 | 8 | 10) : undefined;
+}
+
+export function parseRealXml(xmlContent: string, fileName: string): InvoiceInput {
   const nbanMatch =
     xmlContent.match(/<NBan[\s\S]*?<\/NBan>/i)?.[0] ||
     xmlContent.match(/<SellerInfo[\s\S]*?<\/SellerInfo>/i)?.[0] ||
@@ -59,6 +82,64 @@ function parseRealXml(xmlContent: string, fileName: string): InvoiceInput {
     tag(xmlContent, 'SellerName') ||
     tag(xmlContent, 'CompanyName') ||
     'Đơn vị bán hàng';
+
+  const nmuaMatch =
+    xmlContent.match(/<NMua[\s\S]*?<\/NMua>/i)?.[0] ||
+    xmlContent.match(/<BuyerInfo[\s\S]*?<\/BuyerInfo>/i)?.[0] ||
+    xmlContent.match(/<Buyer[\s\S]*?<\/Buyer>/i)?.[0] || '';
+
+  let rawBuyerMst =
+    tag(nmuaMatch, 'MST') ||
+    tag(nmuaMatch, 'TaxID') ||
+    tag(xmlContent, 'BuyerTaxCode') ||
+    tag(xmlContent, 'NMuaMST');
+  let cleanBuyerMst: string | undefined = undefined;
+  if (rawBuyerMst) {
+    const cleaned = rawBuyerMst.replace(/[^0-9-]/g, '');
+    if (/^\d{10}(?:-\d{3})?$/.test(cleaned)) {
+      cleanBuyerMst = cleaned;
+    } else if (cleaned.replace(/-/g, '').length === 10) {
+      cleanBuyerMst = cleaned.replace(/-/g, '');
+    }
+  }
+
+  const buyerName =
+    tag(nmuaMatch, 'Ten') ||
+    tag(nmuaMatch, 'TenNMua') ||
+    tag(nmuaMatch, 'CompanyName') ||
+    tag(nmuaMatch, 'Name') ||
+    tag(xmlContent, 'BuyerLegalName') ||
+    tag(xmlContent, 'BuyerName');
+
+  const invoiceSeries =
+    tag(xmlContent, 'KHHDon') ||
+    tag(xmlContent, 'InvoiceSeries') ||
+    tag(xmlContent, 'Series') ||
+    tag(xmlContent, 'KyHieu');
+
+  const invoiceTemplate =
+    tag(xmlContent, 'KHMSHDon') ||
+    tag(xmlContent, 'InvoiceTemplate') ||
+    tag(xmlContent, 'Template') ||
+    tag(xmlContent, 'MauSo');
+
+  const taxAuthorityCode =
+    tag(xmlContent, 'MCCQT') ||
+    tag(xmlContent, 'TaxAuthorityCode') ||
+    tag(xmlContent, 'MaCQT');
+
+  let rawSigning =
+    tag(xmlContent, 'SigningDate') ||
+    tag(xmlContent, 'SignatureDate') ||
+    tag(xmlContent, 'NgayKy') ||
+    tag(xmlContent, 'SigningTime');
+  let signingDate: string | undefined = undefined;
+  if (rawSigning) {
+    const sDate = rawSigning.split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(sDate)) {
+      signingDate = sDate;
+    }
+  }
 
   const invoiceNumber =
     tag(xmlContent, 'SHDon') ||
@@ -92,44 +173,61 @@ function parseRealXml(xmlContent: string, fileName: string): InvoiceInput {
     tag(xmlContent, 'ItemName') ||
     'Hàng hóa / Dịch vụ';
 
+  const xmlHeader = xmlContent.replace(/<(?:Items|InvoiceDetail|Details|HHDVu)[\s\S]*?<\/(?:Items|InvoiceDetail|Details|HHDVu)>/gi, '');
+
   let preTaxAmount = numberValue(
-    tag(xmlContent, 'TgTCThue') ||
-    tag(xmlContent, 'TongTienHang') ||
-    tag(xmlContent, 'SubTotal') ||
-    tag(xmlContent, 'SubtotalAmount') ||
-    tag(xmlContent, 'TotalAmount') ||
-    tag(xmlContent, 'ThTien')
+    tag(xmlHeader, 'TgTCThue') ||
+    tag(xmlHeader, 'TongTienHang') ||
+    tag(xmlHeader, 'SubTotal') ||
+    tag(xmlHeader, 'SubtotalAmount') ||
+    tag(xmlHeader, 'TotalAmount') ||
+    tag(xmlHeader, 'ThTien')
   ) || 1000000;
 
   let taxAmount = numberValue(
-    tag(xmlContent, 'TgTTThue') ||
-    tag(xmlContent, 'TgTThue') ||
-    tag(xmlContent, 'TongTienThue') ||
-    tag(xmlContent, 'TotalVAT') ||
-    tag(xmlContent, 'TotalVATAmount') ||
-    tag(xmlContent, 'VATAmount') ||
-    tag(xmlContent, 'TaxAmount')
+    tag(xmlHeader, 'TgTTThue') ||
+    tag(xmlHeader, 'TgTThue') ||
+    tag(xmlHeader, 'TongTienThue') ||
+    tag(xmlHeader, 'TotalVAT') ||
+    tag(xmlHeader, 'TotalVATAmount') ||
+    tag(xmlHeader, 'VATAmount') ||
+    tag(xmlHeader, 'TaxAmount')
   );
 
   let totalAmount = numberValue(
-    tag(xmlContent, 'TgTTTBSo') ||
-    tag(xmlContent, 'GrandTotal') ||
-    tag(xmlContent, 'TotalPayment') ||
-    tag(xmlContent, 'TongThanhToan') ||
-    tag(xmlContent, 'TotalAmount')
+    tag(xmlHeader, 'TgTTTBSo') ||
+    tag(xmlHeader, 'GrandTotal') ||
+    tag(xmlHeader, 'TotalPayment') ||
+    tag(xmlHeader, 'TongThanhToan') ||
+    tag(xmlHeader, 'TotalAmount')
   );
 
-  let taxRate = numberValue(
-    tag(xmlContent, 'TSuat') ||
-    tag(xmlContent, 'ThueSuat') ||
-    tag(xmlContent, 'VATRatePercent') ||
-    tag(xmlContent, 'TaxRatePercent') ||
-    tag(xmlContent, 'VATRate')
-  );
+  const taxRateRaw =
+    tag(xmlHeader, 'TSuat') ||
+    tag(xmlHeader, 'ThueSuat') ||
+    tag(xmlHeader, 'VATRatePercent') ||
+    tag(xmlHeader, 'TaxRatePercent') ||
+    tag(xmlHeader, 'VATRate');
+  let taxRate = parseTaxRateString(taxRateRaw);
 
-  if (taxRate === undefined) taxRate = 10;
-  if (taxAmount === undefined) taxAmount = Math.round(preTaxAmount * taxRate / 100);
+  if (taxRate === undefined) {
+    if (taxAmount === 0) {
+      taxRate = 0;
+    } else if (preTaxAmount > 0 && taxAmount !== undefined) {
+      const calculated = Math.round((taxAmount / preTaxAmount) * 100);
+      taxRate = [0, 5, 8, 10].includes(calculated) ? (calculated as 0 | 5 | 8 | 10) : 10;
+    } else {
+      taxRate = 10;
+    }
+  }
+
+  if (taxAmount === undefined) taxAmount = taxRate === 0 ? 0 : Math.round(preTaxAmount * taxRate / 100);
   if (totalAmount === undefined) totalAmount = preTaxAmount + taxAmount;
+
+  // Nếu có chiết khấu dẫn đến chênh lệch giữa tổng giá trị hàng và tổng thanh toán:
+  if (totalAmount !== undefined && taxAmount !== undefined && Math.abs(preTaxAmount + taxAmount - totalAmount) > 100) {
+    preTaxAmount = totalAmount - taxAmount;
+  }
 
   let cleanMst = supplierTaxCode.replace(/[^0-9-]/g, '');
   if (cleanMst.replace(/-/g, '').length === 10) cleanMst = cleanMst.replace(/-/g, '');
@@ -138,23 +236,72 @@ function parseRealXml(xmlContent: string, fileName: string): InvoiceInput {
   const paymentMethodRaw = (tag(xmlContent, 'HTTT') || tag(xmlContent, 'PaymentMethod') || tag(xmlContent, 'HTTToan') || '').toUpperCase();
   const paymentMethod = paymentMethodRaw.includes('TM') || paymentMethodRaw.includes('CASH') ? 'CASH' : 'BANK_TRANSFER';
 
+  const items: InvoiceInput['items'] = [];
+  const itemMatches = Array.from(xmlContent.matchAll(/<(?:Item|HHDVu|Detail|Product)[\s\S]*?<\/(?:Item|HHDVu|Detail|Product)>/gi));
+  let lineIdx = 1;
+  for (const match of itemMatches) {
+    const itemXml = match[0];
+    const name = tag(itemXml, 'TenHang') || tag(itemXml, 'THHDVu') || tag(itemXml, 'ItemName') || tag(itemXml, 'ProductName') || tag(itemXml, 'ProdName');
+    if (!name) continue;
+
+    const unit = tag(itemXml, 'DVT') || tag(itemXml, 'DVTinh') || tag(itemXml, 'Unit') || tag(itemXml, 'UnitOfMeasure');
+    const quantity = numberValue(tag(itemXml, 'SoLuong') || tag(itemXml, 'SLuong') || tag(itemXml, 'Quantity') || tag(itemXml, 'ProdQuantity')) || 1;
+    const unitPrice = numberValue(tag(itemXml, 'DonGia') || tag(itemXml, 'DGia') || tag(itemXml, 'Price') || tag(itemXml, 'UnitPrice') || tag(itemXml, 'ProdPrice')) || 0;
+    const amount = numberValue(tag(itemXml, 'ThanhTien') || tag(itemXml, 'ThTien') || tag(itemXml, 'Amount') || tag(itemXml, 'ProdAmount')) || (quantity * unitPrice);
+    const itemTaxRateRaw = tag(itemXml, 'ThueSuat') || tag(itemXml, 'TSuat') || tag(itemXml, 'VATRate') || tag(itemXml, 'TaxRate') || tag(itemXml, 'TaxRatePercent');
+    const itemTaxRate = parseTaxRateString(itemTaxRateRaw) ?? taxRate;
+    const itemTaxAmount = numberValue(tag(itemXml, 'TienThue') || tag(itemXml, 'TThue') || tag(itemXml, 'VATAmount') || tag(itemXml, 'TaxAmount')) ?? (itemTaxRate === 0 ? 0 : Math.round((amount * itemTaxRate) / 100));
+    let discount = numberValue(tag(itemXml, 'TienCK') || tag(itemXml, 'DiscountAmount'));
+    const discountRate = numberValue(tag(itemXml, 'Discount') || tag(itemXml, 'ChietKhau') || tag(itemXml, 'DiscountRate'));
+    let netItemAmount = amount;
+    if (itemTaxRate > 0 && itemTaxAmount > 0 && Math.abs((amount * itemTaxRate) / 100 - itemTaxAmount) > 10) {
+      // Amount trong XML là số tiền gộp trước chiết khấu
+      const netTaxable = Math.round((itemTaxAmount * 100) / itemTaxRate);
+      discount = amount - netTaxable;
+      netItemAmount = netTaxable;
+    } else if (discount === undefined && discountRate && discountRate > 0 && discountRate <= 100) {
+      discount = Math.round((quantity * unitPrice) - amount);
+    }
+
+    items.push({
+      lineNumber: numberValue(tag(itemXml, 'STT') || tag(itemXml, 'ItemNo')) || lineIdx++,
+      itemName: name,
+      unit: unit || 'Cái',
+      quantity,
+      unitPrice,
+      amount: netItemAmount,
+      taxRate: [0, 5, 8, 10].includes(itemTaxRate as any) ? (itemTaxRate as 0 | 5 | 8 | 10) : 10,
+      taxAmount: itemTaxAmount,
+      discountAmount: discount
+    });
+  }
+
+  const hasBankSlip = (paymentMethod === 'BANK_TRANSFER');
+
   return {
     id: `REAL-${fileName.replace(/[^a-zA-Z0-9]/g, '-').slice(0, 30)}`,
     invoiceNumber,
     invoiceDate: rawDate,
     supplierTaxCode: cleanMst,
     supplierName,
+    buyerTaxCode: cleanBuyerMst,
+    buyerName,
+    invoiceSeries,
+    invoiceTemplate,
+    taxAuthorityCode,
+    signingDate,
     itemName,
     preTaxAmount,
     taxRate: [0, 5, 8, 10].includes(taxRate) ? (taxRate as 0 | 5 | 8 | 10) : 10,
     taxAmount,
     totalAmount,
     paymentMethod,
-    hasBankSlip: paymentMethod === 'BANK_TRANSFER',
+    hasBankSlip,
     hasItemManifest: true,
     sellerStatus: 'ACTIVE',
     isImageBlurry: false,
-    isAdjustment: false
+    isAdjustment: false,
+    items: items.length > 0 ? items : undefined
   };
 }
 
@@ -273,14 +420,15 @@ async function main() {
         invoiceInput = parseRealXml(xml, fileName);
         console.log(`    + Bóc tách XML: HĐ #${invoiceInput.invoiceNumber} | NCC: ${invoiceInput.supplierName} | Tổng: ${invoiceInput.totalAmount.toLocaleString('vi-VN')}₫`);
       } else {
-        // PDF hoặc ảnh được DeepSeek Server Agent đọc trực tiếp từ chứng từ thực tế
-        console.log(`    + Đang gửi sang DeepSeek Server Agent (Patchright) để OCR chứng từ thực tế...`);
+        // PDF hoặc ảnh được Google Gemini Vision đọc trực tiếp từ chứng từ thực tế
+        console.log(`    + Đang gửi sang Google Gemini Vision để OCR chứng từ thực tế...`);
         try {
           const buffer = fs.readFileSync(filePath);
           const base64 = buffer.toString('base64');
           const mimeType = ext === '.pdf' ? 'application/pdf' : ext === '.png' ? 'image/png' : 'image/jpeg';
 
-          const deepseekResult = await extractInvoiceWithDeepSeek(base64, mimeType, fileName);
+          const { data: deepseekResult, engineUsed } = await extractInvoiceWithUnifiedAI(base64, mimeType, fileName);
+          console.log(`    + OCR thành công qua ${engineUsed}!`);
           
           const invDate = String(deepseekResult.invoiceDate || '').split('T')[0];
           const mst = String(deepseekResult.supplierTaxCode || '').replace(/[^0-9-]/g, '');
@@ -337,7 +485,7 @@ async function main() {
               isAdjustment: false
             };
           } else {
-            throw new Error(`Không thể OCR file ${fileName}: ${geminiErr?.message || geminiErr}`);
+            throw new Error(`Không thể OCR file ${fileName}: ${deepseekErr?.message || deepseekErr}`);
           }
         }
       }
@@ -437,4 +585,6 @@ async function main() {
   console.log('========================================================================');
 }
 
-main().catch(console.error);
+if (process.argv[1]?.includes('ingest-real-samples')) {
+  main().catch(console.error);
+}

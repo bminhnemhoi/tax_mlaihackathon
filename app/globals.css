@@ -38,7 +38,8 @@
 }
 
 html {
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum" 1, "lnum" 1;
+  font-variant-numeric: tabular-nums lining-nums;
   text-rendering: optimizeLegibility;
 }
 
@@ -47,13 +48,15 @@ body {
   background-color: #f8fafc;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   letter-spacing: -0.011em;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum" 1, "lnum" 1;
+  font-variant-numeric: tabular-nums lining-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Dedicated Modern Financial & Metric Numeral Class (Geist / DM Sans) */
+/* Dedicated Modern Financial & Metric Numeral Class (Tabular Lining Numerals) */
 .font-numeric {
-  font-family: 'Geist', 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
   letter-spacing: -0.025em;
@@ -66,7 +69,7 @@ body {
 }
 
 .font-mono {
-  font-family: 'Geist Mono', 'Geist', ui-monospace, SFMono-Regular, monospace;
+  font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1;
   letter-spacing: -0.015em;

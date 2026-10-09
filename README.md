@@ -3,7 +3,7 @@
 > **Dự án dự thi Cuộc thi MLAI Hackathon 2026**  
 > **Bảng 1: OrganizationAI · Đề bài A: The Escalation Referee (Bộ điều phối chuyển tiếp con người)**  
 > **Repository:** [https://github.com/khanhle1406/Tax-Referee.git](https://github.com/khanhle1406/Tax-Referee.git)  
-> **Phiên bản:** v2.6 Production Ready (DeepSeek AI Agent · Sổ Cái Kế Toán TT99/TT133 · Webhook Pháp Lý Real-time)  
+> **Phiên bản:** v3.0 Production Ready (Google Gemini Vision · Alibaba Cloud Qwen · Sổ Cái Kế Toán TT99/TT133 · UI/UX Pro Max)  
 > **Trải nghiệm trực tiếp:** [http://localhost:3000](http://localhost:3000)
 
 ---
@@ -26,8 +26,9 @@ Trước làn sóng siết chặt quản lý thuế bằng hóa đơn điện t�
   - `UNCERTAIN_INFO`: Thông tin chưa đủ độ chắc chắn thực tế (ảnh mờ, thiếu HĐ gốc NĐ 254, nhà cung cấp đóng MST trước ngày xuất).
   - `OUT_OF_POLICY`: Nằm ngoài phạm vi quy định (áp sai thuế suất 8%, thanh toán tiền mặt từ 5 triệu VNĐ, chi phí nhạy cảm rượu bia không phục vụ SXKD).
   - `EXCEED_AUTHORITY`: Vượt thẩm quyền phê duyệt (hóa đơn giảm giá hoặc bồi thường từ 200 triệu VNĐ, mua sắm lớn đẩy Hệ số K vào Vùng Đỏ).
-- **Hỗ trợ quyết định trong 3 giây (Actionable Human-in-the-Loop):** Tích hợp **DeepSeek AI Agent** (kèm fallback Google Gemini) sinh câu hỏi đóng ngữ cảnh hóa kèm đúng 2 phương án đối ứng (**Phương án A** vs **Phương án B**), chuyển tiếp đúng Kế toán trưởng (KTT) hoặc Giám đốc Tài chính (CFO) ra quyết định tức thì.
+- **Hỗ trợ quyết định trong 3 giây (Actionable Human-in-the-Loop):** Tích hợp **Alibaba Cloud Qwen AI** (`qwen-plus-character`) và **TypeSafe AI (Jev)** sinh câu hỏi đóng ngữ cảnh hóa kèm đúng 2 phương án đối ứng (**Phương án A** vs **Phương án B**), chuyển tiếp đúng Kế toán trưởng (KTT) hoặc Giám đốc Tài chính (CFO) ra quyết định tức thì.
 - **Cập nhật pháp luật thời gian thực (Real-time Legal Pipeline):** Tiếp nhận Webhook tức thời từ đối tác pháp lý số, tích hợp luồng RSS XML Cổng Chính phủ và Bộ Tài chính, đối soát chống báo động giả.
+- **Thiết kế chuẩn UI/UX Pro Max (Chống AI Slop):** Giao diện tối giản phong cách Swiss FinTech (Ramp/Linear-grade), loại bỏ triệt để các dải gradient hay hiệu ứng neon tùy tiện; đồng bộ 100% typography và chữ số kế toán `font-numeric` (Inter tabular lining numbers).
 
 ---
 
@@ -41,11 +42,12 @@ Trước làn sóng siết chặt quản lý thuế bằng hóa đơn điện t�
 ┌────────────────────────────────────────────────────────┐
 │               TẦNG TRÍ TUỆ KÉP (DUAL-ENGINE)            │
 │  - Engine 1: Policy Engine Deterministic (Ground Truth) │
-│    + Luật 48/2024, NĐ 254/2026, NQ 204/2025            │
+│    + Luật 48/2024, NĐ 254/2026, NQ 204/2025, TT 219     │
 │    + Giám sát Hệ số K (CV 2392) & Trùng lặp HĐ         │
-│  - Engine 2: DeepSeek AI Agent (Vision OCR & Q-Gen)    │
-│    + Local Python Agent (Patchright Stealth Engine)    │
-│    + Fallback tự động: Google Gemini AI Cascade        │
+│  - Engine 2: AI Intelligence Cascade                   │
+│    + Vision OCR: Google Gemini 2.5 Flash Lite (VLM)     │
+│    + Suy luận & Q-Gen: Alibaba Cloud Qwen-Plus-Char     │
+│    + Tăng tốc phân loại: TypeSafe AI Jev System One    │
 └──────────────────────────┬─────────────────────────────┘
                            │
                            ▼
@@ -61,6 +63,7 @@ Trước làn sóng siết chặt quản lý thuế bằng hóa đơn điện t�
 │      ĐỊNH KHOẢN SỔ CÁI & TÍCH HỢP ERP DOANH NGHIỆP     │
 │  - Sổ cái kế toán Thông tư 99/2025/TT-BTC & TT 133     │
 │  - Adapter đồng bộ MISA AMIS & FAST Accounting         │
+│  - Đối soát Cổng Tổng Cục Thuế & Sổ Phụ Ngân Hàng      │
 │  - Xuất dữ liệu kế toán XML Circular 99 chuẩn W3C     │
 └──────────────────────────┬─────────────────────────────┘
                            │
@@ -98,157 +101,118 @@ Hệ thống sử dụng bộ dữ liệu chứng từ thực tế tải trực 
 | **IMP-08** | **Line-Item Validation** | Rà soát từng dòng hàng chi tiết, bóc tách đơn giá x số lượng, phát hiện sai thuế suất ưu đãi 8% đối với danh mục loại trừ (NQ 204/2025/QH15) và cảnh báo chi phí nhạy cảm rượu bia. |
 | **IMP-09** | **Bulk Confirmation** | Nút bấm 1-click cho phép Kế toán viên xác nhận đồng loạt tất cả các hóa đơn thường quy sạch (`ROUTINE_PROPOSED`), giảm 95% thao tác thủ công. |
 | **IMP-10** | **Duplicate Detector** | Phát hiện trùng lặp 100% số hóa đơn và số tiền hoặc trùng số hóa đơn cùng nhà cung cấp đã tiếp nhận trong hệ thống; tự động gắn cờ `OUT_OF_POLICY`. |
-| **IMP-11** | **Side-by-Side Viewer** | Trình xem bản thể hiện hóa đơn điện tử song song chuẩn Nghị định 123/2020/NĐ-CP; hỗ trợ thu phóng, xem toàn màn hình, in trực tiếp và tải XML gốc. |
-| **IMP-12** | **Precedent Memory** | Bộ nhớ tiền lệ doanh nghiệp: Khi CFO/KTT phê duyệt ngoại lệ có thể lưu thành tiền lệ đặc cách. Các hóa đơn tương tự sau đó được tự động thông qua kèm trích dẫn căn cứ phê duyệt trước đó. |
-| **IMP-13** | **Accounting Ledger Engine** | Tự động sinh bút toán định khoản kế toán kép (Nợ/Có) chuẩn hóa theo **Thông tư 99/2025/TT-BTC** và **Thông tư 133/2016/TT-BTC**, sinh mã Hash bảo mật SHA-256 từng chứng từ, kết xuất XML Circular 99, adapter đồng bộ trực tiếp sang **MISA AMIS** và **FAST Accounting**. |
-| **IMP-14** | **Real-time Legal Pipeline** | Trung tâm thông báo giám sát pháp lý & rủi ro thuế thời gian thực; cơ chế đối soát 4 tầng (Canonization, Baseline Registry, SHA-256 Content Hash, AI Impact Assessment); REST Webhook endpoint `POST /api/webhooks/legal-update` tiếp nhận dữ liệu từ các cổng LegalTech. |
-| **IMP-15** | **1-Click Reset Demo** | Nút khôi phục danh mục hóa đơn mẫu nguyên bản ngay trên thanh điều hướng, giúp giám khảo và người dùng demo thử nghiệm nhiều lần thuận tiện. |
-| **IMP-03** | **SHA-256 Audit Chain** | Chuỗi băm mật mã học liên kết sự kiện kiểm toán (`previous_hash` -> `event_hash`), bảo đảm nhật ký phê duyệt không thể bị can thiệp hay sửa đổi. |
+| **IMP-11** | **Side-by-Side Viewer** | Khung hiển thị trực quan bản thể hiện HĐĐT song song với bảng câu hỏi A/B của trọng tài thuế, hỗ trợ zoom và kiểm tra chữ ký số CQT. |
+| **IMP-12** | **Precedent Memory** | Ghi nhận quyết định phê duyệt đặc cách của CFO làm tiền lệ cho nhà cung cấp trong 6 tháng; tự động đối soát và đưa vào luồng `ROUTINE` các lần sau. |
+| **IMP-13** | **SHA-256 Audit Chain** | Toàn bộ phán quyết, thời gian, người duyệt và lý do giải trình được gắn mã băm SHA-256 bất biến, lưu trữ trực tiếp trong CSDL SQLite. |
+| **IMP-14** | **Tax Defense Dossier** | Tạo biên bản và hồ sơ giải trình thuế 1-Click phục vụ quyết toán thuế, in ấn PDF chuẩn hóa, trích xuất căn cứ pháp lý và phân bổ rủi ro. |
+| **IMP-15** | **General Ledger Sync** | Tự động sinh chứng từ kế toán 2 tài khoản (Nợ TK 152/156/642, Nợ TK 1331, Có TK 112/331) theo Thông tư 99 và Thông tư 133, tích hợp adapter MISA & FAST. |
+| **IMP-16** | **TCT & Bank Reconcile** | Đối soát tự động 3 chiều giữa Hóa đơn đầu vào - Cổng Tổng Cục Thuế - Sổ phụ Sao kê Ngân hàng (khớp lệnh UNC thanh toán không dùng tiền mặt). |
 
 ---
 
-## 4. HƯỚNG DẪN CÀI ĐẶT & KHỞI CHẠY (LOCAL)
+## 4. HƯỚNG DẪN CÀI ĐẶT & KHỞI CHẠY
 
-### 4.1 Yêu Cầu Môi Trường
-- **Node.js:** Phiên bản `>= 20.0.0` (Khuyến nghị Node.js 22 hoặc 24).
-- **Python (Tùy chọn, để chạy DeepSeek Server Agent):** Python `>= 3.10` (Khuyến nghị 3.11, 3.12 hoặc 3.13).
-- **Trình quản lý gói:** `npm`.
+### 4.1 Cài đặt phụ thuộc & Cấu hình môi trường
 
----
-
-### 4.2 Cấu Hình Biến Môi Trường
-Sao chép tệp cấu hình mẫu và điền API key:
 ```bash
+# 1. Cài đặt các gói phụ thuộc
+npm install
+
+# 2. Khởi tạo file biến môi trường
 cp .env.example .env.local
 ```
 
-Nội dung `.env.local` chuẩn:
-```env
-# 1. TypeSafe AI System One (Jev API)
-TYPESAFE_API_KEY=your_typesafe_api_key_here
-
-# 2. DeepSeek Server Agent (Local Agent on port 8000)
-DEEPSEEK_API_URL=http://127.0.0.1:8000/v1/chat/completions
-DEEPSEEK_BASE_URL=http://127.0.0.1:8000
-DEEPSEEK_MODEL=deepseek-chat
-
-# 3. Google Gemini API (Fallback khi không mở DeepSeek Server)
+Cấu hình các API key trong `.env.local`:
+```ini
+# Google Gemini API (OCR Đọc ảnh hóa đơn)
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# Cổng khởi chạy máy chủ Next.js (Mặc định 3000)
-PORT=3000
+# Alibaba Cloud Model Studio (Qwen - Tầng suy luận Q-Gen)
+QWEN_API_KEY=your_qwen_api_key_here
+QWEN_BASE_URL=https://ws-0shshb54xxvk987d.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL=qwen-plus-character
+
+# TypeSafe AI System One (Tùy chọn)
+TYPESAFE_API_KEY=your_typesafe_api_key_here
 ```
 
-> **Cơ chế Fallback thông minh:** Nếu bạn chưa khởi chạy DeepSeek Server, hệ thống sẽ tự động chuyển đổi mượt mà sang **Google Gemini AI** hoặc **Deterministic Policy Engine** nội bộ, đảm bảo 100% tính năng vẫn hoạt động hoàn hảo mà không hề phát sinh lỗi.
+### 4.2 Khởi chạy Ứng dụng
 
----
-
-### 4.3 Khởi Chạy DeepSeek Server Agent (Tùy Chọn)
-Mở một cửa sổ Terminal riêng:
 ```bash
-cd deepseek-agent
-pip install -r requirements.txt
-python -m patchright install chromium
-
-# Đăng nhập một lần duy nhất để tạo session (chỉ làm lần đầu):
-python deepseek_login.py
-
-# Khởi chạy server FastAPI trên cổng 8000:
-python deepseek_server.py
+# Khởi chạy máy chủ phát triển Next.js
+npm run dev
 ```
 
----
+Truy cập trình duyệt tại: **`http://localhost:3000`**
 
-### 4.4 Khởi Chạy Ứng Dụng Tax Referee (Next.js)
-Mở cửa sổ Terminal chính:
-```bash
-# 1. Cài đặt các gói thư viện phụ thuộc
-npm install
-
-# 2. Biên dịch gói ứng dụng production
-npm run build
-
-# 3. Khởi chạy máy chủ production trên cổng 3000
-npm run start -- -p 3000
-
-# Hoặc khởi chạy chế độ phát triển (Development):
-# npm run dev
-```
-
-Truy cập ứng dụng ngay tại: **[http://localhost:3000](http://localhost:3000)**.
+- **Chế độ Giám khảo 1-Click:** Nhấn trực tiếp nút truy cập nhanh trên trang chủ để đăng nhập tức thì với vai trò Kế toán trưởng (`ktt@local`) hoặc CFO (`cfo@local`).
+- **Bộ Kiểm thử Benchmark 90s:** Truy cập `http://localhost:3000/verify` để chạy bộ 5 ca kiểm thử chuẩn Đề bài A với kết quả tức thì.
 
 ---
 
-## 5. TÀI KHOẢN ĐĂNG NHẬP KIỂM THỬ
-
-Hệ thống phân quyền 3 tầng kiểm soát (RBAC). Bạn có thể đăng nhập với các tài khoản mặc định:
-
-| Vai Trò | Email Đăng Nhập | Mật Khẩu | Quyền Hạn Nghiệp Vụ |
-| :--- | :--- | :--- | :--- |
-| **Kế toán viên (KTV)** | `ke-toan@local` | `accountant-local` | Tải chứng từ, nhập form, bấm duyệt xác nhận hàng loạt hóa đơn thường quy (`ROUTINE`), xem định khoản sổ cái kế toán. |
-| **Kế toán trưởng (KTT)** | `ktt@local` | `ktt-local` | Thẩm định các ca ngoại lệ rủi ro Nhóm 1 và Nhóm 2 (< 200 triệu VNĐ), duyệt văn bản pháp luật cào từ Cổng Chính phủ/TCT, đồng bộ ERP. |
-| **Giám đốc Tài chính (CFO)** | `cfo@local` | `cfo-local` | Thẩm định ca vượt thẩm quyền (≥ 200 triệu VNĐ), can thiệp khi Hệ số K rơi vào Vùng Đỏ, ban hành và thu hồi Tiền lệ đặc cách. |
-
----
-
-## 6. KỊCH BẢN KIỂM THỬ TỰ ĐỘNG (CLI TEST RUNNERS)
-
-Hệ thống cung cấp các bộ script kiểm thử tự động toàn diện:
+## 5. BỘ KIỂM THỬ TỰ ĐỘNG (CLI TEST SUITES)
 
 ```bash
-# 1. Kiểm thử tích hợp Sổ cái Kế toán (Thông tư 99, Thông tư 133, MISA, FAST)
-npx tsx scripts/test-ledger-integration.ts
+# 1. Kiểm thử Toàn vẹn Pháp lý Giai đoạn 0 (30 ca)
+npm run test:phase0
 
-# 2. Kiểm thử đa dạng 10 dạng hóa đơn đặc thù niên độ 2025 - 2026
-npx tsx scripts/test-diverse-invoice-types.ts
+# 2. Kiểm thử Phân luồng & Câu hỏi A/B Sprint 1 (17 ca)
+npm run test:phase1:sprint1
 
-# 3. Kiểm thử kết nối Dual-Engine AI (Local Policy + Gemini/DeepSeek Q-Gen)
-npm run test:dual-engine
+# 3. Kiểm thử Kiểm soát Tiền lệ Sprint 2 (24 ca)
+npm run test:phase1:sprint2
 
-# 4. Kiểm thử hồi quy 5 tệp XML theo manifest chuẩn hóa
+# 4. Kiểm thử Đa dạng Loại hình Hóa đơn Sprint 3 (42 ca)
+npm run test:phase1:sprint3
+
+# 5. Kiểm thử Hồi quy 5 Fixtures XML Manifest Chuẩn
 npm run test:manifest
 
-# 5. Khôi phục dữ liệu demo SQLite sạch về trạng thái ban đầu
-npm run demo:reset
-
-# 6. Đồng bộ cập nhật quy định pháp luật mới
-npm run legal:sync
+# 6. Kiểm tra Toàn vẹn Kiểu dữ liệu TypeScript (0 lỗi)
+npx tsc --noEmit
 ```
 
 ---
 
-## 7. CẤU TRÚC THƯ MỤC DỰ ÁN
+## 6. CẤU TRÚC THƯ MỤC DỰ ÁN
 
 ```text
 Tax-Referee/
 ├── app/
 │   ├── api/
+│   │   ├── accounting/              # API định khoản sổ cái kế toán
 │   │   ├── audit/                   # API tra cứu nhật ký chuỗi băm kiểm toán SHA-256
 │   │   ├── auth/                    # API xác thực phiên đăng nhập 3 vai trò (RBAC)
-│   │   ├── documents/               # API bóc tách đa định dạng (XML local, PDF/Ảnh AI)
-│   │   ├── dossiers/                # API xuất Hồ sơ Phòng vệ Thuế 1-Click (HTML/JSON)
-│   │   ├── evaluate/                # API thẩm định kép (Policy Engine + AI Q-Gen)
+│   │   ├── banking/                 # API đối soát sổ phụ ngân hàng
+│   │   ├── documents/               # API bóc tách đa định dạng (XML local, PDF/Ảnh Gemini Vision)
+│   │   ├── dossiers/                # API xuất Hồ sơ Phòng vệ Thuế 1-Click
+│   │   ├── evaluate/                # API thẩm định kép (Policy Engine + Qwen AI)
 │   │   ├── inbox/                   # API quản lý hộp thư và duyệt hàng loạt (Bulk Confirm)
-│   │   ├── invoices/duplicates      # API rà soát và nhóm hóa đơn trùng lặp
+│   │   ├── invoices/duplicates      # API rà soát hóa đơn trùng lặp
 │   │   ├── invoices/reset           # API khôi phục danh mục hóa đơn mẫu demo 1-click
-│   │   ├── ledger/                  # API định khoản sổ cái kế toán TT99/TT133 & adapter ERP
+│   │   ├── ledger/                  # API đồng bộ sổ cái kế toán TT99/TT133 & adapter ERP
 │   │   ├── legal-updates/           # API tiếp nhận và tích hợp quy định thuế mới
 │   │   ├── notifications/           # API Trung tâm thông báo & giám sát rủi ro
 │   │   ├── policy/                  # API cấu hình quy chế động và xuất bản SOP
 │   │   ├── precedents/              # API đăng ký và thu hồi tiền lệ đặc cách của CFO
+│   │   ├── reconciliation/          # API đối soát dữ liệu Cổng Tổng Cục Thuế
 │   │   ├── resolutions/             # API ghi nhận quyết định phê duyệt A/B
+│   │   ├── suppliers/               # API danh mục nhà cung cấp và tra cứu MST
 │   │   ├── tax-forms/               # API tổng hợp tờ khai thuế 01/GTGT nội bộ
-│   │   ├── verify/                  # Endpoint kiểm tra tự động nhanh (Verify 90s)
-│   │   └── webhooks/legal-update    # Webhook endpoint tiếp nhận văn bản thuế thời gian thực
-│   ├── globals.css                  # Toàn bộ CSS giao diện B2B Dark Mode
+│   │   └── verify/                  # Endpoint kiểm tra tự động nhanh (Verify 90s)
+│   ├── globals.css                  # Toàn bộ CSS chuẩn UI/UX Pro Max & Font-Numeric
 │   ├── layout.tsx                   # Khung ứng dụng chuẩn Next.js App Router
 │   └── page.tsx                     # Màn hình làm việc Production Workspace chính
 ├── components/
-│   ├── AuditTrailTable.tsx          # Bảng nhật ký kiểm toán SHA-256 và nút xuất Dossier
-│   ├── DocumentViewer.tsx           # Trình xem bản thể hiện HĐĐT song song (IMP-11)
-│   ├── EscalationCard.tsx           # Thẻ chuyển tiếp ngoại lệ A/B cho KTT/CFO
-│   ├── InboxFilterToolbar.tsx       # Thanh công cụ lọc hộp thư chứng từ
+│   ├── banking/                     # Giao diện đối soát sổ phụ ngân hàng
+│   ├── reconciliation/              # Giao diện đối soát Cổng Tổng Cục Thuế
+│   ├── suppliers/                   # Giao diện quản lý danh mục nhà cung cấp
+│   ├── AuditTrailTable.tsx          # Bảng nhật ký kiểm toán SHA-256 chuẩn font-numeric
+│   ├── DocumentViewer.tsx           # Trình xem bản thể hiện HĐĐT song song
+│   ├── EscalationCard.tsx           # Thẻ chuyển tiếp ngoại lệ A/B phong cách Swiss FinTech
+│   ├── HeaderBanner.tsx             # Banner Stepper quy trình nghiệm thu Đề bài A
 │   ├── InteractiveInputForm.tsx     # Form thẩm định thủ công và tải tệp chứng từ
+│   ├── LedgerSyncModal.tsx          # Modal đồng bộ sổ cái kế toán MISA AMIS / FAST
 │   ├── NotificationCenterView.tsx   # Giao diện Trung tâm Thông báo & Giám sát Pháp luật
 │   ├── PolicyViewerModal.tsx        # Modal xem văn bản quy chế và Sổ Tiền lệ
 │   ├── ProductionWorkspace.tsx      # Giao diện không gian làm việc chính của kế toán
@@ -259,33 +223,34 @@ Tax-Referee/
 │   ├── verification/                # Manifest kiểm thử hồi quy 5 fixtures XML
 │   ├── regulatoryRegistry.ts        # Cơ sở dữ liệu văn bản quy phạm pháp luật
 │   └── sopText.ts                   # Toàn văn Quy chế Quản trị Thuế Tax-SOP-2026
-├── deepseek-agent/                  # DeepSeek Server Agent (Python FastAPI + Patchright Stealth)
-│   ├── deepseek_server.py           # Server FastAPI tương thích chuẩn OpenAI (/v1/chat/completions)
-│   ├── deepseek_login.py            # Script đăng nhập tự động tạo session
-│   ├── requirements.txt             # Thư viện phụ thuộc Python
-│   └── README.md                    # Hướng dẫn chi tiết khởi chạy DeepSeek Server
 ├── input-sample/                    # 11 Hóa đơn thực tế từ Internet (XML, PDF, JPG)
 ├── lib/
+│   ├── accounting/                  # Bảng hệ thống tài khoản và mapper TT 99 / TT 133
+│   ├── banking/                     # Định nghĩa giao dịch ngân hàng và parser sao kê
+│   ├── reconciliation/              # Thuật toán đối soát Cổng TCT
 │   ├── server/                      # Tầng truy xuất CSDL SQLite, Auth và Token
 │   ├── constants.ts                 # Cấu hình ngưỡng pháp lý, hạn mức và API
+│   ├── invoiceMathValidator.ts      # Kiểm tra số học hóa đơn (thành tiền = số lượng x đơn giá)
+│   ├── rawTextParser.ts             # Parser bóc tách văn bản thô
 │   ├── schemas.ts                   # Zod Schemas và Discriminated Unions
 │   └── utils.ts                     # Hàm tiện ích định dạng tiền tệ và thời gian
 ├── scripts/
-│   ├── ingest-real-samples.ts       # Script nạp 11 hóa đơn thực tế vào CSDL
+│   ├── benchmark_10_invoices.ts     # Script đo lường benchmark 10 hóa đơn
+│   ├── compare_ocr_vs_vlm.ts        # So sánh hiệu năng OCR và VLM
+│   ├── ingest-real-samples.ts       # Script nạp hóa đơn thực tế vào CSDL
 │   ├── reset-demo-data.ts           # Script dọn dẹp và reset dữ liệu demo
-│   ├── test-ledger-integration.ts   # Script kiểm thử tích hợp sổ cái kế toán
-│   ├── test-diverse-invoice-types.ts# Script kiểm thử 10 dạng hóa đơn đặc thù
-│   └── test-dual-engine.ts          # Runner kiểm thử AI Dual-Engine
+│   └── test-regression-manifest.ts  # Runner kiểm thử hồi quy 5 fixtures
 ├── services/
-│   ├── deepseekService.ts           # Module kết nối DeepSeek AI Vision OCR & Q-Gen
-│   ├── duplicateDetector.ts         # Module phát hiện hóa đơn trùng lặp (IMP-10)
-│   ├── geminiService.ts             # Module kết nối Google Gemini OCR & Q-Gen Cascade
+│   ├── aiCoordinator.ts             # Điều phối AI thông minh (Gemini Vision + Qwen)
+│   ├── bankMatcherService.ts        # Khớp lệnh thanh toán không dùng tiền mặt với sao kê
+│   ├── geminiService.ts             # Module kết nối Google Gemini Vision OCR
 │   ├── jevService.ts                # Bộ điều phối thẩm định kép (Dual-Engine Orchestrator)
-│   ├── legalCrawlerService.ts       # Crawler tự động rà soát Cổng Chính phủ/TCT
-│   ├── legalUpdateService.ts        # Dịch vụ phân tích, diff và tích hợp thông tư mới
-│   ├── notificationService.ts       # Dịch vụ quản lý thông báo và giám sát hệ thống
+│   ├── localOcrService.ts           # Dịch vụ OCR cục bộ tốc độ cao
 │   ├── policyEngine.ts              # Trọng tài tiền kiểm quy chế nội bộ (Ground Truth)
-│   └── precedentService.ts          # Dịch vụ quản lý tiền lệ CFO (IMP-12)
+│   ├── precedentService.ts          # Dịch vụ quản lý tiền lệ CFO
+│   ├── qwenService.ts               # Module kết nối Alibaba Cloud Qwen AI suy luận & Q-Gen
+│   ├── supplierService.ts           # Dịch vụ quản lý nhà cung cấp và rủi ro
+│   └── taxLookupService.ts          # Tra cứu thông tin người nộp thuế
 ├── .env.example                     # Tệp mẫu cấu hình môi trường
 ├── .gitignore                       # Cấu hình bảo mật bỏ qua tệp nhạy cảm
 ├── LICENSE                          # Giấy phép mã nguồn mở MIT
@@ -295,7 +260,7 @@ Tax-Referee/
 
 ---
 
-## 8. GIẤY PHÉP (LICENSE)
+## 7. GIẤY PHÉP (LICENSE)
 
 Dự án được phát hành theo giấy phép mã nguồn mở [MIT License](./LICENSE).  
 Bản quyền thuộc về **Tax Referee Contributors (2026)**.

@@ -18,6 +18,28 @@ export const RiskGroupEnum = z.enum([
 ]);
 export type RiskGroup = z.infer<typeof RiskGroupEnum>;
 
+// 1.1 Phân loại tính chất quy tắc theo chuẩn P0-2 & P0-3
+export const RuleKindEnum = z.enum([
+  'STATUTORY',         // Luật định chế cứng (không tiền lệ, bắt buộc tuân thủ)
+  'DATA_QUALITY',      // Chất lượng dữ liệu, đối soát chứng từ
+  'INTERNAL_POLICY',   // Quy chế tài chính nội bộ (cho phép tiền lệ CFO)
+  'AUTHORITY'          // Thẩm quyền phê duyệt & Quản trị vĩ mô
+]);
+export type RuleKind = z.infer<typeof RuleKindEnum>;
+
+// 1.2 Schema Phát hiện chi tiết của Bộ máy Quy tắc (P0-3 Rule Finding)
+export const RuleFindingSchema = z.object({
+  ruleId: z.string(),
+  kind: RuleKindEnum,
+  severity: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
+  riskGroup: RiskGroupEnum,
+  flaggedReason: z.string(),
+  plainExplanation: z.string(),
+  legalBasis: z.string(),
+  evidence: z.string().optional()
+});
+export type RuleFinding = z.infer<typeof RuleFindingSchema>;
+
 // 2. Schema Lựa chọn Hành động (Action Option A/B)
 export const ActionOptionSchema = z.object({
   id: z.enum(['A', 'B']),
@@ -43,6 +65,11 @@ export const SystemPolicyConfigSchema = z.object({
   vatReductionRate: z.number().finite().min(0).max(100).default(8),
   vatStandardRate: z.number().finite().min(0).max(100).default(10),
   allowStaffReimbursement: z.boolean().default(true), // Cho phép hoàn ứng ủy quyền nhân viên theo SOP
+  companyTaxCode: z.string().optional(), // MST của doanh nghiệp chủ quản (để đối chiếu hóa đơn mua vào)
+  companyName: z.string().optional(),
+  strictBuyerTaxCodeCheck: z.boolean().default(false), // Bắt buộc khớp MST người mua
+  strictSeriesYearCheck: z.boolean().default(true), // Bắt buộc năm ký hiệu hóa đơn (TT 78) khớp năm ngày lập
+  strictMccqtCheck: z.boolean().default(true), // Bắt buộc hóa đơn có mã CQT phải có chuỗi MCCQT
   excludedVat8Categories: z.array(z.string()).default([
     'VIỄN THÔNG', 'TÀI CHÍNH', 'NGÂN HÀNG', 'CHỨNG KHOÁN', 'BẢO HIỂM',
     'BẤT ĐỘNG SẢN', 'KIM LOẠI', 'KHAI KHOÁNG', 'HÓA CHẤT', 'TIÊU THỤ ĐẶC BIỆT'
@@ -77,6 +104,12 @@ export const InvoiceInputSchema = z.object({
   invoiceDate: IsoDateSchema,         // Định dạng: YYYY-MM-DD
   supplierTaxCode: z.string().trim().regex(/^\d{10}(?:-\d{3})?$/, 'MST phải có 10 hoặc 13 chữ số'),
   supplierName: z.string().trim().min(2),
+  buyerTaxCode: z.string().trim().regex(/^\d{10}(?:-\d{3})?$/, 'MST người mua phải có 10 hoặc 13 chữ số').optional(),
+  buyerName: z.string().trim().optional(),
+  invoiceSeries: z.string().trim().optional(),         // Ký hiệu HĐ theo TT 78 (VD: 1C26TBB)
+  invoiceTemplate: z.string().trim().optional(),       // Mẫu số HĐ (VD: 1/001)
+  taxAuthorityCode: z.string().trim().optional(),      // Mã Cơ quan thuế (MCCQT 34 ký tự)
+  signingDate: IsoDateSchema.optional(),               // Ngày ký số điện tử của bên bán
   itemName: z.string().trim().min(1),
   preTaxAmount: AmountSchema,
   taxRate: z.union([z.literal(0), z.literal(5), z.literal(8), z.literal(10)]),
@@ -149,14 +182,31 @@ export const LegalUpdateCandidateSchema = z.object({
 });
 export type LegalUpdateCandidate = z.infer<typeof LegalUpdateCandidateSchema>;
 
+export const OcrHighlightSchema = z.object({
+  text: z.string(),
+  confidence: z.number(),
+  bbox: z.object({
+    x: z.number(),
+    y: z.number(),
+    w: z.number(),
+    h: z.number()
+  }).optional(),
+  field: z.string().optional(),
+  reason: z.string().optional()
+});
+export type OcrHighlight = z.infer<typeof OcrHighlightSchema>;
+
 export const DocumentExtractionSchema = z.object({
   invoice: InvoiceInputSchema.partial(),
   confidence: z.record(z.string(), z.number().min(0).max(1)).default({}),
   needsReview: z.boolean().default(true),
-  sourceType: z.enum(['XML', 'PDF', 'IMAGE', 'FORM']),
+  sourceType: z.enum(['XML', 'PDF', 'IMAGE', 'FORM', 'MANUAL']),
   artifactId: z.string().trim().min(1).optional(),
   sourceHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  warnings: z.array(z.string()).default([])
+  warnings: z.array(z.string()).default([]),
+  uncertainFields: z.array(z.string()).default([]),
+  fieldWarnings: z.record(z.string(), z.string()).optional(),
+  ocrHighlights: z.array(OcrHighlightSchema).default([])
 });
 export type DocumentExtraction = z.infer<typeof DocumentExtractionSchema>;
 
@@ -184,7 +234,7 @@ export const RoutineDecisionSchema = z.object({
   kFactorAfter: z.number(),           // Hệ số K sau khi hạch toán
   applicableRegulations: z.array(z.string()).optional(), // Căn cứ pháp luật áp dụng theo ngày hóa đơn
   sopVersion: z.string().optional(),  // Phiên bản SOP áp dụng
-  engineUsed: z.enum(['DEEPSEEK_AI', 'JEV_AND_DEEPSEEK_AI', 'JEV_AND_GEMINI_AI', 'GEMINI_AI', 'JEV_AI', 'LOCAL_FALLBACK']).optional(),
+  engineUsed: z.enum(['QWEN_AI', 'GEMINI_AI', 'JEV_AND_QWEN_AI', 'JEV_AND_GEMINI_AI', 'JEV_AI', 'LOCAL_FALLBACK']).optional(),
   confidence: z.number().optional(),
   riskScore: z.number().optional(),
   precedentApplied: z.object({
@@ -193,6 +243,7 @@ export const RoutineDecisionSchema = z.object({
     rationale: z.string()
   }).optional(),
   lineItemAnalysis: LineItemAnalysisSchema.optional(),
+  findings: z.array(RuleFindingSchema).optional(),
   timestamp: z.string()
 });
 export type RoutineDecision = z.infer<typeof RoutineDecisionSchema>;
@@ -223,11 +274,14 @@ export const EscalatedDecisionSchema = z.object({
   requiresCFO: z.boolean().default(false),
   applicableRegulations: z.array(z.string()).optional(), // Căn cứ pháp luật áp dụng theo ngày hóa đơn
   sopVersion: z.string().optional(),  // Phiên bản SOP áp dụng
-  engineUsed: z.enum(['DEEPSEEK_AI', 'JEV_AND_DEEPSEEK_AI', 'JEV_AND_GEMINI_AI', 'GEMINI_AI', 'JEV_AI', 'LOCAL_FALLBACK']).optional(),
+  engineUsed: z.enum(['QWEN_AI', 'GEMINI_AI', 'JEV_AND_QWEN_AI', 'JEV_AND_GEMINI_AI', 'JEV_AI', 'LOCAL_FALLBACK']).optional(),
   confidence: z.number().optional(),
   riskScore: z.number().optional(),
   duplicateInfo: DuplicateInfoSchema.optional(),
   lineItemAnalysis: LineItemAnalysisSchema.optional(),
+  findings: z.array(RuleFindingSchema).optional(),
+  deductibleTax: z.number().optional(),
+  nonDeductibleTax: z.number().optional(),
   timestamp: z.string()
 });
 export type EscalatedDecision = z.infer<typeof EscalatedDecisionSchema>;
@@ -299,4 +353,109 @@ export const SystemNotificationSchema = z.object({
   createdAt: z.string()
 });
 export type SystemNotification = z.infer<typeof SystemNotificationSchema>;
+
+// 12. Schema Danh bạ Nhà cung cấp & Bằng chứng tra cứu CQT (Giai đoạn 1 - Module 2)
+export const SupplierMasterSchema = z.object({
+  taxCode: z.string().trim().regex(/^\d{10}(?:-\d{3})?$/, 'MST phải có 10 hoặc 13 chữ số'),
+  legalName: z.string().trim().min(1, 'Tên pháp lý không được để trống'),
+  tradeName: z.string().optional(),
+  address: z.string().optional(),
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'CLOSED', 'RELOCATED']).default('ACTIVE'),
+  establishedDate: IsoDateSchema.optional(),
+  riskLevel: z.enum(['LOW', 'MEDIUM', 'HIGH_RISK_INVOICE']).default('LOW'),
+  defaultExpenseAccount: z.string().optional(),
+  lastVerifiedAt: z.string(),
+  verificationSource: z.enum(['TCT_PORTAL', 'NATIONAL_BIZ_REGISTRY', 'MANUAL']).default('MANUAL'),
+  evidenceSnapshotPath: z.string().optional(),
+  notes: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string()
+});
+export type SupplierMaster = z.infer<typeof SupplierMasterSchema>;
+
+// 13. Schema Căn cứ Pháp lý Chuẩn mực (Giai đoạn 1 - Module 7)
+export const LegalCitationSchema = z.object({
+  documentCode: z.string().min(1),
+  documentTitle: z.string().min(1),
+  issuingAuthority: z.string().min(1),
+  article: z.string().min(1),
+  clause: z.string().optional(),
+  point: z.string().optional(),
+  effectiveFrom: IsoDateSchema,
+  effectiveTo: IsoDateSchema.optional(),
+  officialSourceUrl: z.string().url(),
+  exactQuote: z.string().min(1),
+  summary: z.string().min(1)
+});
+export type LegalCitation = z.infer<typeof LegalCitationSchema>;
+
+// 14. Schema Hóa đơn Bảng kê Tổng cục Thuế (Giai đoạn 1 - Module 3)
+export const TctInvoiceSchema = z.object({
+  id: z.string().min(1),
+  taxPeriod: z.string().min(1), // VD: '2026-Q1' hoặc '2026-03'
+  invoiceSeries: z.string().trim().min(1),
+  invoiceTemplate: z.string().trim().optional(),
+  invoiceNumber: z.string().trim().min(1),
+  invoiceDate: IsoDateSchema,
+  supplierTaxCode: z.string().trim().regex(/^\d{10}(?:-\d{3})?$/, 'MST phải có 10 hoặc 13 chữ số'),
+  supplierName: z.string().trim().min(1),
+  buyerTaxCode: z.string().trim().optional(),
+  preTaxAmount: AmountSchema,
+  taxRate: z.union([z.literal(0), z.literal(5), z.literal(8), z.literal(10)]),
+  taxAmount: AmountSchema,
+  totalAmount: AmountSchema,
+  taxAuthorityCode: z.string().trim().optional(),
+  tctStatus: z.enum(['NEW', 'ADJUSTED', 'REPLACED', 'CANCELLED']).default('NEW'),
+  importedAt: z.string()
+});
+export type TctInvoice = z.infer<typeof TctInvoiceSchema>;
+
+// 15. Schema Giao dịch Ngân hàng & Sao kê (Giai đoạn 1 - Module 4)
+export const BankTransactionSchema = z.object({
+  id: z.string().min(1),
+  bankCode: z.string().trim().min(2), // VCB, TCB, BIDV, ACB, MB, CTG
+  accountNumber: z.string().trim().min(4),
+  transactionDate: IsoDateSchema,
+  referenceNo: z.string().trim().min(1),
+  debitAmount: AmountSchema, // Số tiền chi ra (VNĐ)
+  creditAmount: AmountSchema.default(0),
+  beneficiaryName: z.string().trim().optional(),
+  beneficiaryAccount: z.string().trim().optional(),
+  beneficiaryTaxCode: z.string().trim().optional(),
+  description: z.string().trim().min(1),
+  matchedInvoiceId: z.string().optional(),
+  matchScore: z.number().int().min(0).max(100).optional(),
+  matchedAt: z.string().optional(),
+  createdAt: z.string()
+});
+export type BankTransaction = z.infer<typeof BankTransactionSchema>;
+
+// 16. Schema Đối soát 3 Chiều (Three-Way Reconciliation)
+export const ReconciliationItemSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(['MATCHED', 'MISSING_IN_VAULT', 'UNREPORTED_BY_SELLER', 'DATA_DISCREPANCY']),
+  invoiceNumber: z.string(),
+  invoiceSeries: z.string(),
+  supplierTaxCode: z.string(),
+  supplierName: z.string(),
+  tctInvoice: TctInvoiceSchema.optional(),
+  systemInvoice: InvoiceInputSchema.optional(),
+  discrepancyReasons: z.array(z.string()).default([]),
+  recommendedAction: z.string()
+});
+export type ReconciliationItem = z.infer<typeof ReconciliationItemSchema>;
+
+export const ReconciliationReportSchema = z.object({
+  totalTct: z.number().int().nonnegative(),
+  totalSystem: z.number().int().nonnegative(),
+  matchedCount: z.number().int().nonnegative(),
+  missingInVaultCount: z.number().int().nonnegative(),
+  unreportedBySellerCount: z.number().int().nonnegative(),
+  discrepancyCount: z.number().int().nonnegative(),
+  reconciledAt: z.string(),
+  items: z.array(ReconciliationItemSchema)
+});
+export type ReconciliationReport = z.infer<typeof ReconciliationReportSchema>;
+
+
 

@@ -145,7 +145,7 @@ export const NotificationCenterView: React.FC<NotificationCenterViewProps> = ({
                   Trung tâm Thông báo & Giám sát Pháp lý
                 </h1>
                 {unreadCount > 0 && (
-                  <Badge variant="destructive" className="px-2 py-0.5 text-xs font-mono">
+                  <Badge variant="destructive" className="px-2 py-0.5 text-xs font-numeric font-bold">
                     {unreadCount} mới
                   </Badge>
                 )}
@@ -206,7 +206,7 @@ export const NotificationCenterView: React.FC<NotificationCenterViewProps> = ({
               }`}
             >
               <span>{pill.label}</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-numeric font-bold ${
                 filterType === pill.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
               }`}>
                 {pill.count}
@@ -282,7 +282,7 @@ export const NotificationCenterView: React.FC<NotificationCenterViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[11px] text-slate-400 font-mono">
+                        <span className="text-[11px] text-slate-400 font-numeric font-medium">
                           {new Date(item.createdAt).toLocaleString('vi-VN', {
                             hour: '2-digit',
                             minute: '2-digit',

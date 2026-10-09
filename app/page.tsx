@@ -2,7 +2,7 @@
 
 import React, { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ShieldCheck, Check } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Check, Sparkles, Play } from 'lucide-react';
 import { ProductionWorkspace } from '@/components/ProductionWorkspace';
 
 type AppUser = { id: string; email: string; displayName: string; role: 'ACCOUNTANT' | 'CHIEF_ACCOUNTANT' | 'CFO' };
@@ -10,8 +10,8 @@ type AppUser = { id: string; email: string; displayName: string; role: 'ACCOUNTA
 export default function HomePage() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [checking, setChecking] = useState(true);
-  const [email, setEmail] = useState('ke-toan@local');
-  const [password, setPassword] = useState('accountant-local');
+  const [email, setEmail] = useState('ktt@local');
+  const [password, setPassword] = useState('ktt-local');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -23,15 +23,14 @@ export default function HomePage() {
       .finally(() => setChecking(false));
   }, []);
 
-  const login = async (event: FormEvent) => {
-    event.preventDefault();
+  const loginWithCredentials = async (loginEmail: string, loginPass: string) => {
     setBusy(true);
     setError('');
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: loginEmail, password: loginPass })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Lỗi đăng nhập');
@@ -41,6 +40,18 @@ export default function HomePage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const login = async (event: FormEvent) => {
+    event.preventDefault();
+    await loginWithCredentials(email, password);
+  };
+
+  const handleInstantJudgeLogin = async (role: 'CHIEF_ACCOUNTANT' | 'CFO') => {
+    const creds = role === 'CFO'
+      ? { email: 'cfo@local', pass: 'cfo-local' }
+      : { email: 'ktt@local', pass: 'ktt-local' };
+    await loginWithCredentials(creds.email, creds.pass);
   };
 
   const logout = async () => {
@@ -73,7 +84,7 @@ export default function HomePage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-100/80 px-4 py-8">
       <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
         
-        {/* Header - To & Rõ ràng, Tối giản chữ */}
+        {/* Header - To & Rõ ràng */}
         <div className="border-b border-slate-200 bg-white p-6 sm:p-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -82,7 +93,9 @@ export default function HomePage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-slate-950">Tax Referee</h1>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tiền hạch toán thuế</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Đề bài A: The Escalation Referee · SOP 2026
+                </p>
               </div>
             </div>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200">
@@ -92,13 +105,55 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Content & Form */}
+        {/* Content & Actions */}
         <div className="p-6 sm:p-8 space-y-6">
           
-          {/* Chọn vai trò (Role tiles - To, Rõ, Ít chữ) */}
+          {/* BAN GIÁM KHẢO 1-CLICK ACCESS (Tiêu chí 1: 10 Điểm Vận hành không cần tài khoản) */}
+          <div className="p-5 rounded-2xl bg-slate-950 text-white space-y-3.5 shadow-sm border border-slate-800">
+            <div className="flex items-center justify-between">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-brand-lime text-slate-950 text-xs font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" /> Dành Cho Ban Giám Khảo
+              </div>
+              <span className="text-[11px] text-slate-400 font-mono font-bold">Tiêu chí 1: 10 Điểm</span>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Vào Trải Nghiệm Tức Thì (Không Cần Cài Đặt)</h3>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                Thao tác trực tiếp với quyền Kế toán trưởng / CFO hoặc chạy bài kiểm thử tự động 90 giây của Đề bài A:
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => handleInstantJudgeLogin('CHIEF_ACCOUNTANT')}
+                disabled={busy}
+                className="py-3 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-950 text-xs font-bold tracking-wide transition flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                <span>VÀO WORKSPACE NGAY</span>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-950" />
+              </button>
+              <Link
+                href="/verify"
+                className="py-3 px-4 rounded-xl bg-brand-lime hover:bg-lime-400 text-slate-950 text-xs font-bold tracking-wide transition flex items-center justify-center gap-2 shadow-sm text-center"
+              >
+                <Play className="w-3.5 h-3.5 fill-slate-950" />
+                <span>BỘ VERIFY BENCHMARK</span>
+              </Link>
+            </div>
+          </div>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-slate-200"></div>
+            <span className="flex-shrink mx-4 text-xs font-bold uppercase tracking-wider text-slate-400">
+              Hoặc đăng nhập theo vai trò
+            </span>
+            <div className="flex-grow border-t border-slate-200"></div>
+          </div>
+
+          {/* Chọn vai trò (Role tiles) */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
-              Chọn vai trò
+              Chọn vai trò thẩm định
             </label>
             <div className="grid grid-cols-3 gap-2.5">
               {[
@@ -116,15 +171,15 @@ export default function HomePage() {
                       setPassword(r.pass);
                       setError('');
                     }}
-                    className={`flex flex-col items-center justify-center p-3.5 rounded-xl border text-center transition cursor-pointer ${
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition cursor-pointer ${
                       isSelected
                         ? 'border-slate-950 bg-slate-950 text-white font-bold shadow-sm'
                         : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100 text-slate-700 font-semibold'
                     }`}
                   >
-                    <span className="text-sm tracking-tight">{r.title}</span>
+                    <span className="text-xs tracking-tight">{r.title}</span>
                     {isSelected && (
-                      <span className="mt-1 flex items-center gap-1 text-[11px] font-bold text-brand-lime">
+                      <span className="mt-1 flex items-center gap-1 text-[10px] font-bold text-brand-lime">
                         <Check className="h-3 w-3" /> Đã chọn
                       </span>
                     )}
@@ -143,7 +198,7 @@ export default function HomePage() {
               <input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900"
                 autoComplete="username"
               />
             </div>
@@ -156,44 +211,33 @@ export default function HomePage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900"
                 autoComplete="current-password"
               />
             </div>
 
             {error && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700">
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700">
                 {error}
               </div>
             )}
 
-            {/* CTA Button: Ramp Accent Lime or Slate Ink, Big & Clear */}
             <button
               type="submit"
               disabled={busy}
-              className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl bg-slate-950 hover:bg-slate-900 px-6 py-3.5 text-base font-bold text-white transition active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-sm"
+              className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl bg-slate-950 hover:bg-slate-900 px-6 py-3 text-sm font-bold text-white transition active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-sm"
             >
               {busy ? (
                 'Đang xử lý...'
               ) : (
                 <>
-                  <span>VÀO WORKSPACE</span>
+                  <span>ĐĂNG NHẬP THỦ CÔNG</span>
                   <ArrowRight className="h-4 w-4 text-brand-lime" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Footer link to verify */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-sm">
-            <span className="text-slate-500 font-medium">Bộ kiểm thử:</span>
-            <Link
-              href="/verify"
-              className="inline-flex items-center gap-1.5 font-bold text-slate-900 hover:text-slate-700 underline underline-offset-4"
-            >
-              Verify Harness & Benchmark <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
         </div>
 
       </div>

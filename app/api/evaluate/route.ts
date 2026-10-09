@@ -73,8 +73,8 @@ export async function POST(req: NextRequest) {
       ? 'ROUTINE_PROPOSED'
       : (result.decision.requiresCFO ? 'WAITING_CFO' : 'WAITING_CHIEF_ACCOUNTANT');
     getDatabase().prepare(`
-      INSERT OR REPLACE INTO invoices (id, invoice_number, supplier_tax_code, invoice_date, payload_json, content_hash, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM invoices WHERE id = ?), ?), ?)
+      INSERT OR REPLACE INTO invoices (id, invoice_number, supplier_tax_code, invoice_date, payload_json, content_hash, status, created_by_user_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_by_user_id FROM invoices WHERE id = ?), ?), COALESCE((SELECT created_at FROM invoices WHERE id = ?), ?), ?)
     `).run(
       invoice.id,
       invoice.invoiceNumber,
@@ -83,6 +83,8 @@ export async function POST(req: NextRequest) {
       JSON.stringify(invoice),
       hashPayload(invoice),
       workflowStatus,
+      invoice.id,
+      user?.id || null,
       invoice.id,
       timestamp,
       timestamp

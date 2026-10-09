@@ -59,14 +59,14 @@ export const EscalationCard: React.FC<EscalationCardProps> = ({ decision, onReso
       </div>
 
       {/* Invoice Overview */}
-      <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200">
+      <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50/80 border border-slate-200">
         <div>
-          <span className="text-xs text-slate-500 font-mono font-bold">HĐ #{decision.invoiceId}</span>
-          <h4 className="text-base font-bold text-slate-950">{decision.supplierName}</h4>
+          <span className="text-xs text-slate-500 font-numeric font-bold tracking-tight">HĐ #{decision.invoiceId}</span>
+          <h4 className="text-base font-bold text-slate-950 mt-0.5">{decision.supplierName}</h4>
           <p className="text-xs font-semibold text-rose-700 mt-0.5">{decision.flaggedReason}</p>
         </div>
         <div className="text-right">
-          <div className="text-xs font-bold text-slate-500 uppercase">Tổng tiền</div>
+          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng tiền</div>
           <div className="text-xl font-numeric font-extrabold text-slate-950 mt-0.5">
             {formatVND(decision.totalAmount)}
           </div>
@@ -74,15 +74,16 @@ export const EscalationCard: React.FC<EscalationCardProps> = ({ decision, onReso
       </div>
 
       {/* Actionable Question Display */}
-      <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-1.5">
-        <span className="text-xs font-bold uppercase tracking-wider text-amber-800 block">
-          Câu hỏi thẩm định:
+      <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/90 space-y-1.5">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900 block">
+          Câu hỏi thẩm định trách nhiệm:
         </span>
-        <p className="text-base font-bold text-slate-950 leading-snug">
+        <p className="text-sm font-bold text-slate-950 leading-snug">
           {decision.actionableQuestion}
         </p>
-        <p className="text-xs font-mono font-bold text-slate-600 pt-1">
-          Căn cứ: {decision.sopClause}
+        <p className="text-xs font-medium text-slate-700 pt-1 flex items-center gap-1.5">
+          <span className="text-slate-500">Căn cứ SOP:</span>
+          <span className="font-semibold text-slate-900 bg-white/80 px-2 py-0.5 rounded border border-slate-200/80">{decision.sopClause}</span>
         </p>
       </div>
 
@@ -92,16 +93,24 @@ export const EscalationCard: React.FC<EscalationCardProps> = ({ decision, onReso
           <button
             key={opt.id}
             onClick={() => onResolve(opt)}
-            className="flex flex-col text-left p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-950 hover:shadow-subtle transition-all cursor-pointer group"
+            className={`flex flex-col text-left p-4 rounded-xl border bg-white transition-all cursor-pointer group shadow-xs hover:shadow-sm ${
+              idx === 0
+                ? 'border-emerald-200/90 hover:border-emerald-600 hover:bg-emerald-50/30'
+                : 'border-amber-200/90 hover:border-amber-600 hover:bg-amber-50/30'
+            }`}
           >
-            <div className="flex items-center justify-between w-full text-xs font-bold text-slate-500 mb-1">
-              <span>PHƯƠNG ÁN {idx === 0 ? 'A' : 'B'}</span>
+            <div className="flex items-center justify-between w-full text-xs font-bold mb-1.5">
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                idx === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+              }`}>
+                PHƯƠNG ÁN {idx === 0 ? 'A' : 'B'}
+              </span>
               <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-950 group-hover:translate-x-0.5 transition-all" />
             </div>
-            <div className="text-sm font-bold text-slate-950">
+            <div className="text-sm font-bold text-slate-950 leading-snug">
               {opt.label}
             </div>
-            <div className="text-xs font-medium text-slate-600 mt-1 leading-relaxed">
+            <div className="text-xs font-medium text-slate-600 mt-1.5 leading-relaxed">
               {opt.actionDescription}
             </div>
           </button>

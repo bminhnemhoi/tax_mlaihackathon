@@ -1,0 +1,284 @@
+{
+  "summary": {
+    "avgTotal": 5977,
+    "amountMatches": 9,
+    "blurDetected": 1
+  },
+  "details": [
+    {
+      "id": 1,
+      "fileName": "05_flight_vietnam_airlines_eticket.png",
+      "category": "Vé máy bay điện tử Vietnam Airlines",
+      "groundTruth": {
+        "vendor": "Tổng Công Ty Hàng Không Việt Nam (Vietnam Airlines)",
+        "amountVnd": 2850000,
+        "docType": "Phiếu thu vé máy bay điện tử (Passenger Itinerary Receipt)"
+      },
+      "extracted": {
+        "vendor": "Corporate VISA (Approval Code: 981240)",
+        "amountVnd": 2850000,
+        "invoiceNumber": "738-2491029104",
+        "invoiceDate": "2026-09-12",
+        "taxCode": "2491029104",
+        "itemCount": 5
+      },
+      "metrics": {
+        "timeLocalMs": 2167,
+        "timeDeepSeekMs": 4265,
+        "totalTimeMs": 6433,
+        "isImageBlurry": false,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": [],
+        "amountMatch": true,
+        "vendorMatch": false
+      }
+    },
+    {
+      "id": 2,
+      "fileName": "06_flight_vietjet_air_boarding_pass.png",
+      "category": "Thẻ lên máy bay Vietjet Air",
+      "groundTruth": {
+        "vendor": "Công Ty Cổ Phần Hàng Không Vietjet (Vietjet Air)",
+        "amountVnd": 1450000,
+        "docType": "Thẻ lên máy bay (Boarding Pass) & Xác nhận thanh toán cước"
+      },
+      "extracted": {
+        "vendor": "Vietjet Air",
+        "amountVnd": 1450000,
+        "invoiceNumber": "VJ-982184",
+        "invoiceDate": "2026-09-19",
+        "itemCount": 1
+      },
+      "metrics": {
+        "timeLocalMs": 1697,
+        "timeDeepSeekMs": 2849,
+        "totalTimeMs": 4546,
+        "isImageBlurry": false,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": [],
+        "amountMatch": true,
+        "vendorMatch": true
+      }
+    },
+    {
+      "id": 3,
+      "fileName": "07_grab_car_airport_trip.png",
+      "category": "Biên nhận chuyến đi GrabCar",
+      "groundTruth": {
+        "vendor": "Công Ty TNHH Grab (Việt Nam)",
+        "amountVnd": 285000,
+        "docType": "Biên nhận điện tử GrabCar (E-Receipt)"
+      },
+      "extracted": {
+        "vendor": "TNHH GRAB (VIỆT NAM)",
+        "amountVnd": 285000,
+        "invoiceNumber": "A-8921849102-VN",
+        "invoiceDate": "2026-09-18",
+        "taxCode": "0312650437",
+        "itemCount": 4
+      },
+      "metrics": {
+        "timeLocalMs": 853,
+        "timeDeepSeekMs": 7068,
+        "totalTimeMs": 7922,
+        "isImageBlurry": false,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": [],
+        "amountMatch": true,
+        "vendorMatch": true
+      }
+    },
+    {
+      "id": 4,
+      "fileName": "08_grab_food_team_overtime.png",
+      "category": "Biên lai đơn hàng GrabFood",
+      "groundTruth": {
+        "vendor": "GrabFood Việt Nam / Cơm Tấm Cali",
+        "amountVnd": 342000,
+        "docType": "Biên lai đơn hàng GrabFood (Food E-Receipt)"
+      },
+      "extracted": {
+        "vendor": "255.000 VND",
+        "amountVnd": 342000,
+        "invoiceNumber": "GF-992148201-VN",
+        "invoiceDate": "2026-09-17",
+        "itemCount": 6
+      },
+      "metrics": {
+        "timeLocalMs": 894,
+        "timeDeepSeekMs": 3965,
+        "totalTimeMs": 7851,
+        "isImageBlurry": false,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": [],
+        "amountMatch": true,
+        "vendorMatch": false
+      }
+    },
+    {
+      "id": 5,
+      "fileName": "09_hotel_muong_thanh_grand_folio.png",
+      "category": "Folio khách sạn Mường Thanh Grand",
+      "groundTruth": {
+        "vendor": "Khách Sạn Mường Thanh Grand Đà Nẵng",
+        "amountVnd": 3600000,
+        "docType": "Phiếu thanh toán lưu trú & Dịch vụ khách sạn (Guest Folio)"
+      },
+      "extracted": {
+        "vendor": "TẬP ĐOAN CÔNG NGHẸ VNG",
+        "amountVnd": 3600000,
+        "invoiceNumber": "0004921",
+        "invoiceDate": "2026-09-17",
+        "taxCode": "0303886515",
+        "itemCount": 6
+      },
+      "metrics": {
+        "timeLocalMs": 905,
+        "timeDeepSeekMs": 3433,
+        "totalTimeMs": 4339,
+        "isImageBlurry": false,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": [],
+        "amountMatch": true,
+        "vendorMatch": false
+      }
+    },
+    {
+      "id": 6,
+      "fileName": "10_hotel_boutique_hanoi_lodging.png",
+      "category": "Hóa đơn khách sạn Hanoi Boutique",
+      "groundTruth": {
+        "vendor": "Hanoi La Siesta Classic Hotel",
+        "amountVnd": 1850000,
+        "docType": "Hóa đơn thanh toán lưu trú (Hotel Invoice)"
+      },
+      "extracted": {
+        "vendor": "HANOI LA SIESTA CLASSIC HOTEL",
+        "amountVnd": 1850000,
+        "invoiceDate": "2026-09-11",
+        "itemCount": 3
+      },
+      "metrics": {
+        "timeLocalMs": 682,
+        "timeDeepSeekMs": 6979,
+        "totalTimeMs": 7661,
+        "isImageBlurry": false,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": [],
+        "amountMatch": true,
+        "vendorMatch": true
+      }
+    },
+    {
+      "id": 7,
+      "fileName": "11_mcocr_stationery_campha_bookstore.jpg",
+      "category": "Bill giấy in nhiệt Nhà sách Cẩm Phả",
+      "groundTruth": {
+        "vendor": "Nhà Sách GD-TC Cẩm Phả (MC-OCR Dataset)",
+        "amountVnd": 158000,
+        "docType": "Hóa đơn bán lẻ / Phiếu tính tiền giấy nhiệt"
+      },
+      "extracted": {
+        "vendor": "NHÀ SÁCH GD-TC CẨM PHẢ",
+        "amountVnd": 158000,
+        "invoiceNumber": "thanh",
+        "invoiceDate": "2020-08-14",
+        "taxCode": "0333363328",
+        "itemCount": 8
+      },
+      "metrics": {
+        "timeLocalMs": 798,
+        "timeDeepSeekMs": 3325,
+        "totalTimeMs": 9126,
+        "isImageBlurry": false,
+        "lowConfidenceCount": 1,
+        "detectedBlurryLines": [
+          "0đ"
+        ],
+        "amountMatch": true,
+        "vendorMatch": true
+      }
+    },
+    {
+      "id": 8,
+      "fileName": "13_mcocr_restaurant_uudam_chay.jpg",
+      "category": "Bill nhà hàng Ưu Đàm Chay",
+      "groundTruth": {
+        "vendor": "Ưu Đàm Chay (MC-OCR Dataset)",
+        "amountVnd": 115080,
+        "docType": "Hóa đơn thanh toán ẩm thực cao cấp"
+      },
+      "extracted": {
+        "vendor": "ƯU ĐÀM CHAY",
+        "amountVnd": 705000,
+        "invoiceNumber": "140820023",
+        "invoiceDate": "2020-08-14",
+        "itemCount": 7
+      },
+      "metrics": {
+        "timeLocalMs": 767,
+        "timeDeepSeekMs": 3433,
+        "totalTimeMs": 4200,
+        "isImageBlurry": false,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": [],
+        "amountMatch": false,
+        "vendorMatch": true
+      }
+    },
+    {
+      "id": 9,
+      "fileName": "18_vietqr_bank_transfer_techcombank.png",
+      "category": "Lệnh chuyển khoản VietQR Techcombank",
+      "groundTruth": {
+        "vendor": "Hộ Kinh Doanh Cá Thể (Nguyễn Thị Mai - Bánh ngọt tea break)",
+        "amountVnd": 4500000,
+        "docType": "Ảnh chụp màn hình Mobile Banking xác thực chuyển khoản VietQR"
+      },
+      "extracted": {
+        "vendor": "NGUYEN THI MAI",
+        "amountVnd": 4500000,
+        "invoiceNumber": "FT26261984218",
+        "invoiceDate": "2026-09-18",
+        "itemCount": 1
+      },
+      "metrics": {
+        "timeLocalMs": 661,
+        "timeDeepSeekMs": 3008,
+        "totalTimeMs": 3669,
+        "isImageBlurry": false,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": [],
+        "amountMatch": true,
+        "vendorMatch": false
+      }
+    },
+    {
+      "id": 10,
+      "fileName": "20_edge_case_late_night_alcohol_violation.png",
+      "category": "Hóa đơn quán Bar & Lounge đêm khuya",
+      "groundTruth": {
+        "vendor": "Chill Skybar & Lounge",
+        "amountVnd": 4890000,
+        "docType": "Hóa đơn quán Bar / Lounge đêm khuya vi phạm chính sách"
+      },
+      "extracted": {
+        "vendor": "CHILL SKYBAR & LOUNGE",
+        "amountVnd": 4890000,
+        "invoiceNumber": "CSB-260920-0042",
+        "invoiceDate": "2026-09-20",
+        "itemCount": 6
+      },
+      "metrics": {
+        "timeLocalMs": 761,
+        "timeDeepSeekMs": 3257,
+        "totalTimeMs": 4018,
+        "isImageBlurry": false,
+        "lowConfidenceCount": 0,
+        "detectedBlurryLines": [],
+        "amountMatch": true,
+        "vendorMatch": true
+      }
+    }
+  ]
+}

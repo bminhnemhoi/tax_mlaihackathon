@@ -1,21 +1,17 @@
 import { GEMINI_API_CONFIG } from '@/lib/constants';
 import { InvoiceInput, ActionOptionSchema, RiskGroup } from '@/lib/schemas';
 import {
-  extractInvoiceWithDeepSeek,
-  generateActionableQuestionWithDeepSeek,
-  isDeepSeekServerAlive,
-  DeepSeekQuestionResult,
-  DeepSeekQuestionResultSchema
-} from './deepseekService';
-import { z } from 'zod';
+  QwenQuestionResult,
+  QwenQuestionResultSchema,
+  generateActionableQuestionWithQwen
+} from './qwenService';
 
-export const GeminiQuestionResultSchema = DeepSeekQuestionResultSchema;
-export type GeminiQuestionResult = DeepSeekQuestionResult;
+export const GeminiQuestionResultSchema = QwenQuestionResultSchema;
+export type GeminiQuestionResult = QwenQuestionResult;
 
 const CANDIDATE_MODELS = [
-  'gemini-3.5-flash-lite',
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite'
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash'
 ];
 
 async function callGeminiApiWithFallback(body: any, timeoutMs = 25000): Promise<any> {
@@ -50,25 +46,13 @@ async function callGeminiApiWithFallback(body: any, timeoutMs = 25000): Promise<
 }
 
 /**
- * Trích xuất hóa đơn từ ảnh/PDF bằng DeepSeek Server Agent (ưu tiên hàng đầu)
- * Fallback sang Google Gemini nếu DeepSeek server tạm dừng
+ * Trích xuất hóa đơn từ ảnh/PDF luôn sử dụng trực tiếp Google Gemini Vision (siêu nhanh, chính xác)
  */
 export async function extractInvoiceWithGemini(
   fileBase64: string,
   mimeType: string,
   fileName?: string
 ): Promise<Partial<InvoiceInput>> {
-  // 1. Ưu tiên chạy thật với DeepSeek Server Agent (Patchright)
-  try {
-    const deepSeekAlive = await isDeepSeekServerAlive(2000);
-    if (deepSeekAlive) {
-      return await extractInvoiceWithDeepSeek(fileBase64, mimeType, fileName);
-    }
-  } catch (deepSeekErr) {
-    console.warn('[AI Service] DeepSeek Server OCR gặp sự cố, thử Gemini fallback:', deepSeekErr);
-  }
-
-  // 2. Fallback sang Google Gemini Vision nếu có GEMINI_API_KEY
   const prompt = `
 Bạn là Trợ lý AI Kế toán Thuế chuyên nghiệp tại Việt Nam. Hãy đọc kỹ tài liệu/ảnh hóa đơn, phiếu thu, hoặc bill bán lẻ đính kèm và trích xuất dữ liệu sang định dạng JSON sau:
 {
@@ -106,9 +90,13 @@ Chỉ trả về duy nhất chuỗi JSON hợp lệ, không bọc markdown block
       ],
       generationConfig: {
         temperature: 0.1,
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        thinkingConfig: {
+          thinkingBudget: 0
+        },
+        maxOutputTokens: 1000
       }
-    }, 60000);
+    }, 20000);
 
     const textOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
     const cleanJson = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -121,7 +109,8 @@ Chỉ trả về duy nhất chuỗi JSON hợp lệ, không bọc markdown block
 
 /**
  * Actionable Question Generator (Q-Gen)
- * Ưu tiên gọi DeepSeek Server Agent (Patchright)
+ * Ưu tiên gọi Alibaba Cloud Qwen (qwen-plus-character) cho suy luận thuế sắc bén
+ * Tự động fallback sang Gemini nếu Qwen gặp sự cố mạng
  */
 export async function generateActionableQuestionWithGemini(
   invoice: InvoiceInput,
@@ -129,17 +118,14 @@ export async function generateActionableQuestionWithGemini(
   detectedHint?: string,
   sopClauseHint?: string
 ): Promise<GeminiQuestionResult> {
-  // 1. Ưu tiên chạy thật với DeepSeek Server Agent (Patchright)
+  // 1. Ưu tiên số 1: Gọi mô hình suy luận Qwen (Alibaba Cloud)
   try {
-    const deepSeekAlive = await isDeepSeekServerAlive(2000);
-    if (deepSeekAlive) {
-      return await generateActionableQuestionWithDeepSeek(invoice, riskGroup, detectedHint, sopClauseHint);
-    }
-  } catch (deepSeekErr) {
-    console.warn('[AI Service] DeepSeek Server Q-Gen gặp sự cố, thử Gemini fallback:', deepSeekErr);
+    return await generateActionableQuestionWithQwen(invoice, riskGroup, detectedHint, sopClauseHint);
+  } catch (qwenErr: any) {
+    console.warn('[AI Service] Qwen Q-Gen gặp sự cố, kích hoạt Gemini fallback:', qwenErr?.message || qwenErr);
   }
 
-  // 2. Fallback sang Google Gemini nếu DeepSeek không bật
+  // 2. Fallback sang Google Gemini nếu Qwen không khả dụng
   const prompt = `
 VAI TRÒ:
 Bạn là "ACTIONABLE QUESTION GENERATOR" cho hệ thống Tax Referee (MLAI Hackathon 2026).
@@ -162,14 +148,16 @@ Trả về JSON với: flaggedReason, plainExplanation, sopClause, actionableQue
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       temperature: 0.1,
-      responseMimeType: 'application/json'
+      responseMimeType: 'application/json',
+      thinkingConfig: {
+        thinkingBudget: 0
+      },
+      maxOutputTokens: 800
     }
-  }, 20000);
+  }, 15000);
 
   const textOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
   const cleanJson = textOutput.replace(/```json/gi, '').replace(/```/g, '').trim();
   const parsed = JSON.parse(cleanJson);
   return GeminiQuestionResultSchema.parse(parsed);
 }
-
-export { extractInvoiceWithDeepSeek, generateActionableQuestionWithDeepSeek };

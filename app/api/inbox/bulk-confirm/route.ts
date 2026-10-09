@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireRequestUser } from '@/lib/server/auth';
-import { appendAuditEvent } from '@/lib/server/audit';
+import { canApproveInvoice, requireRequestUser } from '@/lib/server/auth';
+import { appendAuditEvent, appendImmutableAudit } from '@/lib/server/audit';
 import { getDatabase, jsonNow } from '@/lib/server/db';
 
 export const dynamic = 'force-dynamic';
@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const user = requireRequestUser(request);
-    if (user.role !== 'ACCOUNTANT') {
-      return NextResponse.json({ error: 'Chỉ Kế toán viên được xác nhận hàng loạt hồ sơ Routine' }, { status: 403 });
+    if (user.role === 'ACCOUNTANT') {
+      return NextResponse.json({ error: 'Kế toán viên không có thẩm quyền phê duyệt hồ sơ (chỉ Kế toán trưởng hoặc Giám đốc tài chính)' }, { status: 403 });
     }
     const body = await request.json().catch(() => ({}));
     const invoiceIds: unknown = body.invoiceIds;
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Chuẩn bị statement
     const getInvoiceStmt = db.prepare(`
-      SELECT i.id, i.status, i.payload_json, e.decision_json
+      SELECT i.id, i.status, i.payload_json, i.created_by_user_id, e.decision_json
       FROM invoices i
       LEFT JOIN evaluations e ON e.id = (
         SELECT e2.id FROM evaluations e2 WHERE e2.invoice_id = i.id
@@ -35,11 +35,11 @@ export async function POST(request: NextRequest) {
       WHERE i.id = ?
     `);
 
-    const updateInvoiceStmt = db.prepare('UPDATE invoices SET status = ?, updated_at = ? WHERE id = ?');
+    const updateInvoiceStmt = db.prepare('UPDATE invoices SET status = ?, approved_deductible_tax = ?, updated_at = ? WHERE id = ?');
 
     for (const rawId of invoiceIds) {
       const id = String(rawId);
-      const row = getInvoiceStmt.get(id) as { id: string; status: string; payload_json: string; decision_json?: string } | undefined;
+      const row = getInvoiceStmt.get(id) as { id: string; status: string; payload_json: string; created_by_user_id?: string | null; decision_json?: string } | undefined;
       
       if (!row) {
         skippedIds.push(id);
@@ -54,13 +54,21 @@ export async function POST(request: NextRequest) {
       }
 
       const invoicePayload = JSON.parse(row.payload_json);
-      // Guardrail kiểm tra hạn mức thẩm quyền (dưới 200 triệu)
-      if (invoicePayload.totalAmount && Math.abs(invoicePayload.totalAmount) >= 200_000_000) {
+
+      // Phân quyền thứ bậc & chặn tự duyệt (Anti-Self-Approval)
+      const authCheck = canApproveInvoice(user, {
+        id,
+        totalAmount: invoicePayload.totalAmount || 0,
+        createdByUserId: row.created_by_user_id,
+        requiresCFO: decision.requiresCFO
+      });
+      if (!authCheck.allowed) {
         skippedIds.push(id);
         continue;
       }
 
-      updateInvoiceStmt.run('APPROVED', timestamp, id);
+      const approvedTax = Number(decision.approvedTaxAmount ?? invoicePayload.taxAmount ?? 0);
+      updateInvoiceStmt.run('APPROVED', approvedTax, timestamp, id);
       totalConfirmedAmount += (invoicePayload.totalAmount || 0);
       confirmedIds.push(id);
 
@@ -74,6 +82,21 @@ export async function POST(request: NextRequest) {
           role: user.role,
           batchAction: true,
           confirmedCount: invoiceIds.length
+        }
+      });
+
+      appendImmutableAudit({
+        eventType: 'ROUTINE_CONFIRMED',
+        entityId: id,
+        userId: user.id,
+        userRole: user.role,
+        action: 'BULK_APPROVE_ROUTINE',
+        rationale: 'Phê duyệt hàng loạt hồ sơ Routine đủ điều kiện',
+        payload: {
+          invoice: invoicePayload,
+          decision,
+          role: user.role,
+          batchAction: true
         }
       });
     }

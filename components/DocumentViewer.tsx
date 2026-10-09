@@ -50,7 +50,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, classNa
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
             <span>Chứng từ {invoice.sourceArtifactId ? 'gốc' : 'số'}</span>
           </span>
-          <span className="font-mono text-xs font-bold text-slate-500">
+          <span className="font-numeric text-xs font-bold text-slate-500">
             HĐ: {invoice.invoiceNumber}
           </span>
         </div>
@@ -67,7 +67,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, classNa
             <ZoomOut className="w-3.5 h-3.5" />
           </Button>
 
-          <span className="text-xs font-mono font-bold text-slate-700 w-10 text-center">{zoom}%</span>
+          <span className="text-xs font-numeric font-bold text-slate-700 w-10 text-center">{zoom}%</span>
 
           <Button
             size="icon"
@@ -133,8 +133,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, classNa
             <h2 className="text-xl font-bold text-slate-950 uppercase tracking-tight">
               HÓA ĐƠN ĐIỆN TỬ
             </h2>
-            <div className="text-xs font-mono font-bold text-slate-500 mt-1">
-              Số: <strong className="text-slate-950 text-sm">{invoice.invoiceNumber}</strong> · Ngày: {formatDate(invoice.invoiceDate)}
+            <div className="text-xs font-numeric font-medium text-slate-500 mt-1">
+              Số: <strong className="text-slate-950 text-sm font-bold">{invoice.invoiceNumber}</strong> · Ngày: {formatDate(invoice.invoiceDate)}
             </div>
           </div>
 
@@ -146,7 +146,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, classNa
             </div>
             <div className="flex justify-between">
               <span className="font-semibold text-slate-500">Mã số thuế:</span>
-              <span className="font-mono font-bold text-slate-950">{invoice.supplierTaxCode}</span>
+              <span className="font-numeric font-bold text-slate-950">{invoice.supplierTaxCode}</span>
             </div>
             <div className="flex justify-between">
               <span className="font-semibold text-slate-500">Thanh toán:</span>
@@ -172,7 +172,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, classNa
                 {invoice.items && invoice.items.length > 0 ? (
                   invoice.items.map((item, idx) => (
                     <tr key={idx} className={item.flaggedReason ? 'bg-amber-50/70 font-semibold' : ''}>
-                      <td className="p-2 text-center font-mono text-slate-500">{item.lineNumber || idx + 1}</td>
+                      <td className="p-2 text-center font-numeric text-slate-500">{item.lineNumber || idx + 1}</td>
                       <td className="p-2 font-bold text-slate-900">
                         <div>{item.itemName}</div>
                         {item.flaggedReason && (
@@ -181,18 +181,18 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, classNa
                           </span>
                         )}
                       </td>
-                      <td className="p-2 text-center font-mono font-semibold">{item.quantity}</td>
-                      <td className="p-2 text-right font-mono font-semibold">{formatVND(item.unitPrice)}</td>
-                      <td className="p-2 text-right font-mono font-bold text-slate-950">{formatVND(item.amount)}</td>
+                      <td className="p-2 text-center font-numeric font-semibold">{item.quantity}</td>
+                      <td className="p-2 text-right font-numeric font-semibold">{formatVND(item.unitPrice)}</td>
+                      <td className="p-2 text-right font-numeric font-bold text-slate-950">{formatVND(item.amount)}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td className="p-2 text-center font-mono">1</td>
+                    <td className="p-2 text-center font-numeric text-slate-500">1</td>
                     <td className="p-2 font-bold text-slate-900">{invoice.itemName || 'Hàng hóa / Dịch vụ chung'}</td>
-                    <td className="p-2 text-center font-mono font-semibold">1</td>
-                    <td className="p-2 text-right font-mono font-semibold">{formatVND(invoice.totalAmount - (invoice.taxAmount || 0))}</td>
-                    <td className="p-2 text-right font-mono font-bold text-slate-950">{formatVND(invoice.totalAmount - (invoice.taxAmount || 0))}</td>
+                    <td className="p-2 text-center font-numeric font-semibold">1</td>
+                    <td className="p-2 text-right font-numeric font-semibold">{formatVND(invoice.totalAmount - (invoice.taxAmount || 0))}</td>
+                    <td className="p-2 text-right font-numeric font-bold text-slate-950">{formatVND(invoice.totalAmount - (invoice.taxAmount || 0))}</td>
                   </tr>
                 )}
               </tbody>

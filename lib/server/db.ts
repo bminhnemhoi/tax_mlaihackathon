@@ -125,6 +125,108 @@ function applyMigrations(db: Database.Database): void {
     `);
     record.run(7, now());
   }
+
+  if (!applied.has(8)) {
+    if (!hasColumn(db, 'invoices', 'approved_deductible_tax')) {
+      db.exec('ALTER TABLE invoices ADD COLUMN approved_deductible_tax REAL DEFAULT 0');
+    }
+    record.run(8, now());
+  }
+
+  if (!applied.has(9)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS supplier_master (
+        tax_code TEXT PRIMARY KEY,
+        legal_name TEXT NOT NULL,
+        trade_name TEXT,
+        address TEXT,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        established_date TEXT,
+        risk_level TEXT NOT NULL DEFAULT 'LOW',
+        default_expense_account TEXT,
+        last_verified_at TEXT NOT NULL,
+        verification_source TEXT NOT NULL DEFAULT 'MANUAL',
+        evidence_snapshot_path TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_supplier_status ON supplier_master(status);
+      CREATE INDEX IF NOT EXISTS idx_supplier_risk ON supplier_master(risk_level);
+    `);
+    record.run(9, now());
+  }
+
+  if (!applied.has(10)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS tct_invoices (
+        id TEXT PRIMARY KEY,
+        tax_period TEXT NOT NULL,
+        invoice_series TEXT NOT NULL,
+        invoice_template TEXT,
+        invoice_number TEXT NOT NULL,
+        invoice_date TEXT NOT NULL,
+        supplier_tax_code TEXT NOT NULL,
+        supplier_name TEXT NOT NULL,
+        buyer_tax_code TEXT,
+        pre_tax_amount REAL NOT NULL,
+        tax_rate REAL NOT NULL,
+        tax_amount REAL NOT NULL,
+        total_amount REAL NOT NULL,
+        tax_authority_code TEXT,
+        tct_status TEXT NOT NULL DEFAULT 'NEW',
+        imported_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_tct_lookup ON tct_invoices(supplier_tax_code, invoice_number);
+      CREATE INDEX IF NOT EXISTS idx_tct_period ON tct_invoices(tax_period);
+
+      CREATE TABLE IF NOT EXISTS bank_transactions (
+        id TEXT PRIMARY KEY,
+        bank_code TEXT NOT NULL,
+        account_number TEXT NOT NULL,
+        transaction_date TEXT NOT NULL,
+        reference_no TEXT NOT NULL,
+        debit_amount REAL NOT NULL,
+        credit_amount REAL DEFAULT 0,
+        beneficiary_name TEXT,
+        beneficiary_account TEXT,
+        beneficiary_tax_code TEXT,
+        description TEXT NOT NULL,
+        matched_invoice_id TEXT,
+        match_score INTEGER DEFAULT 0,
+        matched_at TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_bank_date ON bank_transactions(transaction_date);
+      CREATE INDEX IF NOT EXISTS idx_bank_matched ON bank_transactions(matched_invoice_id);
+    `);
+    record.run(10, now());
+  }
+
+  if (!applied.has(11)) {
+    if (!hasColumn(db, 'invoices', 'created_by_user_id')) {
+      db.exec('ALTER TABLE invoices ADD COLUMN created_by_user_id TEXT');
+    }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS immutable_audit_trail (
+        id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        user_role TEXT NOT NULL,
+        action TEXT NOT NULL,
+        rationale TEXT,
+        previous_hash TEXT,
+        entry_hash TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_immutable_audit_entity ON immutable_audit_trail(entity_id);
+      CREATE INDEX IF NOT EXISTS idx_immutable_audit_created ON immutable_audit_trail(created_at);
+      CREATE INDEX IF NOT EXISTS idx_immutable_audit_user ON immutable_audit_trail(user_id);
+    `);
+    record.run(11, now());
+  }
 }
 
 function initializeDatabase(db: Database.Database): void {
@@ -161,9 +263,28 @@ function initializeDatabase(db: Database.Database): void {
       payload_json TEXT NOT NULL,
       content_hash TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'RECEIVED',
+      approved_deductible_tax REAL DEFAULT 0,
+      created_by_user_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS immutable_audit_trail (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      user_role TEXT NOT NULL,
+      action TEXT NOT NULL,
+      rationale TEXT,
+      previous_hash TEXT,
+      entry_hash TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_immutable_audit_entity ON immutable_audit_trail(entity_id);
+    CREATE INDEX IF NOT EXISTS idx_immutable_audit_created ON immutable_audit_trail(created_at);
+    CREATE INDEX IF NOT EXISTS idx_immutable_audit_user ON immutable_audit_trail(user_id);
 
     CREATE TABLE IF NOT EXISTS policy_versions (
       version TEXT PRIMARY KEY,
