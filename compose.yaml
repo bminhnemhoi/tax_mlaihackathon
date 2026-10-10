@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - runtime:/app/data/runtime
+    mem_limit: 2g
+volumes:
+  runtime:

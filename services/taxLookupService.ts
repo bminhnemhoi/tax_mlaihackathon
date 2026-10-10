@@ -443,7 +443,7 @@ export async function lookupByTaxCode(taxCode: string): Promise<SupplierLookupRe
  */
 export async function lookupByName(
   name: string,
-  context?: { address?: string; rawText?: string }
+  context?: { address?: string; rawText?: string; skipAi?: boolean }
 ): Promise<SupplierLookupResult | null> {
   const cleanName = name.trim();
   if (!cleanName || cleanName.length < 2) return null;
@@ -517,6 +517,11 @@ export async function lookupByName(
     return bestDbMatch;
   }
 
+  // Nếu cờ skipAi được bật, bỏ qua gọi LLM để đảm bảo tốc độ bóc tách < 1s
+  if (context?.skipAi) {
+    return bestDbMatch;
+  }
+
   // BƯỚC 2: Dùng AI suy luận ứng viên MST nếu CSDL chưa có (dùng Qwen)
   try {
     if (Boolean(process.env.QWEN_API_KEY)) {
@@ -585,6 +590,7 @@ export async function autoEnrichSupplierData(params: {
   supplierName?: string;
   address?: string;
   rawText?: string;
+  skipAi?: boolean;
 }): Promise<{
   supplierTaxCode?: string;
   supplierName?: string;
@@ -615,7 +621,8 @@ export async function autoEnrichSupplierData(params: {
   if (name && name.length >= 2 && (!taxCode || taxCode.length < 10)) {
     const lookup = await lookupByName(name, {
       address: params.address,
-      rawText: params.rawText
+      rawText: params.rawText,
+      skipAi: params.skipAi
     });
     if (lookup?.taxCode) {
       return {

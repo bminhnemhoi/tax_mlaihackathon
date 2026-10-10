@@ -1,8 +1,9 @@
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { listCorporatePrecedents, createPrecedent, revokeCorporatePrecedent } from '@/services/precedentService';
 import { getRequestUser } from '@/lib/server/auth';
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     const user = getRequestUser(request);
     if (!user) {
@@ -19,14 +20,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const user = getRequestUser(request);
     if (!user) {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
     }
 
-    if (user.role !== 'CFO' && user.role !== 'CHIEF_ACCOUNTANT') {
+    if (user.role !== 'CFO') {
       return NextResponse.json({ error: 'Chỉ CFO hoặc Kế toán trưởng mới có thẩm quyền tạo tiền lệ' }, { status: 403 });
     }
 
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Thiếu thông tin bắt buộc để tạo tiền lệ' }, { status: 400 });
     }
 
+    if (!body.purpose?.trim() || !Number.isFinite(body.maximumAmount) || body.maximumAmount <= 0 || !String(riskPattern).startsWith('INTERNAL_POLICY_')) return NextResponse.json({ error: 'Cần phạm vi nội bộ, mục đích và hạn mức CFO rõ ràng.' }, { status: 400 });
     const precedent = createPrecedent({
       supplierTaxCode,
       supplierName,
@@ -45,6 +47,9 @@ export async function POST(request: NextRequest) {
       approvedOption: approvedOption || 'ACCEPT_ADJUSTMENT',
       rationale,
       approvedBy: `${user.displayName} (${user.role})`,
+      purpose: body.purpose,
+      maximumAmount: body.maximumAmount,
+      currentThreshold: 0,
       effectiveMonths: effectiveMonths || 6
     });
 
@@ -57,14 +62,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+async function handleDELETE(request: NextRequest) {
   try {
     const user = getRequestUser(request);
     if (!user) {
       return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
     }
 
-    if (user.role !== 'CFO' && user.role !== 'CHIEF_ACCOUNTANT') {
+    if (user.role !== 'CFO') {
       return NextResponse.json({ error: 'Không có quyền thu hồi tiền lệ' }, { status: 403 });
     }
 
@@ -83,3 +88,9 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }
+
+export async function DELETE(...args: Parameters<typeof handleDELETE>) { return withRequestDatabase(args[0], () => handleDELETE(...args)); }

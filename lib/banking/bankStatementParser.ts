@@ -90,8 +90,9 @@ export function parseBankStatement(content: string, defaultBankCode: string = 'V
     ref: header.findIndex(h => h.includes('tham chiếu') || h.includes('ref') || h.includes('bút toán') || h.includes('mã gd')),
     debit: header.findIndex(h => h.includes('ghi nợ') || h.includes('debit') || h.includes('chi ra') || h.includes('số tiền')),
     credit: header.findIndex(h => h.includes('ghi có') || h.includes('credit') || h.includes('tiền vào')),
-    beneficiary: header.findIndex(h => h.includes('người nhận') || h.includes('thụ hưởng') || h.includes('beneficiary') || h.includes('đơn vị nhận')),
-    account: header.findIndex(h => h.includes('tài khoản nhận') || h.includes('tk nhận') || h.includes('stk')),
+    beneficiary: header.findIndex(h => h.includes('người nhận') || h.includes('thụ hưởng') || h === 'beneficiaryname' || h.includes('đơn vị nhận')),
+    account: header.findIndex(h => h.includes('tài khoản nhận') || h.includes('tk nhận') || h.includes('stk') || h === 'beneficiaryaccount'),
+    beneficiaryTax: header.findIndex(h => h === 'beneficiarytaxcode' || h === 'beneficiary_mst' || h === 'mst người nhận'),
     desc: header.findIndex(h => h.includes('nội dung') || h.includes('description') || h.includes('diễn giải') || h.includes('ghi chú'))
   };
 
@@ -110,9 +111,9 @@ export function parseBankStatement(content: string, defaultBankCode: string = 'V
     const desc = (colIdx.desc !== -1 ? rawCols[colIdx.desc] : rawCols[rawCols.length - 1]) || 'Thanh toán tiền hàng';
 
     // Thử trích xuất MST người thụ hưởng từ nội dung nếu có
-    let benTax: string | undefined = undefined;
+    let benTax: string | undefined = colIdx.beneficiaryTax !== -1 ? rawCols[colIdx.beneficiaryTax] || undefined : undefined;
     const mstMatch = desc.match(/(?:MST|mst|Mã số thuế)[:\s]*(\d{10}(?:-\d{3})?)/i);
-    if (mstMatch) benTax = mstMatch[1];
+    if (!benTax && mstMatch) benTax = mstMatch[1];
 
     const id = `BANK-${defaultBankCode}-${refNo.replace(/[^a-zA-Z0-9_-]/g, '')}`;
     results.push(

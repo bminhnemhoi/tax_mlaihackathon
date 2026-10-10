@@ -221,7 +221,7 @@ function evaluateInvoiceLocallyInternal(
           id: 'A',
           label: 'Yêu cầu nhà cung cấp lập biên bản điều chỉnh',
           actionDescription: 'Tạm treo hóa đơn, yêu cầu NCC kiểm tra lại phần mềm xuất hóa đơn và điều chỉnh',
-          resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+          resultingAction: 'REQUEST_INFORMATION'
         },
         {
           id: 'B',
@@ -252,7 +252,7 @@ function evaluateInvoiceLocallyInternal(
           id: 'A',
           label: 'Bổ sung và xác nhận hồ sơ',
           actionDescription: 'Tạm treo quyết định và yêu cầu bổ sung dữ liệu/chứng từ còn thiếu.',
-          resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+          resultingAction: 'REQUEST_INFORMATION'
         },
         {
           id: 'B',
@@ -282,7 +282,7 @@ function evaluateInvoiceLocallyInternal(
           id: 'A',
           label: 'Xác minh hồ sơ thực tế',
           actionDescription: 'Tạm dừng hạch toán để kiểm tra hồ sơ giao nhận hàng hóa',
-          resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+          resultingAction: 'REQUEST_INFORMATION'
         },
         {
           id: 'B',
@@ -356,7 +356,7 @@ function evaluateInvoiceLocallyInternal(
             id: 'A',
             label: 'Yêu cầu nhà cung cấp hủy và xuất lại HĐ đúng MST doanh nghiệp',
             actionDescription: 'Tạm dừng hạch toán, gửi văn bản yêu cầu người bán hủy hóa đơn sai thông tin và phát hành lại đúng MST công ty',
-            resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+            resultingAction: 'REQUEST_INFORMATION'
           },
           {
             id: 'B',
@@ -391,7 +391,7 @@ function evaluateInvoiceLocallyInternal(
               id: 'A',
               label: 'Tra cứu lại trên Cổng thông tin HĐĐT Tổng cục Thuế',
               actionDescription: 'Tạm treo chứng từ để đối soát lại dữ liệu hóa đơn trên Cổng Cục Thuế',
-              resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+              resultingAction: 'REQUEST_INFORMATION'
             },
             {
               id: 'B',
@@ -426,7 +426,7 @@ function evaluateInvoiceLocallyInternal(
               id: 'A',
               label: 'Yêu cầu nhà cung cấp giải trình và xuất biên bản điều chỉnh',
               actionDescription: 'Tạm hoãn tiếp nhận, yêu cầu người bán giải trình lý do lệch dải năm',
-              resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+              resultingAction: 'REQUEST_INFORMATION'
             },
             {
               id: 'B',
@@ -468,7 +468,7 @@ function evaluateInvoiceLocallyInternal(
             id: 'B',
             label: 'Yêu cầu bên bán lập hóa đơn mới đúng ngày',
             actionDescription: 'Yêu cầu hủy hóa đơn ký muộn và phát hành hóa đơn mới',
-            resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+            resultingAction: 'REQUEST_INFORMATION'
           }
         ],
         requiresCFO: false
@@ -477,6 +477,18 @@ function evaluateInvoiceLocallyInternal(
   }
 
   // 9. STATUTORY: Người bán đóng MST phát hành hóa đơn sau ngày đóng
+  if (inv.sellerStatus === 'CLOSED' && !inv.sellerSuspensionDate) {
+    evaluatedFindings.push({
+      ruleId: 'RULE_SELLER_CLOSURE_DATE_UNKNOWN', kind: 'DATA_QUALITY', severity: 'HIGH',
+      riskGroup: 'UNCERTAIN_INFO', flaggedReason: 'Bên bán đã đóng MST nhưng chưa có ngày đóng để đối chiếu ngày hóa đơn.',
+      plainExplanation: 'Cần xác minh ngày đóng MST và chứng từ nguồn trước khi xét điều kiện hóa đơn.',
+      legalBasis: 'Quy trình kiểm soát dữ liệu nguồn', sopClause: 'Quy trình kiểm soát dữ liệu nguồn',
+      actionableQuestion: 'Kế toán trưởng cần bổ sung bằng chứng ngày đóng MST bên bán, hay tạm giữ hồ sơ chờ xác minh?',
+      options: [{id:'A',label:'Bổ sung ngày đóng MST và nguồn xác minh',actionDescription:'Đối chiếu nguồn và đánh giá lại.',resultingAction:'REQUEST_INFORMATION'},
+        {id:'B',label:'Tạm giữ hồ sơ',actionDescription:'Chưa duyệt thuế khi thiếu bằng chứng.',resultingAction:'REQUEST_INFORMATION'}], requiresCFO: false
+    });
+  }
+
   if (inv.sellerStatus === 'CLOSED' && inv.sellerSuspensionDate && inv.invoiceDate > inv.sellerSuspensionDate) {
     evaluatedFindings.push({
       ruleId: 'STATUTORY_DECREE_254_CLOSED_SELLER',
@@ -499,7 +511,7 @@ function evaluateInvoiceLocallyInternal(
           id: 'B',
           label: 'Tạm giữ hồ sơ, chuyển Ban Pháp chế',
           actionDescription: 'Tạm dừng hạch toán để bộ phận pháp chế làm việc với nhà cung cấp',
-          resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+          resultingAction: 'REQUEST_INFORMATION'
         }
       ],
       requiresCFO: isExceedKtt
@@ -526,7 +538,7 @@ function evaluateInvoiceLocallyInternal(
             id: 'A',
             label: 'Yêu cầu nộp Ủy nhiệm chi ngân hàng',
             actionDescription: 'Tạm treo hóa đơn, yêu cầu nhân viên thanh toán bổ sung UNC',
-            resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+            resultingAction: 'REQUEST_INFORMATION'
           },
           {
             id: 'B',
@@ -581,7 +593,7 @@ function evaluateInvoiceLocallyInternal(
               id: 'A',
               label: 'Yêu cầu thanh toán bổ sung Ủy nhiệm chi ngân hàng',
               actionDescription: 'Tạm treo toàn bộ cụm hóa đơn và yêu cầu chuyển khoản qua ngân hàng',
-              resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+              resultingAction: 'REQUEST_INFORMATION'
             },
             {
               id: 'B',
@@ -623,7 +635,7 @@ function evaluateInvoiceLocallyInternal(
           id: 'A',
           label: 'Yêu cầu nhà cung cấp xuất lại HĐ 10%',
           actionDescription: 'Trả lại hóa đơn, yêu cầu bên bán lập hóa đơn thay thế hoặc điều chỉnh thuế 10%',
-          resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+          resultingAction: 'REQUEST_INFORMATION'
         },
         {
           id: 'B',
@@ -692,7 +704,7 @@ function evaluateInvoiceLocallyInternal(
           id: 'B',
           label: 'Rà soát lại tiến độ nhận hàng thực tế',
           actionDescription: 'Tạm dừng hạch toán, chuyển bộ phận Thu mua kiểm tra đối soát biên bản nghiệm thu trước khi hạch toán',
-          resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+          resultingAction: 'REQUEST_INFORMATION'
         }
       ],
       requiresCFO: true
@@ -805,7 +817,7 @@ function evaluateInvoiceLocallyInternal(
           id: 'A',
           label: 'Tạm treo, yêu cầu bổ sung bảng kê',
           actionDescription: 'Gửi yêu cầu cho nhân viên mua hàng nộp bảng kê trước khi duyệt',
-          resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+          resultingAction: 'REQUEST_INFORMATION'
         },
         {
           id: 'B',
@@ -835,7 +847,7 @@ function evaluateInvoiceLocallyInternal(
           id: 'A',
           label: 'Tạm treo chờ tra soát hóa đơn gốc',
           actionDescription: 'Liên hệ kế toán đối tác để xác minh số hóa đơn gốc đã phát hành',
-          resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+          resultingAction: 'REQUEST_INFORMATION'
         },
         {
           id: 'B',
@@ -957,6 +969,11 @@ function evaluateInvoiceLocallyInternal(
 
   const primaryFinding = activeFindings[0];
   const requiresCFO = isExceedKtt || activeFindings.some(f => f.requiresCFO || f.kind === 'AUTHORITY');
+  const genericQuestion = /(?:KTT(?:\/CFO)? xử lý thế nào\?|CFO phê duyệt chiến lược xử lý\?|KTT quyết định\?|CFO phê duyệt ghi nhận\?)$/i;
+  const question = primaryFinding.actionableQuestion.trim();
+  const actionableQuestion = genericQuestion.test(question)
+    ? `${question.replace(genericQuestion, '').trim()} ${requiresCFO ? 'CFO' : 'Kế toán trưởng'} chọn phương án: ${primaryFinding.options.map(option => option.label).join(' / ')}.`
+    : question;
 
   // Tính toán tách thuế: deductibleTax vs nonDeductibleTax
   let deductibleTax = 0;
@@ -983,7 +1000,7 @@ function evaluateInvoiceLocallyInternal(
     flaggedReason: combinedReason,
     plainExplanation: primaryFinding.plainExplanation,
     sopClause: primaryFinding.sopClause,
-    actionableQuestion: primaryFinding.actionableQuestion,
+    actionableQuestion,
     options: primaryFinding.options,
     requiresCFO,
     lineItemAnalysis,
@@ -998,8 +1015,9 @@ function evaluateInvoiceLocallyInternal(
       legalBasis: f.legalBasis,
       evidence: f.evidence
     })),
-    deductibleTax,
-    nonDeductibleTax,
+    // No tax entitlement is established while any finding remains open.
+    deductibleTax: 0,
+    nonDeductibleTax: 0,
     timestamp
   };
 }
@@ -1055,7 +1073,7 @@ function uncertainDecision(inv: InvoiceInput, reason: string, timestamp: string)
         id: 'A',
         label: 'Bổ sung và xác nhận hồ sơ',
         actionDescription: 'Tạm treo quyết định và yêu cầu bổ sung dữ liệu/chứng từ còn thiếu.',
-        resultingAction: 'REQUEST_SUPPLIER_REISSUE'
+        resultingAction: 'REQUEST_INFORMATION'
       },
       {
         id: 'B',

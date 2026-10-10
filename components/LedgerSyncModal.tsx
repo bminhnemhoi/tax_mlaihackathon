@@ -100,6 +100,21 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
     window.open(`/api/ledger/export?format=${format}&regime=${regime}`, '_blank');
   };
 
+  const handleDownloadPackage = () => {
+    if (!lastSyncResult?.exportedData) return;
+    const isXml = targetSystem === 'UNIVERSAL_XML';
+    const isCsv = targetSystem === 'UNIVERSAL_EXCEL';
+    const extension = isXml ? 'xml' : isCsv ? 'csv' : 'json';
+    const mime = isXml ? 'application/xml' : isCsv ? 'text/csv' : 'application/json';
+    const blob = new Blob([lastSyncResult.exportedData], { type: `${mime};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${targetSystem}_import_${regime}.${extension}`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white border-slate-200 shadow-2xl">
@@ -236,15 +251,16 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
               <div className="space-y-1">
                 <div className="flex items-center gap-2 font-bold text-sm text-emerald-800">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  Đồng bộ thành công {lastSyncResult.syncedCount} chứng từ sang {targetSystem}!
+                  Đã tạo gói nhập thủ công gồm {lastSyncResult.syncedCount} chứng từ cho {targetSystem}.
                 </div>
                 <div className="text-xs text-emerald-700">
-                  Mã lô chứng từ: <span className="font-mono font-bold">{lastSyncResult.reference}</span> · Toàn bộ bút toán đã lưu vết mã băm SHA-256.
+                  Mã gói: <span className="font-mono font-bold">{lastSyncResult.reference}</span> · Hãy tải gói và nhập vào phần mềm kế toán.
                 </div>
               </div>
               <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-300 text-xs">
-                Ready in ERP
+                Chờ nhập thủ công
               </Badge>
+              <Button size="sm" variant="outline" onClick={handleDownloadPackage} disabled={!lastSyncResult.exportedData}>Tải gói nhập</Button>
             </div>
           )}
 
@@ -347,12 +363,12 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
               {syncing ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  Đang truyền dữ liệu...
+                  Đang tạo gói nhập...
                 </>
               ) : (
                 <>
                   <SendHorizontal className="w-3.5 h-3.5 text-[#e4f222]" />
-                  Đồng Bộ Sang {targetSystem.replace('_', ' ')}
+                  Tạo Gói Nhập {targetSystem.replace('_', ' ')}
                 </>
               )}
             </Button>

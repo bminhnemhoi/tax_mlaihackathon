@@ -1,15 +1,16 @@
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { createPolicyDraft, listPolicyVersions, publishPolicy, readActivePolicy, rollbackPolicy, validatePolicyBundle } from '@/services/policyService';
 import { getRequestUser } from '@/lib/server/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   if (!getRequestUser(req)) return NextResponse.json({ error: 'Vui lòng đăng nhập' }, { status: 401 });
   return NextResponse.json({ active: readActivePolicy(), versions: listPolicyVersions() });
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     const user = getRequestUser(req);
     if (!user) return NextResponse.json({ error: 'Vui lòng đăng nhập' }, { status: 401 });
@@ -30,3 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể cập nhật policy' }, { status: 400 });
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }

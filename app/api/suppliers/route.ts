@@ -1,3 +1,6 @@
+import { requireRequestUser } from '@/lib/server/auth';
+import { RequestError, requestErrorResponse } from '@/lib/server/http';
+import { isSandbox, withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { listSuppliers, getSupplier, upsertSupplier, recordVerificationEvidence, seedDefaultSuppliers } from '@/services/supplierService';
 import { SupplierMasterSchema } from '@/lib/schemas';
@@ -24,8 +27,9 @@ const UpsertSupplierBodySchema = z.object({
   }).optional()
 });
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
+    requireRequestUser(req);
     const { searchParams } = new URL(req.url);
     const taxCode = searchParams.get('taxCode');
     const query = searchParams.get('query') || undefined;
@@ -34,6 +38,7 @@ export async function GET(req: NextRequest) {
     const autoSeed = searchParams.get('autoSeed');
 
     if (autoSeed === 'true') {
+      if (!isSandbox()) throw new RequestError('Chỉ tạo dữ liệu mẫu trong demo.', 403);
       seedDefaultSuppliers();
     }
 
@@ -48,12 +53,14 @@ export async function GET(req: NextRequest) {
     const suppliers = listSuppliers({ query, status, riskLevel });
     return NextResponse.json({ suppliers, count: suppliers.length });
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Lỗi xử lý yêu cầu' }, { status: 500 });
+    return requestErrorResponse(error, 'Lỗi xử lý yêu cầu');
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
+    const user = requireRequestUser(req);
+    if (user.role === 'ACCOUNTANT') throw new RequestError('Cần Kế toán trưởng hoặc CFO để cập nhật nhà cung cấp.', 403);
     const body = await req.json();
     const parsed = UpsertSupplierBodySchema.parse(body);
 
@@ -74,6 +81,10 @@ export async function POST(req: NextRequest) {
     if (error?.name === 'ZodError') {
       return NextResponse.json({ error: 'Dữ liệu không hợp lệ', details: error.errors }, { status: 400 });
     }
-    return NextResponse.json({ error: error?.message || 'Lỗi cập nhật nhà cung cấp' }, { status: 500 });
+    return requestErrorResponse(error, 'Lỗi cập nhật nhà cung cấp');
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }

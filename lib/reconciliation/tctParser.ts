@@ -20,25 +20,29 @@ function numberValue(value?: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function requiredAmount(value: unknown): number {
+  const number = numberValue(value);
+  if (number === undefined) throw new Error('Thiếu số tiền trong bảng kê TCT.');
+  return number;
+}
+
 function parseTaxRate(value?: unknown): 0 | 5 | 8 | 10 {
-  if (value === undefined || value === null) return 10;
+  if (value === undefined || value === null || String(value).trim()==='') throw new Error('Thiếu thuế suất trong bảng kê TCT.');
   const str = String(value).trim().toUpperCase();
   if (str.includes('KCT') || str.includes('KKKNT') || str.includes('KHONG') || str.includes('MIEN')) return 0;
   const num = numberValue(str);
-  if (num === undefined) return 10;
-  if (num === 0 || num <= 2) return 0;
-  if (num >= 4 && num <= 6) return 5;
-  if (num >= 7 && num <= 9) return 8;
-  return 10;
+  if (num === undefined) throw new Error('Thuế suất không hợp lệ.');
+  if ([0,5,8,10].includes(num)) return num as 0|5|8|10;
+  throw new Error('Thuế suất không được hỗ trợ.');
 }
 
 function normalizeDate(raw?: string): string {
-  if (!raw) return new Date().toISOString().slice(0, 10);
+  if (!raw) throw new Error('Thiếu ngày hóa đơn trong bảng kê TCT.');
   const trimmed = raw.trim().split('T')[0];
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed) && !Number.isNaN(Date.parse(trimmed)) && new Date(trimmed).toISOString().slice(0,10)===trimmed) return trimmed;
   const dmy = trimmed.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
-  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
-  return new Date().toISOString().slice(0, 10);
+  if (dmy) return normalizeDate(`${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`);
+  throw new Error('Ngày hóa đơn không hợp lệ.');
 }
 
 function parseTctStatus(val?: string): 'NEW' | 'ADJUSTED' | 'REPLACED' | 'CANCELLED' {
@@ -61,25 +65,28 @@ export function parseTctExport(content: string, defaultTaxPeriod: string = '2026
       const list = Array.isArray(data) ? data : (data.items || data.invoices || data.data || []);
       const results: TctInvoice[] = [];
 
+      if (!Array.isArray(list)) throw new Error('Bảng kê phải chứa danh sách hóa đơn.');
       for (const item of list) {
-        const series = String(item.khhdon || item.invoiceSeries || item.series || item.kh || '').trim().toUpperCase() || '1C26TBB';
+        if (!item || typeof item !== 'object') throw new Error('Dòng bảng kê không hợp lệ.');
+        const series = String(item.khhdon || item.invoiceSeries || item.series || item.kh || '').trim().toUpperCase() || '';
+        if (!series) throw new Error('Thiếu ký hiệu hóa đơn TCT.');
         const template = item.khmshdon || item.invoiceTemplate || item.template || undefined;
-        let invNum = String(item.shdon || item.invoiceNumber || item.so || item.invNum || '').trim();
+        let invNum = String(item.shdon || item.invoiceNumber || item.number || item.so || item.invNum || '').trim();
         if (invNum) invNum = invNum.padStart(7, '0');
-        else invNum = '0000001';
+        else throw new Error('Thiếu số hóa đơn TCT.');
 
         const invDate = normalizeDate(item.tdlap || item.ngaylap || item.invoiceDate || item.date);
-        let mst = String(item.nbmst || item.supplierTaxCode || item.mst || item.taxCode || '').replace(/[^0-9-]/g, '').trim();
+        let mst = String(item.nbmst || item.supplierTaxCode || item.sellerTaxCode || item.mst || item.taxCode || '').replace(/[^0-9-]/g, '').trim();
         if (mst.replace(/-/g, '').length === 10) mst = mst.replace(/-/g, '');
-        if (!mst) mst = '0100109106';
+        if (!mst) throw new Error('Thiếu MST người bán TCT.');
 
-        const name = String(item.nbten || item.supplierName || item.ten || item.sellerName || 'Nhà cung cấp Cổng TCT').trim();
-        const preTax = numberValue(item.tgtcthue || item.preTaxAmount || item.tienhang) || 0;
-        const rate = parseTaxRate(item.tsuat || item.taxRate || item.thuesuat);
-        const tax = numberValue(item.tgtthue || item.taxAmount || item.tienthue) ?? Math.round((preTax * rate) / 100);
-        const total = numberValue(item.tgtttbso || item.totalAmount || item.tongtien) ?? (preTax + tax);
+        const name = String(item.nbten || item.supplierName || item.ten || item.sellerName || 'Chưa xác minh').trim();
+        const preTax = requiredAmount(item.tgtcthue ?? item.preTaxAmount ?? item.tienhang);
+        const rate = parseTaxRate(item.tsuat ?? item.taxRate ?? item.thuesuat);
+        const tax = requiredAmount(item.tgtthue ?? item.taxAmount ?? item.tienthue);
+        const total = requiredAmount(item.tgtttbso ?? item.totalAmount ?? item.tongtien);
         const mccqt = item.mccqt || item.taxAuthorityCode || undefined;
-        const status = parseTctStatus(item.tthdon || item.tctStatus || item.trangthai);
+        const status = parseTctStatus(item.tthdon || item.tctStatus || item.status || item.trangthai);
 
         const id = `TCT-${series}-${invNum}-${mst}`;
         results.push(
@@ -104,8 +111,8 @@ export function parseTctExport(content: string, defaultTaxPeriod: string = '2026
         );
       }
       return results;
-    } catch {
-      // Tiếp tục thử định dạng CSV
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'JSON bảng kê không hợp lệ.');
     }
   }
 
@@ -136,22 +143,23 @@ export function parseTctExport(content: string, defaultTaxPeriod: string = '2026
 
   for (let i = startIndex; i < lines.length; i++) {
     const rawCols = lines[i].split(delimiter).map(c => c.trim().replace(/^["']|["']$/g, ''));
-    if (rawCols.length < 4) continue;
+    if (rawCols.length < 4) throw new Error('Dòng bảng kê thiếu cột bắt buộc.');
 
-    const series = (colIdx.series !== -1 ? rawCols[colIdx.series] : rawCols[0]) || '1C26TBB';
-    let invNum = (colIdx.number !== -1 ? rawCols[colIdx.number] : rawCols[1]) || '0000001';
+    const series = (colIdx.series !== -1 ? rawCols[colIdx.series] : rawCols[0]) || '';
+    let invNum = (colIdx.number !== -1 ? rawCols[colIdx.number] : rawCols[1]) || '';
+    if (!series || !invNum) throw new Error('Thiếu ký hiệu hoặc số hóa đơn TCT.');
     invNum = invNum.padStart(7, '0');
 
     const invDate = normalizeDate(colIdx.date !== -1 ? rawCols[colIdx.date] : rawCols[2]);
-    let mst = (colIdx.mst !== -1 ? rawCols[colIdx.mst] : rawCols[3]) || '0100109106';
+    let mst = (colIdx.mst !== -1 ? rawCols[colIdx.mst] : rawCols[3]) || '';
     mst = mst.replace(/[^0-9-]/g, '').trim();
     if (mst.replace(/-/g, '').length === 10) mst = mst.replace(/-/g, '');
 
-    const name = (colIdx.name !== -1 ? rawCols[colIdx.name] : rawCols[4]) || 'Nhà cung cấp Cổng TCT';
-    const preTax = numberValue(colIdx.preTax !== -1 ? rawCols[colIdx.preTax] : rawCols[5]) || 0;
+    const name = (colIdx.name !== -1 ? rawCols[colIdx.name] : rawCols[4]) || 'Chưa xác minh';
+    const preTax = requiredAmount(colIdx.preTax !== -1 ? rawCols[colIdx.preTax] : rawCols[5]);
     const rate = parseTaxRate(colIdx.taxRate !== -1 ? rawCols[colIdx.taxRate] : rawCols[6]);
-    const tax = numberValue(colIdx.tax !== -1 ? rawCols[colIdx.tax] : rawCols[7]) ?? Math.round((preTax * rate) / 100);
-    const total = numberValue(colIdx.total !== -1 ? rawCols[colIdx.total] : rawCols[8]) ?? (preTax + tax);
+    const tax = requiredAmount(colIdx.tax !== -1 ? rawCols[colIdx.tax] : rawCols[7]);
+    const total = requiredAmount(colIdx.total !== -1 ? rawCols[colIdx.total] : rawCols[8]);
     const mccqt = colIdx.mccqt !== -1 ? rawCols[colIdx.mccqt] : undefined;
     const status = parseTctStatus(colIdx.status !== -1 ? rawCols[colIdx.status] : undefined);
 

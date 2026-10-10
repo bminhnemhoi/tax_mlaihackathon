@@ -1,3 +1,6 @@
+import { requireRequestUser } from '@/lib/server/auth';
+import { RequestError, requestErrorResponse } from '@/lib/server/http';
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase, jsonNow } from '@/lib/server/db';
 import { parseTctExport } from '@/lib/reconciliation/tctParser';
@@ -114,8 +117,9 @@ function saveTctInvoices(invoices: TctInvoice[]): void {
   tx(invoices);
 }
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
+    requireRequestUser(req);
     const { searchParams } = new URL(req.url);
     const taxPeriod = searchParams.get('taxPeriod') || undefined;
 
@@ -130,12 +134,13 @@ export async function GET(req: NextRequest) {
       systemInvoicesCount: systemInvoices.length
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Lỗi đối soát bảng kê Cổng Thuế' }, { status: 500 });
+    return requestErrorResponse(error, 'Lỗi đối soát bảng kê Cổng Thuế');
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
+    const user = requireRequestUser(req);
     const body = await req.json();
     const content = body.content as string;
     const taxPeriod = (body.taxPeriod as string) || '2026-Q1';
@@ -144,22 +149,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nội dung bảng kê Cổng Thuế không được để trống' }, { status: 400 });
     }
 
-    const tctInvoices = parseTctExport(content, taxPeriod);
+    let tctInvoices: TctInvoice[];
+    try { tctInvoices = parseTctExport(content, taxPeriod); }
+    catch { throw new RequestError('Bảng kê TCT sai cấu trúc hoặc thiếu dữ liệu bắt buộc.'); }
     if (tctInvoices.length === 0) {
       return NextResponse.json({ error: 'Không trích xuất được hóa đơn nào từ tệp dữ liệu đã tải lên' }, { status: 400 });
     }
 
-    saveTctInvoices(tctInvoices);
-
-    const systemInvoices = getAllSystemInvoices();
-    const report = reconcileTctWithSystem(tctInvoices, systemInvoices);
-
-    return NextResponse.json({
-      success: true,
-      importedCount: tctInvoices.length,
-      report
-    });
+    const result = getDatabase().transaction(() => {
+      saveTctInvoices(tctInvoices);
+      const systemInvoices = getAllSystemInvoices();
+      const report = reconcileTctWithSystem(tctInvoices, systemInvoices);
+      return { success: true, importedCount: tctInvoices.length, report };
+    })();
+    return NextResponse.json(result);
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Lỗi bóc tách bảng kê Cổng Thuế' }, { status: 500 });
+    return requestErrorResponse(error, 'Lỗi bóc tách bảng kê Cổng Thuế');
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }

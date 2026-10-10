@@ -1,17 +1,16 @@
-import { QWEN_API_CONFIG } from '@/lib/constants';
+import { QWEN_API_CONFIG, OPENROUTER_API_CONFIG } from '@/lib/constants';
 import { InvoiceInput, ActionOptionSchema, RiskGroup } from '@/lib/schemas';
 import { z } from 'zod';
+import {
+  callGeminiChat,
+  extractInvoiceWithGeminiVision,
+  generateActionableQuestionWithGemini,
+  GeminiQuestionResultSchema,
+  GeminiQuestionResult
+} from './geminiService';
 
-export const QwenQuestionResultSchema = z.object({
-  flaggedReason: z.string().min(5),
-  plainExplanation: z.string().min(10),
-  sopClause: z.string().min(3),
-  actionableQuestion: z.string().min(10),
-  options: z.tuple([ActionOptionSchema, ActionOptionSchema]),
-  requiresCFO: z.boolean()
-});
-
-export type QwenQuestionResult = z.infer<typeof QwenQuestionResultSchema>;
+export const QwenQuestionResultSchema = GeminiQuestionResultSchema;
+export type QwenQuestionResult = GeminiQuestionResult;
 
 function sanitizeJsonString(str: string): string {
   let inString = false;
@@ -45,46 +44,18 @@ export function extractCleanJson(text: string): any {
 }
 
 /**
- * Gọi Qwen Model (qwen-plus-character) để thực hiện suy luận thuế, thẩm định rủi ro
+ * Gọi AI Model thực hiện suy luận thuế, thẩm định rủi ro (chuyển tiếp sang Gemini 2.5 Flash)
  */
 export async function callQwenChat(
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-  model: string = QWEN_API_CONFIG.MODEL,
+  model?: string,
   timeoutMs = 25000
 ): Promise<string> {
-  const url = QWEN_API_CONFIG.ENDPOINT;
-  const apiKey = QWEN_API_CONFIG.API_KEY;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.1
-    }),
-    signal: AbortSignal.timeout(timeoutMs)
-  });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`[Qwen API] Lỗi HTTP ${res.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error('[Qwen API] Không nhận được nội dung phản hồi từ mô hình');
-  }
-
-  return content;
+  return callGeminiChat(messages, model, timeoutMs);
 }
 
 /**
- * Actionable Question Generator (Q-Gen) dùng Alibaba Cloud Qwen (qwen-plus-character)
+ * Actionable Question Generator (Q-Gen) dùng Gemini 2.5 Flash
  * Giúp KTT hoặc CFO ra phán quyết trong 3 giây đối với hóa đơn rủi ro
  */
 export async function generateActionableQuestionWithQwen(
@@ -93,118 +64,95 @@ export async function generateActionableQuestionWithQwen(
   detectedHint?: string,
   sopClauseHint?: string
 ): Promise<QwenQuestionResult> {
-  const systemPrompt = `VAI TRÒ:
-Bạn là "ACTIONABLE QUESTION GENERATOR" cho hệ thống Tax Referee (MLAI Hackathon 2026).
-Nhiệm vụ của bạn là hỗ trợ Kế toán trưởng (KTT) hoặc Giám đốc Tài chính (CFO) ra phán quyết trong 3 giây khi phát hiện một hóa đơn có rủi ro thuế.
-
-CĂN CỨ PHÁP LÝ & QUY CHẾ:
-- Quy chế Quản trị Thuế nội bộ: Tax-SOP-2026 v2.5.
-- Nghị định 254/2026/NĐ-CP (Truy vết hóa đơn điều chỉnh/thay thế, bắt buộc mã HĐ gốc; sai tên địa chỉ nhưng đúng MST gửi Mẫu 04/SS-HĐĐT vẫn hợp lệ).
-- Nghị quyết 204/2025/QH15 & Nghị định 174/2025/NĐ-CP (Quy tắc thuế suất 8% áp dụng đến 31/12/2026, danh mục loại trừ bắt buộc 10% như viễn thông, tài chính, bds, hóa chất).
-- Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & NĐ 320/2025/NĐ-CP (Hóa đơn từ 5.000.000 VNĐ trở lên bắt buộc thanh toán không dùng tiền mặt).
-- Điều 2.2 Tax-SOP-2026: Nhà cung cấp đóng MST: Xuất SAU ngày đóng MST = bất hợp pháp 100%; Xuất TRƯỚC ngày đóng MST = tạm dừng để KTT xác minh bộ hồ sơ thực tế.
-- Điều 3.3 & Chương 4 Tax-SOP-2026: Hóa đơn điều chỉnh giảm hoặc chi phí bồi thường >= 200.000.000 VNĐ, hoặc hóa đơn làm biến động Tham số K vào Vùng Đỏ (< 0.95 hoặc > 1.35 theo CV 2392/TCT-QLRR) bắt buộc thẩm quyền CFO.
-
-YÊU CẦU ĐẦU RA (JSON THUẦN TÚY):
-Trả về JSON đúng cấu trúc sau (không markdown, không thêm text bên ngoài):
-{
-  "flaggedReason": "Lý do vi phạm ngắn gọn, súc tích (1 câu)",
-  "plainExplanation": "Lời giải thích bằng tiếng Việt bình dân, dễ hiểu cho người không chuyên kế toán (1-2 câu)",
-  "sopClause": "Điều khoản quy chế vi phạm (ví dụ: Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 1.2 Tax-SOP-2026)",
-  "actionableQuestion": "Câu hỏi ĐÓNG, NGẮN GỌN, CHÍNH XÁC. BẮT BUỘC chứa: Mã hóa đơn, Tên đối tác, Số tiền VNĐ, Căn cứ luật/SOP, và hỏi KTT/CFO lựa chọn giữa 2 phương án đối ứng.",
-  "requiresCFO": true/false (true nếu rủi ro thuộc Nhóm 3 EXCEED_AUTHORITY, số tiền >= 200M hoặc K-factor vào Vùng Đỏ; ngược lại false),
-  "options": [
-    {
-      "id": "A",
-      "label": "Tên ngắn trên nút bấm (dưới 35 ký tự)",
-      "actionDescription": "Mô tả hành động cụ thể khi chọn nút này",
-      "resultingAction": "ACCEPT_WITH_DOCS"
-    },
-    {
-      "id": "B",
-      "label": "Tên ngắn trên nút bấm (dưới 35 ký tự)",
-      "actionDescription": "Mô tả hành động cụ thể khi chọn nút này",
-      "resultingAction": "REJECT_TAX_DEDUCTION"
-    }
-  ]
+  return generateActionableQuestionWithGemini(invoice, riskGroup, detectedHint, sopClauseHint);
 }
-Các giá trị hợp lệ duy nhất của resultingAction gồm: 'ACCEPT_WITH_DOCS', 'REJECT_TAX_DEDUCTION', 'FORWARD_TO_CFO', 'REQUEST_SUPPLIER_REISSUE', 'ACCEPT_ADJUSTMENT', 'ACCEPT_WITH_DEFENSE_DOSSIER'.`;
 
-  const totalAmountStr = typeof invoice.totalAmount === 'number'
-    ? invoice.totalAmount.toLocaleString('vi-VN')
-    : String(invoice.totalAmount || '0');
+/**
+ * Trích xuất hóa đơn từ ảnh/PDF bằng Gemini 2.5 Flash Vision
+ */
+export async function extractInvoiceWithQwenVision(
+  fileBase64: string,
+  mimeType: string,
+  fileName?: string
+): Promise<Partial<InvoiceInput>> {
+  return extractInvoiceWithGeminiVision(fileBase64, mimeType, fileName);
+}
 
-  const userPrompt = `DỮ LIỆU HÓA ĐƠN ĐẦU VÀO:
-- Mã số hóa đơn: ${invoice.invoiceNumber || invoice.id}
-- Ngày lập: ${invoice.invoiceDate || 'Chưa rõ'}
-- Nhà cung cấp: ${invoice.supplierName} (MST: ${invoice.supplierTaxCode})
-- Tổng tiền: ${totalAmountStr} VNĐ
-- Phương thức thanh toán: ${invoice.paymentMethod === 'CASH' ? 'Tiền mặt' : 'Chuyển khoản'}
-- Phân loại rủi ro: ${riskGroup}
-${detectedHint ? `- Dấu hiệu vi phạm: ${detectedHint}` : ''}
-${sopClauseHint ? `- Gợi ý điều khoản: ${sopClauseHint}` : ''}
 
-Hãy trả về duy nhất chuỗi JSON hợp lệ theo đúng cấu trúc đã chỉ định.`;
+/**
+ * Semantic entity extraction from resident OCR text. Sending the compact OCR
+ * transcript instead of the image keeps the small model call fast and cheap;
+ * the model may only copy facts present in the transcript and must omit
+ * unreadable fields. The deterministic parser remains a candidate generator,
+ * never a source for invented values.
+ */
+export async function extractInvoiceWithQwenOcrText(
+  lines: Array<{ text: string; confidence: number; bbox?: { x: number; y: number; w: number; h: number } }>
+): Promise<Partial<InvoiceInput>> {
+  const apiKey = OPENROUTER_API_CONFIG.API_KEY;
+  if (!apiKey) throw new Error('Chưa cấu hình OPENROUTER_API_KEY để xác minh OCR.');
+  const transcript = lines
+    .map((line, index) => `${index + 1}. [conf=${line.confidence.toFixed(2)}] ${line.text}`)
+    .join('\n');
+  const prompt = `Bạn là bộ trích xuất thực thể hóa đơn Việt Nam. Chỉ đọc bản OCR bên dưới và trả về MỘT JSON ngắn, không markdown.
+Khóa: n=invoice number, d=date YYYY-MM-DD, s=seller tax code, v=seller name, b=buyer tax code, i=item names, p=pre-tax VND, r=VAT percent, t=VAT VND, a=total payable VND, m=CASH/BANK_TRANSFER.
+Chỉ sao chép thông tin nhìn thấy trong transcript; không suy ra, không sửa số, không lấy số điện thoại làm MST, không tính thuế từ tổng tiền. Nếu trường không rõ hoặc mâu thuẫn thì bỏ trường đó. Tiền phải là số nguyên VND. Dòng có confidence thấp là bằng chứng yếu và cần bỏ qua nếu không có dòng khác xác nhận.
+OCR TRANSCRIPT:
+${transcript}`;
+  const model = OPENROUTER_API_CONFIG.MODEL;
+  const res = await fetch(OPENROUTER_API_CONFIG.ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://tax-referee.local',
+      'X-Title': 'Tax Referee OCR verifier'
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      max_tokens: 512,
+      temperature: 0
+    }),
+    signal: AbortSignal.timeout(Number(process.env.LOCAL_OCR_AI_TIMEOUT_MS || 1800))
+  });
+  if (!res.ok) throw new Error(`[OpenRouter OCR verifier] HTTP ${res.status}: ${(await res.text()).slice(0, 180)}`);
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+  if (!content) throw new Error('OCR verifier không trả JSON.');
+  return expandVisionFields(extractCleanJson(content));
+}
 
-  try {
-    const rawContent = await callQwenChat([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ]);
-
-    const parsed = extractCleanJson(rawContent);
-
-    // Chuẩn hóa và làm sạch options để bảo vệ Guardrail Zod
-    const VALID_ACTIONS = [
-      'ACCEPT_WITH_DOCS',
-      'REJECT_TAX_DEDUCTION',
-      'FORWARD_TO_CFO',
-      'REQUEST_SUPPLIER_REISSUE',
-      'ACCEPT_ADJUSTMENT',
-      'ACCEPT_WITH_DEFENSE_DOSSIER'
-    ];
-
-    if (Array.isArray(parsed.options) && parsed.options.length >= 2) {
-      parsed.options = [
-        {
-          id: 'A',
-          label: String(parsed.options[0].label || 'Chấp thuận có điều kiện'),
-          actionDescription: String(parsed.options[0].actionDescription || parsed.options[0].label || 'Chấp nhận kèm hồ sơ giải trình'),
-          resultingAction: VALID_ACTIONS.includes(parsed.options[0].resultingAction)
-            ? parsed.options[0].resultingAction
-            : 'ACCEPT_WITH_DOCS'
-        },
-        {
-          id: 'B',
-          label: String(parsed.options[1].label || 'Từ chối khấu trừ'),
-          actionDescription: String(parsed.options[1].actionDescription || parsed.options[1].label || 'Loại chi phí thuế khỏi khấu trừ'),
-          resultingAction: VALID_ACTIONS.includes(parsed.options[1].resultingAction)
-            ? parsed.options[1].resultingAction
-            : 'REJECT_TAX_DEDUCTION'
-        }
-      ];
-    } else {
-      parsed.options = [
-        {
-          id: 'A',
-          label: 'Chấp thuận kèm bổ sung chứng từ',
-          actionDescription: 'Yêu cầu phòng ban cung cấp ủy nhiệm chi / biên bản trước khi quyết toán',
-          resultingAction: 'ACCEPT_WITH_DOCS'
-        },
-        {
-          id: 'B',
-          label: 'Loại khỏi chi phí được trừ',
-          actionDescription: 'Không kê khai khấu trừ thuế GTGT để tránh bị phạt thuế',
-          resultingAction: 'REJECT_TAX_DEDUCTION'
-        }
-      ];
-    }
-
-    parsed.requiresCFO = Boolean(parsed.requiresCFO);
-
-    return QwenQuestionResultSchema.parse(parsed);
-  } catch (err: any) {
-    console.error('[Qwen Service] Q-Gen gặp sự cố:', err);
-    throw err;
+/** Stable wire format, versioned with the extraction cache. */
+export function expandVisionFields(value: unknown): Partial<InvoiceInput> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('OCR không trả đối tượng JSON.');
+  const aliases: Record<string, string> = { n:'invoiceNumber',d:'invoiceDate',s:'supplierTaxCode',v:'supplierName',b:'buyerTaxCode',i:'itemName',p:'preTaxAmount',r:'taxRate',t:'taxAmount',a:'totalAmount',m:'paymentMethod',blur:'isImageBlurry' };
+  const fields: Record<string,unknown> = {};
+  for (const [key, valueField] of Object.entries(value)) {
+    const field = aliases[key] || key;
+    if (!Object.values(aliases).includes(field) || valueField === null || valueField === '') continue;
+    fields[field] = valueField;
   }
+  return fields as Partial<InvoiceInput>;
+}
+
+/** Endpoint-specific capabilities: do not silently route to a different price tier. */
+export function visionRequestOptions(model: string): Record<string, unknown> {
+  const reasoning = { enabled: false, effort: 'none' };
+  if (model === 'inclusionai/ling-3.0-flash-vl') return {
+    response_format: undefined, reasoning,
+    provider: { only: ['novita'], sort: 'latency', allow_fallbacks: false }
+  };
+  if (model === 'nex-agi/nex-n2.5-mini') return {
+    response_format: undefined, reasoning,
+    provider: { only: ['nex-agi'], sort: 'latency', allow_fallbacks: false }
+  };
+  if (model.startsWith('google/gemini')) return {
+    reasoning, provider: { only: ['google-ai-studio'], sort: 'latency', allow_fallbacks: false }
+  };
+  if (model.startsWith('qwen/')) return {
+    reasoning, provider: { only: ['alibaba'], sort: 'throughput', allow_fallbacks: false }
+  };
+  return { reasoning, provider: { sort: 'latency', require_parameters: true } };
 }

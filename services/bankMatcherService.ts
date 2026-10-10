@@ -1,3 +1,5 @@
+import { AppUser } from '@/lib/server/auth';
+import { recordBankEvidence } from './workflowService';
 import { BankTransaction, InvoiceInput } from '@/lib/schemas';
 import { getDatabase, jsonNow } from '@/lib/server/db';
 
@@ -167,16 +169,10 @@ export function matchInvoicesWithBankTransactions(
  * Áp dụng kết quả khớp tự động vào Database:
  * Cập nhật hasBankSlip = true và lưu tham chiếu số bút toán ngân hàng vào hóa đơn
  */
-export function applyAutoMatchToDatabase(matches: InvoiceBankMatch[]): number {
+export function applyAutoMatchToDatabase(matches: InvoiceBankMatch[], user: AppUser): number {
   if (matches.length === 0) return 0;
   const db = getDatabase();
   let count = 0;
-
-  const updateInvoiceStmt = db.prepare(`
-    UPDATE invoices
-    SET payload_json = json_set(payload_json, '$.hasBankSlip', 1, '$.bankReference', ?)
-    WHERE id = ?
-  `);
 
   const updateTxnStmt = db.prepare(`
     UPDATE bank_transactions
@@ -188,9 +184,9 @@ export function applyAutoMatchToDatabase(matches: InvoiceBankMatch[]): number {
   const tx = db.transaction((items: InvoiceBankMatch[]) => {
     for (const m of items) {
       if (!m.isAutoMatched) continue;
-      updateInvoiceStmt.run(m.transactionId, m.invoiceId);
+      const changed = recordBankEvidence(m.invoiceId, m.transactionId, user);
       updateTxnStmt.run(m.invoiceId, m.score, now, m.transactionId);
-      count++;
+      if (changed) count++;
     }
   });
 

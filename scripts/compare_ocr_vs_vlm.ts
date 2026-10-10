@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
-import { extractInvoiceWithGemini } from '../services/geminiService';
+import { extractInvoiceWithQwenVision } from '../services/qwenService';
 import { parseInvoiceFromRawText } from '../lib/rawTextParser';
 import { autoEnrichSupplierData } from '../services/taxLookupService';
 
@@ -81,7 +81,7 @@ async function runVlmPipeline(imagePath: string) {
   const fileName = path.basename(imagePath);
 
   try {
-    const extracted = await extractInvoiceWithGemini(base64, 'image/jpeg', fileName);
+    const extracted = await extractInvoiceWithQwenVision(base64, 'image/jpeg', fileName);
     const t1 = Date.now();
 
     return {

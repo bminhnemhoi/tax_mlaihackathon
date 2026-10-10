@@ -8,7 +8,12 @@ export function cn(...inputs: ClassValue[]) {
 export function formatVND(amount: number): string {
   const isNegative = amount < 0;
   const absAmount = Math.abs(amount);
-  const formatted = new Intl.NumberFormat('vi-VN').format(absAmount) + ' ₫';
+  // Preserve fractional tax amounts printed on retail receipts (for example
+  // 658.67) while keeping whole VND amounts compact as before.
+  const formatted = new Intl.NumberFormat('vi-VN', {
+    minimumFractionDigits: Number.isInteger(absAmount) ? 0 : 2,
+    maximumFractionDigits: 2
+  }).format(absAmount) + ' ₫';
   return isNegative ? `-${formatted}` : formatted;
 }
 
@@ -88,4 +93,3 @@ export function parseTaxRateString(value?: unknown): 0 | 5 | 8 | 10 | undefined 
   if (num >= 9.5 && num <= 11) return 10;
   return [0, 5, 8, 10].includes(num as any) ? (num as 0 | 5 | 8 | 10) : undefined;
 }
-

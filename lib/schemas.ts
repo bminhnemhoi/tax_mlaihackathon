@@ -46,6 +46,8 @@ export const ActionOptionSchema = z.object({
   label: z.string(),                  // Tên trên nút bấm (VD: "Phương án A: 140.000₫")
   actionDescription: z.string(),      // Mô tả hành động chi tiết
   resultingAction: z.enum([
+    'REQUEST_INFORMATION',
+    'CONFIRM_CORRECTED_DATA',
     'ACCEPT_WITH_DOCS',               // Chấp nhận kèm hồ sơ giải trình
     'REJECT_TAX_DEDUCTION',           // Loại phần thuế khỏi khấu trừ
     'FORWARD_TO_CFO',                 // Chuyển tiếp lên CFO
@@ -116,6 +118,7 @@ export const InvoiceInputSchema = z.object({
   taxAmount: AmountSchema,
   totalAmount: AmountSchema,
   paymentMethod: z.enum(['BANK_TRANSFER', 'CASH']).optional(), // Chuyển khoản hoặc Tiền mặt
+  bankReference: z.string().trim().min(1).optional(),
   hasBankSlip: z.boolean().optional(),             // Đã có Ủy nhiệm chi chưa?
   hasItemManifest: z.boolean().optional(),         // Có bảng kê chi tiết mặt hàng?
   isImageBlurry: z.boolean().default(false),         // Hóa đơn chụp mờ?
@@ -196,6 +199,21 @@ export const OcrHighlightSchema = z.object({
 });
 export type OcrHighlight = z.infer<typeof OcrHighlightSchema>;
 
+export const FieldEvidenceSchema = z.object({
+  source: z.enum(['XML', 'PDF_TEXT', 'OCR', 'VLM', 'USER', 'INFERRED']),
+  status: z.enum(['VERIFIED', 'UNCERTAIN', 'ABSENT', 'CONFLICT']),
+  confidence: z.number().min(0).max(1),
+  text: z.string().optional(),
+  page: z.number().int().positive().optional(),
+  bbox: z.object({
+    x: z.number(),
+    y: z.number(),
+    w: z.number(),
+    h: z.number()
+  }).optional()
+});
+export type FieldEvidence = z.infer<typeof FieldEvidenceSchema>;
+
 export const DocumentExtractionSchema = z.object({
   invoice: InvoiceInputSchema.partial(),
   confidence: z.record(z.string(), z.number().min(0).max(1)).default({}),
@@ -205,7 +223,10 @@ export const DocumentExtractionSchema = z.object({
   sourceHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   warnings: z.array(z.string()).default([]),
   uncertainFields: z.array(z.string()).default([]),
+  absentFields: z.array(z.string()).default([]),
+  conflicts: z.array(z.string()).default([]),
   fieldWarnings: z.record(z.string(), z.string()).optional(),
+  fieldEvidence: z.record(z.string(), FieldEvidenceSchema).default({}),
   ocrHighlights: z.array(OcrHighlightSchema).default([])
 });
 export type DocumentExtraction = z.infer<typeof DocumentExtractionSchema>;
@@ -222,6 +243,9 @@ export const LineItemAnalysisSchema = z.object({
 });
 export type LineItemAnalysis = z.infer<typeof LineItemAnalysisSchema>;
 
+// Preserve the original engine metadata when reading historical Gemini evaluations.
+const EvaluationEngineSchema = z.enum(['QWEN_AI', 'JEV_AND_QWEN_AI', 'JEV_AI', 'LOCAL_FALLBACK', 'GEMINI_AI', 'JEV_AND_GEMINI_AI']);
+
 // 4. Phán quyết Thường quy (ROUTINE) - Tự động thông qua 100%
 export const RoutineDecisionSchema = z.object({
   status: z.literal('ROUTINE'),
@@ -234,7 +258,7 @@ export const RoutineDecisionSchema = z.object({
   kFactorAfter: z.number(),           // Hệ số K sau khi hạch toán
   applicableRegulations: z.array(z.string()).optional(), // Căn cứ pháp luật áp dụng theo ngày hóa đơn
   sopVersion: z.string().optional(),  // Phiên bản SOP áp dụng
-  engineUsed: z.enum(['QWEN_AI', 'GEMINI_AI', 'JEV_AND_QWEN_AI', 'JEV_AND_GEMINI_AI', 'JEV_AI', 'LOCAL_FALLBACK']).optional(),
+  engineUsed: EvaluationEngineSchema.optional(),
   confidence: z.number().optional(),
   riskScore: z.number().optional(),
   precedentApplied: z.object({
@@ -274,7 +298,7 @@ export const EscalatedDecisionSchema = z.object({
   requiresCFO: z.boolean().default(false),
   applicableRegulations: z.array(z.string()).optional(), // Căn cứ pháp luật áp dụng theo ngày hóa đơn
   sopVersion: z.string().optional(),  // Phiên bản SOP áp dụng
-  engineUsed: z.enum(['QWEN_AI', 'GEMINI_AI', 'JEV_AND_QWEN_AI', 'JEV_AND_GEMINI_AI', 'JEV_AI', 'LOCAL_FALLBACK']).optional(),
+  engineUsed: EvaluationEngineSchema.optional(),
   confidence: z.number().optional(),
   riskScore: z.number().optional(),
   duplicateInfo: DuplicateInfoSchema.optional(),
@@ -296,6 +320,9 @@ export type RefereeDecision = z.infer<typeof RefereeDecisionSchema>;
 // 8. Schema Nhật ký Kiểm toán (Audit Entry)
 export const AuditEntrySchema = z.object({
   id: z.string(),
+  invoiceRecordId: z.string().optional(),
+  evaluationId: z.string().optional(),
+  currentStatus: z.string().optional(),
   timestamp: z.string(),
   invoiceId: z.string(),
   supplierName: z.string(),
@@ -330,6 +357,10 @@ export const CorporatePrecedentSchema = z.object({
   supplierTaxCode: z.string().min(1),
   supplierName: z.string().min(1),
   riskPattern: z.string().min(1),
+  purpose: z.string().optional(),
+  maximumAmount: z.number().nonnegative().optional(),
+  currentThreshold: z.number().nonnegative().optional(),
+  thresholdVersion: z.number().int().optional(),
   sopClause: z.string().min(1),
   approvedOption: z.string().min(1),
   rationale: z.string().min(1),

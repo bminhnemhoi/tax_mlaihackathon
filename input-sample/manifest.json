@@ -1,0 +1,123 @@
+{
+  "version": "2026-10-10.v2",
+  "purpose": "Vietnamese incoming invoice extraction benchmark",
+  "accuracyContract": "100% of fields with source evidence; absent or unreadable fields remain absent",
+  "licensePolicy": "Only items marked REDISTRIBUTABLE may be used for public accuracy claims",
+  "items": [
+    {
+      "id": "xml-viettel-01",
+      "file": "01_real_viettel_sinvoice.xml",
+      "kind": "XML",
+      "sourceUrl": "https://raw.githubusercontent.com/rezonia/invoice-processor/main/internal/parser/xml/testdata/viettel_invoice.xml",
+      "licenseStatus": "UNVERIFIED",
+      "truthStatus": "PENDING_INDEPENDENT_LABEL",
+      "sha256": "524404372cf830b9627b293b4b711eab8ceec8f388e9f67ea31132fc61238f34",
+      "retrievedAt": "2026-10-10"
+    },
+    {
+      "id": "xml-misa-02",
+      "file": "02_real_misa_meinvoice.xml",
+      "kind": "XML",
+      "sourceUrl": "https://raw.githubusercontent.com/rezonia/invoice-processor/main/internal/parser/xml/testdata/misa_invoice.xml",
+      "licenseStatus": "UNVERIFIED",
+      "truthStatus": "PENDING_INDEPENDENT_LABEL",
+      "sha256": "d59a332b90dc7b381719d1e8b4d9f10a687902d8dc3f8d96edb5413edb956bea",
+      "retrievedAt": "2026-10-10"
+    },
+    {
+      "id": "xml-vnpt-03",
+      "file": "03_real_vnpt_einvoice.xml",
+      "kind": "XML",
+      "sourceUrl": "https://raw.githubusercontent.com/rezonia/invoice-processor/main/internal/parser/xml/testdata/vnpt_invoice.xml",
+      "licenseStatus": "UNVERIFIED",
+      "truthStatus": "PENDING_INDEPENDENT_LABEL",
+      "sha256": "b215367f1d00025069528457480bae0e3973571c1fca2d9e97ef399f6e28a630",
+      "retrievedAt": "2026-10-10"
+    },
+    {
+      "id": "xml-fpt-04",
+      "file": "04_real_fpt_einvoice.xml",
+      "kind": "XML",
+      "sourceUrl": "https://raw.githubusercontent.com/rezonia/invoice-processor/main/internal/parser/xml/testdata/fpt_invoice.xml",
+      "licenseStatus": "UNVERIFIED",
+      "truthStatus": "PENDING_INDEPENDENT_LABEL",
+      "sha256": "c87fc629adbcc19600976c66caccda94c966f60ea7cc7c1732a8a34d01c916fc",
+      "retrievedAt": "2026-10-10"
+    },
+    {
+      "id": "xml-tct-05",
+      "file": "05_real_tct_invoice.xml",
+      "kind": "XML",
+      "sourceUrl": "https://raw.githubusercontent.com/rezonia/invoice-processor/main/internal/parser/xml/testdata/tct_invoice.xml",
+      "licenseStatus": "UNVERIFIED",
+      "truthStatus": "PENDING_INDEPENDENT_LABEL",
+      "sha256": "43a4fb2889b39397f441d4c013263653426653dab07a58099073234de60115d0",
+      "retrievedAt": "2026-10-10"
+    },
+    {
+      "id": "pdf-vinhlong-06",
+      "file": "06_real_einvoice_vinhlong.pdf",
+      "kind": "PDF_TEXT_OR_SCAN",
+      "sourceUrl": "https://raw.githubusercontent.com/thuyetbao/einvoice-lens/master/tests/data/sample-sale-invoice.pdf",
+      "licenseStatus": "UNVERIFIED",
+      "truthStatus": "PENDING_INDEPENDENT_LABEL",
+      "sha256": "fe55ee74a965c00c3a976110d236aa5abd3f11ded0f17305ab311dc876526576",
+      "retrievedAt": "2026-10-10"
+    },
+    {
+      "id": "camera-circlek-07",
+      "file": "07_real_bill_circle_k.jpg",
+      "kind": "IMAGE_POS",
+      "sourceUrl": "https://raw.githubusercontent.com/huyhoang17/KIE_invoice_minimal/master/images/mcocr_val_145115twueq.jpg",
+      "licenseStatus": "RESEARCH_ONLY_OR_UNVERIFIED",
+      "truthStatus": "MANUALLY_TRANSCRIBED",
+      "truthFile": "ground-truth/camera-truth.json",
+      "sha256": "52b164e9436665514ed16cf38532dee1d13eec8a454fcf5087c0e5e03a745429",
+      "retrievedAt": "2026-10-10"
+    },
+    {
+      "id": "camera-coopfood-08",
+      "file": "08_real_bill_coopfood.jpg",
+      "kind": "IMAGE_POS",
+      "sourceUrl": "https://raw.githubusercontent.com/huyhoang17/KIE_invoice_minimal/master/images/mcocr_val_145115alcfe.jpg",
+      "licenseStatus": "RESEARCH_ONLY_OR_UNVERIFIED",
+      "truthStatus": "MANUALLY_TRANSCRIBED",
+      "truthFile": "ground-truth/camera-truth.json",
+      "sha256": "d096f9e61f34fc79abeda1a7355981d5ce887b5212b94d8e1d1154275ff8ce3b",
+      "retrievedAt": "2026-10-10"
+    },
+    {
+      "id": "camera-retail-09",
+      "file": "09_real_bill_retail_store.jpg",
+      "kind": "IMAGE_POS",
+      "sourceUrl": "https://raw.githubusercontent.com/huyhoang17/KIE_invoice_minimal/master/images/mcocr_val_145115cdskc.jpg",
+      "licenseStatus": "RESEARCH_ONLY_OR_UNVERIFIED",
+      "truthStatus": "MANUALLY_TRANSCRIBED",
+      "truthFile": "ground-truth/camera-truth.json",
+      "sha256": "44517317af964fc5b30afe4414b754519b8ad08c092efb14e6fc0d16ff9365a3",
+      "retrievedAt": "2026-10-10"
+    },
+    {
+      "id": "camera-restaurant-10",
+      "file": "10_real_bill_restaurant.jpg",
+      "kind": "IMAGE_POS",
+      "sourceUrl": "https://raw.githubusercontent.com/huyhoang17/KIE_invoice_minimal/master/images/mcocr_val_145115vfxzi.jpg",
+      "licenseStatus": "RESEARCH_ONLY_OR_UNVERIFIED",
+      "truthStatus": "MANUALLY_TRANSCRIBED",
+      "truthFile": "ground-truth/camera-truth.json",
+      "sha256": "e3004ddbee0d05e05b57e6e7631f2c781a0ddd428227417fae74c1faf0dd2b0b",
+      "retrievedAt": "2026-10-10"
+    },
+    {
+      "id": "camera-game-11",
+      "file": "11_real_invoice_photo.jpg",
+      "kind": "IMAGE_CAMERA",
+      "sourceUrl": "https://raw.githubusercontent.com/TranThanh159/Doc_Hoa_Don/main/z6122928388575_a749b59718e26d2f9d400cdc0aac4188.jpg",
+      "licenseStatus": "UNVERIFIED",
+      "truthStatus": "MANUALLY_TRANSCRIBED",
+      "truthFile": "ground-truth/camera-truth.json",
+      "sha256": "d7d9a29455c26818ca96490ab7e6128cec97942ed04cbd99c93ebf3ad3904d64",
+      "retrievedAt": "2026-10-10"
+    }
+  ]
+}

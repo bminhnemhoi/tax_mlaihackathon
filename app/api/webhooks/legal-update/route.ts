@@ -1,3 +1,4 @@
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { processIncomingLegalUpdate } from '@/services/legalUpdateService';
 
@@ -9,7 +10,7 @@ const EXPECTED_SECRET = process.env.LEGAL_WEBHOOK_SECRET || 'tax-referee-webhook
  * Webhook tiếp nhận thông báo văn bản pháp luật thuế mới theo thời gian thực (Push Event).
  * Dành cho các đối tác LegalTech (Thư Viện Pháp Luật, LuatVietnam) hoặc hệ sinh thái nội bộ.
  */
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization') || '';
     const secretHeader = req.headers.get('x-webhook-secret') || '';
@@ -55,3 +56,5 @@ export async function GET() {
     documentation: 'Gửi POST với header Authorization: Bearer <secret> hoặc x-webhook-secret: <secret>'
   });
 }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }

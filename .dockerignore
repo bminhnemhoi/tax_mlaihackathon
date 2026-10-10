@@ -1,0 +1,12 @@
+node_modules
+.next*
+.git
+data/runtime
+data/uploads
+.env*
+!.env.example
+brainstorming
+backups
+
+.codex-finalizer
+docs/submission

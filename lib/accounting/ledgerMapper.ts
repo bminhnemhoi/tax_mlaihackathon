@@ -176,8 +176,6 @@ export function generateCanonicalVoucher(
       ? explicitApprovedTax
       : decision && decision.status === 'ROUTINE'
       ? decision.approvedTaxAmount
-      : invoice.taxAmount !== 0 && invoice.paymentMethod !== 'CASH' && invoice.hasBankSlip !== false
-      ? invoice.taxAmount
       : 0;
 
   // Lấy tài khoản mặc định của Nhà cung cấp nếu có

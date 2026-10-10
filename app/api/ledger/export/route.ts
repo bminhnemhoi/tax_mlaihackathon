@@ -1,3 +1,5 @@
+import { RequestError, requestErrorResponse } from '@/lib/server/http';
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRequestUser } from '@/lib/server/auth';
 import { getDatabase } from '@/lib/server/db';
@@ -16,7 +18,7 @@ function parseJson<T>(value: unknown, fallback: T): T {
   }
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     requireRequestUser(request);
     const { searchParams } = new URL(request.url);
@@ -35,6 +37,7 @@ export async function GET(request: NextRequest) {
         WHERE e2.invoice_id = i.id
         ORDER BY datetime(e2.created_at) DESC LIMIT 1
       )
+      WHERE i.status = 'APPROVED'
       ORDER BY datetime(i.updated_at) DESC
       LIMIT 200
     `).all() as Array<Record<string, unknown>>;
@@ -82,9 +85,8 @@ export async function GET(request: NextRequest) {
       }
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Lỗi xuất tệp kế toán' },
-      { status: 500 }
-    );
+    return requestErrorResponse(err, 'Lỗi xuất tệp kế toán');
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }

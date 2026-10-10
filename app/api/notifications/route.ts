@@ -1,3 +1,4 @@
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   listNotifications,
@@ -9,7 +10,7 @@ import { getRequestUser } from '@/lib/server/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   const user = getRequestUser(req);
   if (!user) return NextResponse.json({ error: 'Vui lòng đăng nhập' }, { status: 401 });
 
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const user = getRequestUser(req);
   if (!user) return NextResponse.json({ error: 'Vui lòng đăng nhập' }, { status: 401 });
 
@@ -45,3 +46,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Lỗi xử lý thông báo' }, { status: 500 });
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }

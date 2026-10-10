@@ -1,3 +1,4 @@
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRequestUser } from '@/lib/server/auth';
 import { listAuditEventsForEntity, verifyAuditChain } from '@/lib/server/audit';
@@ -10,7 +11,7 @@ function readJson(value: unknown): any {
   try { return value ? JSON.parse(String(value)) : null; } catch { return null; }
 }
 
-export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handleGET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const user = requireRequestUser(request);
     const { id } = await context.params;
@@ -102,3 +103,5 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     return NextResponse.json({ error: 'Không thể xuất hồ sơ' }, { status: 500 });
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }

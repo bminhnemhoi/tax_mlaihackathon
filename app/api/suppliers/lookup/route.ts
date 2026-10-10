@@ -1,10 +1,11 @@
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { lookupByTaxCode, lookupByName, validateTaxCode } from '@/services/taxLookupService';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const taxCode = searchParams.get('taxCode');
@@ -61,3 +62,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }

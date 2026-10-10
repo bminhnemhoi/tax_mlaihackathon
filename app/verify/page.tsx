@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { VerifyHarness } from '@/components/VerifyHarness';
@@ -9,7 +9,40 @@ import { DEFAULT_POLICY_CONFIG } from '@/lib/constants';
 import { InvoiceInput, RefereeDecision } from '@/lib/schemas';
 import { formatVND } from '@/lib/utils';
 
+// Share the pending request across Strict Mode mounts to avoid creating two sessions.
+let pendingSession: Promise<boolean> | null = null;
+function initializeSession(): Promise<boolean> {
+  if (!pendingSession) {
+    pendingSession = fetch('/api/demo/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preserveExisting: true })
+    }).then(async response => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Không thể khởi tạo phiên thử nghiệm.');
+      return data.demo === true;
+    }).finally(() => { pendingSession = null; });
+  }
+  return pendingSession;
+}
+
 export default function VerifyPage() {
+  const [sessionState, setSessionState] = useState<'loading' | 'demo' | 'internal' | 'error'>('loading');
+  const [sessionError, setSessionError] = useState('');
+  const [sessionAttempt, setSessionAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setSessionState('loading');
+    initializeSession().then(demo => {
+      if (active) setSessionState(demo ? 'demo' : 'internal');
+    }).catch(error => {
+      if (active) {
+        setSessionState('error');
+        setSessionError(error instanceof Error ? error.message : 'Không thể mở demo.');
+      }
+    });
+    return () => { active = false; };
+  }, [sessionAttempt]);
   const [decision, setDecision] = useState<RefereeDecision | null>(null);
   const [invoice, setInvoice] = useState<InvoiceInput | null>(null);
 
@@ -51,14 +84,17 @@ export default function VerifyPage() {
             <h2 className="text-lg font-bold text-slate-950 mb-4 pb-2 border-b border-slate-100">
               Nhập Hóa Đơn Thử Nghiệm
             </h2>
-            <InteractiveInputForm
+            {sessionState === 'loading' && <p role="status">Đang chuẩn bị phiên thử nghiệm…</p>}
+            {sessionState === 'error' && <div role="alert"><p>{sessionError}</p><button type="button" className="mt-3 rounded-lg border px-4 py-2 font-semibold" onClick={() => setSessionAttempt(attempt => attempt + 1)}>Thử lại</button></div>}
+            {sessionState === 'internal' && <p>Phiên đăng nhập nội bộ được giữ nguyên. Dùng khung nhập JSON phía trên để thử dữ liệu trong sandbox độc lập.</p>}
+            {sessionState === 'demo' && <InteractiveInputForm
               demoMode
               onEvaluateResult={(nextDecision, nextInvoice) => {
                 setDecision(nextDecision);
                 setInvoice(nextInvoice);
               }}
               dynamicConfig={DEFAULT_POLICY_CONFIG}
-            />
+            />}
           </div>
 
           {/* Test Case Outcome Display */}
@@ -103,6 +139,7 @@ export default function VerifyPage() {
                 </div>
               </div>
 
+              {decision.status === 'ESCALATED' && <div className="mt-4 rounded-lg bg-amber-50 p-4"><p className="font-semibold">{decision.actionableQuestion}</p><p className="mt-2 text-sm">Người nhận: {decision.requiresCFO ? 'CFO' : 'Kế toán trưởng'} · Chưa xác định số thuế được duyệt.</p></div>}
               {decision.status === 'ESCALATED' && decision.options && decision.options.length > 0 && (
                 <div className="mt-6 pt-4 border-t border-slate-100 space-y-2.5">
                   <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">

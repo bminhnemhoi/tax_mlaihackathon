@@ -1,0 +1,12 @@
+{
+  "invoiceNumber": "QA-SYN-001",
+  "invoiceDate": "2026-10-10",
+  "supplierTaxCode": "0100000001",
+  "supplierName": "CONG TY GIA LAP QA",
+  "buyerTaxCode": "0100109106",
+  "itemName": "Giay in van phong",
+  "preTaxAmount": 1000000,
+  "taxRate": 10,
+  "taxAmount": 100000,
+  "totalAmount": 1100000
+}

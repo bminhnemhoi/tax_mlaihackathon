@@ -2,7 +2,7 @@ import { InvoiceInput, MacroState, RefereeDecision, RiskGroup, SystemPolicyConfi
 import { evaluateInvoiceLocally } from './policyEngine';
 import { generateActionableQuestionWithUnifiedAI } from './aiCoordinator';
 
-export type DualEngineType = 'QWEN_AI' | 'GEMINI_AI' | 'JEV_AND_QWEN_AI' | 'JEV_AND_GEMINI_AI' | 'JEV_AI' | 'LOCAL_FALLBACK';
+export type DualEngineType = 'QWEN_AI' | 'JEV_AND_QWEN_AI' | 'JEV_AI' | 'LOCAL_FALLBACK' | 'GEMINI_AI' | 'JEV_AND_GEMINI_AI';
 
 export interface EvaluationResult {
   decision: RefereeDecision;

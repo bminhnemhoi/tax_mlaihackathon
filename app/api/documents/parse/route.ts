@@ -1,3 +1,7 @@
+import { assertValidXml, parseXml, sanitizeInvoice } from '@/lib/documentParser';
+import { requireRequestUser } from '@/lib/server/auth';
+import { artifactRoot } from '@/lib/server/db';
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -8,452 +12,58 @@ import { getDatabase, jsonNow } from '@/lib/server/db';
 
 import { parseNumberValue as numberValue, parseTaxRateString } from '@/lib/utils';
 import { parseInvoiceFromRawText } from '@/lib/rawTextParser';
-import { autoEnrichSupplierData } from '@/services/taxLookupService';
+import { autoEnrichSupplierData, validateTaxCode } from '@/services/taxLookupService';
 import { extractTextFromPdfBuffer, optimizeImageBuffer } from '@/lib/server/pdfToImage';
+import { GEMINI_API_CONFIG } from '@/lib/constants';
 import { validateInvoiceMathematics } from '@/lib/invoiceMathValidator';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-function tag(xml: string, name: string): string | undefined {
-  const pattern = `<(?:[a-zA-Z0-9_]+:)?${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[a-zA-Z0-9_]+:)?${name}>`;
-  const match = xml.match(new RegExp(pattern, 'i'));
-  return match?.[1]?.replace(/<[^>]+>/g, '').trim() || undefined;
-}
-
-function parseXml(xml: string) {
-  // 1. Trích xuất khối Người bán <NBan> hoặc <SellerInfo> hoặc <Seller>
-  const nbanMatch =
-    xml.match(/<NBan[\s\S]*?<\/NBan>/i)?.[0] ||
-    xml.match(/<SellerInfo[\s\S]*?<\/SellerInfo>/i)?.[0] ||
-    xml.match(/<Seller[\s\S]*?<\/Seller>/i)?.[0] ||
-    '';
-  const supplierTaxCode =
-    tag(nbanMatch, 'MST') ||
-    tag(nbanMatch, 'TaxID') ||
-    tag(xml, 'SellerTaxCode') ||
-    tag(xml, 'TaxCode') ||
-    tag(xml, 'MST');
-
-  const supplierName =
-    tag(nbanMatch, 'Ten') ||
-    tag(nbanMatch, 'TenNBan') ||
-    tag(nbanMatch, 'CompanyName') ||
-    tag(nbanMatch, 'Name') ||
-    tag(xml, 'SellerLegalName') ||
-    tag(xml, 'SellerName') ||
-    tag(xml, 'CompanyName') ||
-    tag(xml, 'Ten');
-
-  // 1b. Trích xuất khối Người mua <NMua> hoặc <BuyerInfo> hoặc <Buyer>
-  const nmuaMatch =
-    xml.match(/<NMua[\s\S]*?<\/NMua>/i)?.[0] ||
-    xml.match(/<BuyerInfo[\s\S]*?<\/BuyerInfo>/i)?.[0] ||
-    xml.match(/<Buyer[\s\S]*?<\/Buyer>/i)?.[0] ||
-    '';
-  const buyerTaxCode =
-    tag(nmuaMatch, 'MST') ||
-    tag(nmuaMatch, 'TaxID') ||
-    tag(xml, 'BuyerTaxCode') ||
-    tag(xml, 'NMuaMST');
-
-  const buyerName =
-    tag(nmuaMatch, 'Ten') ||
-    tag(nmuaMatch, 'TenNMua') ||
-    tag(nmuaMatch, 'CompanyName') ||
-    tag(nmuaMatch, 'Name') ||
-    tag(xml, 'BuyerLegalName') ||
-    tag(xml, 'BuyerName');
-
-  // Ký hiệu & Mẫu số hóa đơn
-  const invoiceSeries =
-    tag(xml, 'KHHDon') ||
-    tag(xml, 'InvoiceSeries') ||
-    tag(xml, 'Series') ||
-    tag(xml, 'KyHieu');
-
-  const invoiceTemplate =
-    tag(xml, 'KHMSHDon') ||
-    tag(xml, 'InvoiceTemplate') ||
-    tag(xml, 'Template') ||
-    tag(xml, 'MauSo');
-
-  // Mã Cơ quan thuế (MCCQT 34 ký tự)
-  const taxAuthorityCode =
-    tag(xml, 'MCCQT') ||
-    tag(xml, 'TaxAuthorityCode') ||
-    tag(xml, 'MaCQT');
-
-  // Ngày ký số
-  const rawSigningDate =
-    tag(xml, 'SigningDate') ||
-    tag(xml, 'SignatureDate') ||
-    tag(xml, 'NgayKy') ||
-    tag(xml, 'SigningTime');
-
-  // 2. Trích xuất số hóa đơn
-  const invoiceNumber =
-    tag(xml, 'SHDon') ||
-    tag(xml, 'SHD') ||
-    tag(xml, 'InvNum') ||
-    tag(xml, 'InvoiceNumber') ||
-    tag(xml, 'InvoiceNo') ||
-    tag(xml, 'SoHoaDon');
-
-  // 3. Trích xuất ngày lập hóa đơn
-  const rawDate =
-    tag(xml, 'NLap') ||
-    tag(xml, 'NgayLap') ||
-    tag(xml, 'InvDate') ||
-    tag(xml, 'InvoiceDate') ||
-    tag(xml, 'IssueDate');
-
-  // 4. Trích xuất tên hàng hóa dịch vụ
-  const itemName =
-    tag(xml, 'THHDVu') ||
-    tag(xml, 'TenHH') ||
-    tag(xml, 'TenHang') ||
-    tag(xml, 'TenHHDVu') ||
-    tag(xml, 'ProductName') ||
-    tag(xml, 'ProdName') ||
-    tag(xml, 'ItemName') ||
-    'Hàng hóa / Dịch vụ';
-
-  const xmlHeader = xml.replace(/<(?:Items|InvoiceDetail|Details|HHDVu)[\s\S]*?<\/(?:Items|InvoiceDetail|Details|HHDVu)>/gi, '');
-
-  // 5. Trích xuất tiền và thuế
-  const preTaxAmount = numberValue(
-    tag(xmlHeader, 'TgTCThue') ||
-    tag(xmlHeader, 'TongTienHang') ||
-    tag(xmlHeader, 'SubTotal') ||
-    tag(xmlHeader, 'SubtotalAmount') ||
-    tag(xmlHeader, 'ThTien') ||
-    tag(xmlHeader, 'TotalSaleAmount') ||
-    tag(xmlHeader, 'TotalAmountWithoutVAT') ||
-    (tag(xmlHeader, 'GrandTotal') ? tag(xmlHeader, 'TotalAmount') : undefined) ||
-    (tag(xmlHeader, 'TotalPayment') ? tag(xmlHeader, 'TotalAmount') : undefined) ||
-    tag(xml, 'TgTCThue') ||
-    tag(xml, 'TongTienHang')
-  );
-
-  const taxAmount = numberValue(
-    tag(xmlHeader, 'TgTTThue') ||
-    tag(xmlHeader, 'TgTThue') ||
-    tag(xmlHeader, 'TongTienThue') ||
-    tag(xmlHeader, 'TotalVAT') ||
-    tag(xmlHeader, 'TotalVATAmount') ||
-    tag(xmlHeader, 'VATAmount') ||
-    tag(xmlHeader, 'TThue') ||
-    tag(xmlHeader, 'TaxAmount') ||
-    tag(xml, 'TgTTThue') ||
-    tag(xml, 'TgTThue') ||
-    tag(xml, 'TongTienThue')
-  );
-
-  const totalAmount = numberValue(
-    tag(xmlHeader, 'TgTTTBSo') ||
-    tag(xmlHeader, 'GrandTotal') ||
-    tag(xmlHeader, 'TotalPayment') ||
-    tag(xmlHeader, 'TongThanhToan') ||
-    tag(xmlHeader, 'TongTien') ||
-    tag(xmlHeader, 'TotalAmountWithVAT') ||
-    tag(xmlHeader, 'InvoiceTotal') ||
-    tag(xmlHeader, 'TotalAmount') ||
-    tag(xml, 'TgTTTBSo') ||
-    tag(xml, 'GrandTotal') ||
-    tag(xml, 'TotalPayment') ||
-    tag(xml, 'TongThanhToan')
-  );
-
-  const taxRateRaw =
-    tag(xmlHeader, 'TSuat') ||
-    tag(xmlHeader, 'ThueSuat') ||
-    tag(xmlHeader, 'VATRatePercent') ||
-    tag(xmlHeader, 'TaxRatePercent') ||
-    tag(xmlHeader, 'VATRate') ||
-    tag(xmlHeader, 'VATPercentage') ||
-    tag(xml, 'TSuat') ||
-    tag(xml, 'ThueSuat');
-  const taxRate = parseTaxRateString(taxRateRaw);
-
-  const paymentMethodRaw = (tag(xml, 'HTTT') || tag(xml, 'PaymentMethod') || '').toUpperCase();
-  const paymentMethod = paymentMethodRaw.includes('TM') && !paymentMethodRaw.includes('CK') ? 'CASH' : 'BANK_TRANSFER';
-
-  // 6. Trích xuất chi tiết dòng hàng <Item> hoặc <HHDVu> (IMP-08)
-  const items: Array<{
-    lineNumber: number;
-    itemName: string;
-    unit?: string;
-    quantity: number;
-    unitPrice: number;
-    amount: number;
-    taxRate: number;
-    taxAmount: number;
-    discountAmount?: number;
-  }> = [];
-
-  const xmlWarnings: string[] = [];
-
-  const itemMatches = Array.from(xml.matchAll(/<(?:Item|HHDVu|Detail|Product)[\s\S]*?<\/(?:Item|HHDVu|Detail|Product)>/gi));
-  let lineIdx = 1;
-  for (const match of itemMatches) {
-    const itemXml = match[0];
-    const name = tag(itemXml, 'TenHang') || tag(itemXml, 'THHDVu') || tag(itemXml, 'ItemName') || tag(itemXml, 'ProductName') || tag(itemXml, 'ProdName');
-    if (!name) continue;
-
-    const unit = tag(itemXml, 'DVT') || tag(itemXml, 'DVTinh') || tag(itemXml, 'Unit') || tag(itemXml, 'UnitOfMeasure');
-    const quantity = numberValue(tag(itemXml, 'SoLuong') || tag(itemXml, 'SLuong') || tag(itemXml, 'Quantity') || tag(itemXml, 'ProdQuantity')) || 1;
-    const unitPrice = numberValue(tag(itemXml, 'DonGia') || tag(itemXml, 'DGia') || tag(itemXml, 'Price') || tag(itemXml, 'ProdPrice')) || 0;
-    const amount = numberValue(tag(itemXml, 'ThanhTien') || tag(itemXml, 'ThTien') || tag(itemXml, 'Amount') || tag(itemXml, 'TotalAmount')) || (quantity * unitPrice);
-
-    const itemTaxRateRaw = tag(itemXml, 'ThueSuat') || tag(itemXml, 'TSuat') || tag(itemXml, 'VATRate') || tag(itemXml, 'TaxRate') || tag(itemXml, 'TaxRatePercent');
-    const parsedItemTaxRate = parseTaxRateString(itemTaxRateRaw);
-    let itemTaxRate: 0 | 5 | 8 | 10;
-    if (parsedItemTaxRate !== undefined) {
-      itemTaxRate = parsedItemTaxRate;
-    } else if (taxRate !== undefined) {
-      itemTaxRate = taxRate;
-    } else {
-      itemTaxRate = 0;
-      xmlWarnings.push(`Dòng ${lineIdx} [${name}]: Không tìm thấy thuế suất, không áp đặt mặc định 10%.`);
-    }
-    const itemTaxAmount = numberValue(tag(itemXml, 'TienThue') || tag(itemXml, 'TThue') || tag(itemXml, 'VATAmount') || tag(itemXml, 'TaxAmount')) ?? (itemTaxRate === 0 ? 0 : Math.round((amount * itemTaxRate) / 100));
-    let discount = numberValue(tag(itemXml, 'TienCK') || tag(itemXml, 'DiscountAmount'));
-    const discountRate = numberValue(tag(itemXml, 'Discount') || tag(itemXml, 'ChietKhau') || tag(itemXml, 'DiscountRate'));
-    let netItemAmount = amount;
-    if (itemTaxRate > 0 && itemTaxAmount > 0 && Math.abs((amount * itemTaxRate) / 100 - itemTaxAmount) > 10) {
-      const netTaxable = Math.round((itemTaxAmount * 100) / itemTaxRate);
-      discount = amount - netTaxable;
-      netItemAmount = netTaxable;
-    } else if (discount === undefined && discountRate && discountRate > 0 && discountRate <= 100) {
-      discount = Math.round((quantity * unitPrice) - amount);
-    }
-
-    items.push({
-      lineNumber: numberValue(tag(itemXml, 'STT') || tag(itemXml, 'ItemNo')) || lineIdx++,
-      itemName: name,
-      unit: unit || 'Cái',
-      quantity,
-      unitPrice,
-      amount: netItemAmount,
-      taxRate: itemTaxRate,
-      taxAmount: itemTaxAmount,
-      discountAmount: discount
-    });
-  }
-
-  return {
-    rawInvoice: {
-      invoiceNumber,
-      invoiceDate: rawDate,
-      supplierTaxCode,
-      supplierName,
-      buyerTaxCode,
-      buyerName,
-      invoiceSeries,
-      invoiceTemplate,
-      taxAuthorityCode,
-      signingDate: rawSigningDate,
-      itemName,
-      preTaxAmount,
-      taxRate,
-      taxAmount,
-      totalAmount,
-      paymentMethod,
-      items: items.length > 0 ? items : undefined
-    },
-    warnings: xmlWarnings
-  };
-}
-
-function sanitizeInvoice(raw: Record<string, unknown>): { invoice: Record<string, unknown>; warnings: string[] } {
-  const invoice: Record<string, unknown> = {};
-  const warnings: string[] = [];
-
-  // invoiceNumber
-  if (raw.invoiceNumber && typeof raw.invoiceNumber === 'string') {
-    const invNum = raw.invoiceNumber.trim();
-    if (invNum) invoice.invoiceNumber = invNum;
-  }
-
-  // invoiceDate -> chuẩn hóa YYYY-MM-DD
-  if (raw.invoiceDate && typeof raw.invoiceDate === 'string') {
-    const trimmed = raw.invoiceDate.trim().split('T')[0];
-    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-      invoice.invoiceDate = trimmed;
-    } else {
-      const dmy = trimmed.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
-      if (dmy) {
-        const [, d, m, y] = dmy;
-        invoice.invoiceDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-      } else {
-        const ymd = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
-        if (ymd) {
-          const [, y, m, d] = ymd;
-          invoice.invoiceDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-        }
-      }
-    }
-  }
-
-  // buyerTaxCode -> chuẩn hóa MST người mua 10 hoặc 13 số
-  if (raw.buyerTaxCode) {
-    const cleanedBuyerMst = String(raw.buyerTaxCode).replace(/[^0-9-]/g, '').trim();
-    if (/^\d{10}(?:-\d{3})?$/.test(cleanedBuyerMst)) {
-      invoice.buyerTaxCode = cleanedBuyerMst;
-    } else {
-      const digitsOnly = cleanedBuyerMst.replace(/-/g, '');
-      if (digitsOnly.length === 10) {
-        invoice.buyerTaxCode = digitsOnly;
-      } else if (digitsOnly.length === 13) {
-        invoice.buyerTaxCode = `${digitsOnly.slice(0, 10)}-${digitsOnly.slice(10)}`;
-      }
-    }
-  }
-
-  // buyerName
-  if (raw.buyerName && typeof raw.buyerName === 'string') {
-    const bName = raw.buyerName.trim();
-    if (bName) invoice.buyerName = bName;
-  }
-
-  // invoiceSeries & invoiceTemplate
-  if (raw.invoiceSeries && typeof raw.invoiceSeries === 'string') {
-    const s = raw.invoiceSeries.trim().toUpperCase();
-    if (s) invoice.invoiceSeries = s;
-  }
-  if (raw.invoiceTemplate && typeof raw.invoiceTemplate === 'string') {
-    const t = raw.invoiceTemplate.trim();
-    if (t) invoice.invoiceTemplate = t;
-  }
-
-  // taxAuthorityCode (MCCQT 34 ký tự)
-  if (raw.taxAuthorityCode && typeof raw.taxAuthorityCode === 'string') {
-    const c = raw.taxAuthorityCode.trim();
-    if (c) invoice.taxAuthorityCode = c;
-  }
-
-  // signingDate -> chuẩn hóa YYYY-MM-DD
-  if (raw.signingDate && typeof raw.signingDate === 'string') {
-    const sTrimmed = raw.signingDate.trim().split('T')[0];
-    if (/^\d{4}-\d{2}-\d{2}$/.test(sTrimmed)) {
-      invoice.signingDate = sTrimmed;
-    } else {
-      const dmy = sTrimmed.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
-      if (dmy) {
-        const [, d, m, y] = dmy;
-        invoice.signingDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-      }
-    }
-  }
-
-  // supplierTaxCode -> 10 hoặc 13 ký tự số
-  if (raw.supplierTaxCode) {
-    const cleanedMst = String(raw.supplierTaxCode).replace(/[^0-9-]/g, '').trim();
-    if (/^\d{10}(?:-\d{3})?$/.test(cleanedMst)) {
-      invoice.supplierTaxCode = cleanedMst;
-    } else {
-      const digitsOnly = cleanedMst.replace(/-/g, '');
-      if (digitsOnly.length === 10) {
-        invoice.supplierTaxCode = digitsOnly;
-      } else if (digitsOnly.length === 13) {
-        invoice.supplierTaxCode = `${digitsOnly.slice(0, 10)}-${digitsOnly.slice(10)}`;
-      } else if (digitsOnly.length > 0) {
-        warnings.push(`Mã số thuế bên bán [${cleanedMst}] chưa chuẩn 10 hoặc 13 số.`);
-      }
-    }
-  }
-
-  // supplierName
-  if (raw.supplierName && typeof raw.supplierName === 'string') {
-    const name = raw.supplierName.trim();
-    if (name.length >= 2) invoice.supplierName = name;
-  }
-
-  // itemName
-  if (raw.itemName && typeof raw.itemName === 'string') {
-    const item = raw.itemName.trim();
-    if (item.length >= 1) invoice.itemName = item;
-  }
-
-  // Tiền & thuế
-  const preTax = typeof raw.preTaxAmount === 'number' && Number.isFinite(raw.preTaxAmount) ? raw.preTaxAmount : numberValue(raw.preTaxAmount);
-  const tax = typeof raw.taxAmount === 'number' && Number.isFinite(raw.taxAmount) ? raw.taxAmount : numberValue(raw.taxAmount);
-  const total = typeof raw.totalAmount === 'number' && Number.isFinite(raw.totalAmount) ? raw.totalAmount : numberValue(raw.totalAmount);
-
-  let rate: number | undefined;
-  if (raw.taxRate !== undefined && raw.taxRate !== null) {
-    rate = parseTaxRateString(raw.taxRate);
-  }
-
-  if (preTax !== undefined) invoice.preTaxAmount = Math.round(preTax);
-  if (rate !== undefined) invoice.taxRate = rate;
-  if (tax !== undefined) invoice.taxAmount = Math.round(tax);
-  if (total !== undefined) invoice.totalAmount = Math.round(total);
-
-  // Tự động suy luận số tiền còn thiếu nếu có 2 trong 3 trường
-  if (invoice.preTaxAmount !== undefined && invoice.taxRate !== undefined && invoice.taxAmount === undefined) {
-    invoice.taxAmount = invoice.taxRate === 0 ? 0 : Math.round((Number(invoice.preTaxAmount) * Number(invoice.taxRate)) / 100);
-  }
-  if (invoice.preTaxAmount !== undefined && invoice.taxAmount !== undefined && invoice.totalAmount === undefined) {
-    invoice.totalAmount = Number(invoice.preTaxAmount) + Number(invoice.taxAmount);
-  } else if (invoice.totalAmount !== undefined && invoice.preTaxAmount !== undefined && invoice.taxAmount === undefined) {
-    invoice.taxAmount = Number(invoice.totalAmount) - Number(invoice.preTaxAmount);
-  } else if (invoice.totalAmount !== undefined && invoice.taxAmount !== undefined && invoice.preTaxAmount === undefined) {
-    invoice.preTaxAmount = Number(invoice.totalAmount) - Number(invoice.taxAmount);
-  } else if (invoice.totalAmount !== undefined && invoice.taxAmount !== undefined && invoice.preTaxAmount !== undefined) {
-    // Nếu tổng thành tiền trước thuế gộp trừ chiết khấu dẫn đến lệch tổng thanh toán:
-    if (Math.abs((Number(invoice.preTaxAmount) + Number(invoice.taxAmount)) - Number(invoice.totalAmount)) > 100) {
-      invoice.preTaxAmount = Number(invoice.totalAmount) - Number(invoice.taxAmount);
-    }
-  }
-
-  // paymentMethod
-  if (raw.paymentMethod === 'CASH' || raw.paymentMethod === 'BANK_TRANSFER') {
-    invoice.paymentMethod = raw.paymentMethod;
-  } else {
-    invoice.paymentMethod = 'CASH';
-  }
-
-  if (typeof raw.hasBankSlip === 'boolean') invoice.hasBankSlip = raw.hasBankSlip;
-  if (typeof raw.hasItemManifest === 'boolean') invoice.hasItemManifest = raw.hasItemManifest;
-  invoice.isImageBlurry = Boolean(raw.isImageBlurry);
-  invoice.sellerStatus = raw.sellerStatus === 'ACTIVE' || raw.sellerStatus === 'SUSPENDED' || raw.sellerStatus === 'CLOSED'
-    ? raw.sellerStatus
-    : 'UNKNOWN';
-  invoice.isAdjustment = Boolean(raw.isAdjustment);
-
-  // Chuẩn hóa danh sách dòng hàng (IMP-08)
-  if (Array.isArray(raw.items) && raw.items.length > 0) {
-    invoice.items = raw.items.map((it: any, index: number) => ({
-      lineNumber: typeof it.lineNumber === 'number' ? it.lineNumber : index + 1,
-      itemName: String(it.itemName || `Mặt hàng ${index + 1}`),
-      unit: it.unit ? String(it.unit) : undefined,
-      quantity: typeof it.quantity === 'number' ? it.quantity : 1,
-      unitPrice: typeof it.unitPrice === 'number' ? it.unitPrice : 0,
-      amount: typeof it.amount === 'number' ? it.amount : 0,
-      taxRate: typeof it.taxRate === 'number' && [0, 5, 8, 10].includes(it.taxRate)
-        ? it.taxRate
-        : (parseTaxRateString(it.taxRate) ?? (invoice.taxRate !== undefined ? (invoice.taxRate as 0 | 5 | 8 | 10) : 0)),
-      taxAmount: typeof it.taxAmount === 'number' ? it.taxAmount : 0,
-      discountAmount: typeof it.discountAmount === 'number' ? it.discountAmount : undefined
-    }));
-  }
-
-  if (invoice.totalAmount === undefined) {
-    warnings.push('Chưa nhận diện được Tổng tiền thanh toán. Vui lòng kiểm tra lại.');
-  }
-
-  return { invoice, warnings };
-}
-
-export async function POST(req: NextRequest) {
+// Stored in the current request database: never reuse another session's artifact/review.
+const extractionVersion = `vision-compact-v3:${GEMINI_API_CONFIG.BASE_URL}:${GEMINI_API_CONFIG.MODEL}:${process.env.DOCUMENT_IMAGE_MAX_DIM || "1000"}-q${process.env.DOCUMENT_IMAGE_JPEG_QUALITY || "80"}:provenance-v1:${process.env.DOCUMENT_IMAGE_ENGINE || "gemini"}:receipt-v2:${process.env.LOCAL_OCR_PROFILE || "min960"}`;
+function getCachedDocumentResult(hash: string) {
+  const row = getDatabase().prepare(`SELECT r.payload_json FROM document_artifacts a
+    JOIN extraction_reviews r ON r.artifact_id=a.id WHERE a.content_hash=?`).get(hash) as {payload_json:string}|undefined;
+  if (!row) return null;
   try {
+    const stored = JSON.parse(row.payload_json);
+    if (stored.extractionVersion !== extractionVersion) return null;
+    const result = DocumentExtractionSchema.safeParse(stored.cachedResult);
+    return result.success ? result.data : null;
+  } catch { return null; }
+}
+function extractionResponse(result: unknown, started: number, cacheHit=false) {
+  const totalMs = Math.round(performance.now()-started);
+  return NextResponse.json({ ...(result as object), performance:{totalMs,cacheHit} },
+    { headers:{'Server-Timing':`extraction;dur=${totalMs}`, 'Cache-Control':'no-store'} });
+}
+
+
+function persistTextExtraction(rawText:string, rawInvoice:Record<string,unknown>, result:any, extractedFields:string[]) {
+ const db=getDatabase();const hash=result.sourceHash;
+ const prior=db.prepare('SELECT id FROM document_artifacts WHERE content_hash=?').get(hash) as {id:string}|undefined;
+ const id=prior?.id || crypto.randomUUID();const directory=artifactRoot();const storage=path.join(directory,`${id}.txt`);
+ if(!prior){fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(storage,rawText,{flag:'wx'});db.prepare('INSERT INTO document_artifacts (id,invoice_id,revision,original_file_name,source_type,mime_type,storage_path,content_hash,byte_size,signature_status,created_at) VALUES (?,?,1,?,?,?,?,?,?,?,?)').run(id,`pending:${id}`,'van-ban.txt','FORM','text/plain',storage,hash,Buffer.byteLength(rawText),'NOT_APPLICABLE',jsonNow());}
+ const inferredFields=Object.keys(result.invoice).filter(k=>!extractedFields.includes(k) && !['isImageBlurry','isAdjustment'].includes(k));
+ const uncertainFields=[...new Set([...(result.uncertainFields || []),...inferredFields])];
+ const output={...result,artifactId:id,uncertainFields,needsReview:true};
+ db.prepare('INSERT OR REPLACE INTO extraction_reviews VALUES (?,?)').run(id,JSON.stringify({...output,invoice:rawInvoice,inferredFields}));return output;
+}
+
+async function handlePOST(req: NextRequest) {
+  const started = performance.now();
+  try {
+    requireRequestUser(req);
     const contentType = req.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
       const body = await req.json();
       const rawText = String(body.rawText || '').trim();
       if (!rawText) return NextResponse.json({ error: 'Nội dung văn bản trống' }, { status: 400 });
+
+      const textHash = crypto.createHash('sha256').update(rawText).digest('hex');
+      const cached = getCachedDocumentResult(textHash);
+      if (cached) return NextResponse.json(cached);
 
       const parsedText = parseInvoiceFromRawText(rawText);
       const { invoice, warnings } = sanitizeInvoice(parsedText.invoice);
@@ -462,15 +72,13 @@ export async function POST(req: NextRequest) {
       const enriched = await autoEnrichSupplierData({
         supplierTaxCode: typeof invoice.supplierTaxCode === 'string' ? invoice.supplierTaxCode : undefined,
         supplierName: typeof invoice.supplierName === 'string' ? invoice.supplierName : undefined,
-        rawText
+        rawText,
+        skipAi: true
       });
       if (enriched.enrichedField) {
         invoice.supplierTaxCode = enriched.supplierTaxCode || invoice.supplierTaxCode;
         invoice.supplierName = enriched.supplierName || invoice.supplierName;
       }
-
-      const textHash = crypto.createHash('sha256').update(rawText).digest('hex');
-      const artifactId = `RAW-${Date.now().toString(36).toUpperCase()}`;
 
       const combinedWarnings = [
         `Đã bóc tách tự động từ văn bản thô (${parsedText.extractedFields.length} trường nhận diện).`,
@@ -483,16 +91,19 @@ export async function POST(req: NextRequest) {
         confidence: Object.fromEntries(Object.keys(invoice).map((key) => [key, parsedText.extractedFields.includes(key) ? 0.95 : 0.7])),
         needsReview: true,
         sourceType: 'FORM',
-        artifactId,
         sourceHash: textHash,
         warnings: combinedWarnings
       });
-      return NextResponse.json(result);
+      return NextResponse.json(persistTextExtraction(rawText,parsedText.invoice as Record<string,unknown>,result,parsedText.extractedFields));
     }
 
     const form = await req.formData();
     const rawText = form.get('rawText');
     if (typeof rawText === 'string' && rawText.trim()) {
+      const textHash = crypto.createHash('sha256').update(rawText.trim()).digest('hex');
+      const cached = getCachedDocumentResult(textHash);
+      if (cached) return NextResponse.json(cached);
+
       const parsedText = parseInvoiceFromRawText(rawText.trim());
       const { invoice, warnings } = sanitizeInvoice(parsedText.invoice);
 
@@ -500,15 +111,13 @@ export async function POST(req: NextRequest) {
       const enriched = await autoEnrichSupplierData({
         supplierTaxCode: typeof invoice.supplierTaxCode === 'string' ? invoice.supplierTaxCode : undefined,
         supplierName: typeof invoice.supplierName === 'string' ? invoice.supplierName : undefined,
-        rawText: rawText.trim()
+        rawText: rawText.trim(),
+        skipAi: true
       });
       if (enriched.enrichedField) {
         invoice.supplierTaxCode = enriched.supplierTaxCode || invoice.supplierTaxCode;
         invoice.supplierName = enriched.supplierName || invoice.supplierName;
       }
-
-      const textHash = crypto.createHash('sha256').update(rawText).digest('hex');
-      const artifactId = `RAW-${Date.now().toString(36).toUpperCase()}`;
 
       const combinedWarnings = [
         `Đã bóc tách tự động từ văn bản thô (${parsedText.extractedFields.length} trường nhận diện).`,
@@ -521,11 +130,10 @@ export async function POST(req: NextRequest) {
         confidence: Object.fromEntries(Object.keys(invoice).map((key) => [key, parsedText.extractedFields.includes(key) ? 0.95 : 0.7])),
         needsReview: true,
         sourceType: 'FORM',
-        artifactId,
         sourceHash: textHash,
         warnings: combinedWarnings
       });
-      return NextResponse.json(result);
+      return NextResponse.json(persistTextExtraction(rawText,parsedText.invoice as Record<string,unknown>,result,parsedText.extractedFields));
     }
 
     const file = form.get('file');
@@ -546,10 +154,14 @@ export async function POST(req: NextRequest) {
 
     if (!sourceType) return NextResponse.json({ error: 'Chỉ hỗ trợ file XML, PDF và ảnh hóa đơn (PNG, JPG)' }, { status: 415 });
 
+    if (sourceType === 'XML') assertValidXml(buffer.toString('utf8'));
+    const cachedFile = form.get('forceRefresh') === 'true' ? null : getCachedDocumentResult(sourceHash);
+    if (cachedFile && cachedFile.sourceType === sourceType) return extractionResponse(cachedFile,started,true);
+
     const existingArtifact = getDatabase().prepare('SELECT id FROM document_artifacts WHERE content_hash = ?').get(sourceHash) as { id: string } | undefined;
     const artifactId = existingArtifact?.id || crypto.randomUUID();
     const extension = path.extname(file.name).toLowerCase().replace(/[^a-z0-9.]/g, '') || '.bin';
-    const artifactDirectory = path.join(process.cwd(), 'data', 'runtime', 'artifacts');
+    const artifactDirectory = artifactRoot();
     const storagePath = path.join(artifactDirectory, `${artifactId}${extension}`);
 
     if (!existingArtifact) {
@@ -576,7 +188,10 @@ export async function POST(req: NextRequest) {
 
     let rawData: Record<string, unknown> = {};
     let initialWarnings: string[] = [];
+    let sourceReadFields: string[] | undefined;
     let extractedOcrDetails: any = null;
+    let extractedFieldConfidences: Record<string, number> = {};
+    let localUncertainFields: string[] = [];
 
     if (sourceType === 'XML') {
       const parsed = parseXml(buffer.toString('utf8'));
@@ -595,8 +210,9 @@ export async function POST(req: NextRequest) {
           parsedPdf.extractedFields.includes('invoiceNumber')
         ) {
           rawData = parsedPdf.invoice as Record<string, unknown>;
+          sourceReadFields = parsedPdf.extractedFields;
           initialWarnings.push(
-            `Đã trích xuất siêu tốc (<0.05s) trực tiếp từ Digital PDF (${parsedPdf.extractedFields.length} trường).`
+            `Đã đọc lớp chữ trực tiếp từ PDF (${parsedPdf.extractedFields.length} trường).`
           );
         }
       }
@@ -612,59 +228,89 @@ export async function POST(req: NextRequest) {
           rawData = (extracted || {}) as Record<string, unknown>;
           const engineLabel =
             engineUsed === 'GEMINI_AI'
-              ? 'Google Gemini Vision'
+              ? 'Gemini 2.5 Flash'
+              : engineUsed === 'QWEN_AI'
+              ? GEMINI_API_CONFIG.MODEL
               : engineUsed === 'HYBRID_NEURAL_OCR'
               ? 'Hybrid Neural OCR'
-              : 'AI OCR Engine';
-          initialWarnings.push(`Dữ liệu OCR được đọc bởi ${engineLabel}; kế toán vui lòng kiểm tra lại trước khi thẩm định.`);
-        } catch (aiError) {
-          console.warn('Unified AI extraction fallback:', aiError);
-          initialWarnings.push('Không thể nhận diện tự động qua AI. Vui lòng nhập thông tin chứng từ trên Form.');
+              : 'Gemini 2.5 Flash';
+          initialWarnings.push(`Dữ liệu được trích xuất trực tiếp bởi ${engineLabel}; kế toán vui lòng kiểm tra lại trước khi thẩm định.`);
+        } catch (aiError: any) {
+          console.error('[Document Parse] Lỗi bóc tách PDF scan qua Gemini Vision:', aiError);
+          return NextResponse.json({
+            error: `Lỗi đọc tài liệu PDF từ Gemini Vision: ${aiError?.message || 'Không thể trích xuất dữ liệu từ API'}`
+          }, { status: 502 });
         }
       }
     } else {
-      // IMAGE: Ưu tiên Hybrid Pipeline (Apple Vision NPU + DeepSeek Text Parser)
+      // IMAGE: Sử dụng model Gemini 2.5 Flash Vision
       let mimeType = file.type || 'image/jpeg';
       if (!mimeType.startsWith('image/')) mimeType = 'image/jpeg';
 
-      const optimized = optimizeImageBuffer(buffer, mimeType);
+      const t_opt0 = Date.now();
+      const optimized = await optimizeImageBuffer(buffer, mimeType);
+      console.log(`[Parse Perf] Optimize Image: ${Date.now() - t_opt0}ms`);
 
       try {
-        const { data: extracted, ocrDetails } = await extractInvoiceWithHybridPipeline({
+        const t_ai0 = Date.now();
+        const { data: extracted, ocrDetails, uncertainFields: localFields, fieldConfidences, fallbackReason } = await extractInvoiceWithHybridPipeline({
           imagePath: storagePath,
           fileBase64: optimized.buffer.toString('base64'),
           mimeType: optimized.mimeType,
           fileName: file.name
         });
+        console.log(`[Parse Perf] Vision AI Call: ${Date.now() - t_ai0}ms`);
         rawData = (extracted || {}) as Record<string, unknown>;
         extractedOcrDetails = ocrDetails;
+        extractedFieldConfidences = fieldConfidences || {};
+        localUncertainFields = localFields || [];
+        if (fallbackReason) initialWarnings.push(`Luồng trích xuất: ${fallbackReason}.`);
+        if (process.env.DOCUMENT_IMAGE_ENGINE === 'local-ocr') sourceReadFields = Object.keys(rawData);
 
-        // Cảnh báo chất lượng quang học chỉ khi có nhiều dòng mờ nét (>= 3 dòng)
         if (ocrDetails?.lowConfidenceLines && ocrDetails.lowConfidenceLines.length >= 3) {
           initialWarnings.push(
             `⚠️ Phát hiện ${ocrDetails.lowConfidenceLines.length} dòng chữ in bị mờ nét hoặc phai mực trên chứng từ.`
           );
         }
-      } catch (aiError) {
-        console.warn('Hybrid AI extraction fallback:', aiError);
-        initialWarnings.push('Không thể nhận diện tự động qua AI. Vui lòng nhập thông tin chứng từ trên Form.');
+      } catch (aiError: any) {
+        console.error('[Document Parse] Lỗi bóc tách ảnh hóa đơn qua Gemini Vision:', aiError);
+        return NextResponse.json({
+          error: `Lỗi đọc ảnh hóa đơn từ Gemini 2.5 Flash: ${aiError?.message || 'Không thể trích xuất dữ liệu từ API'}`
+        }, { status: 502 });
       }
     }
 
+    const t_san0 = Date.now();
     const { invoice, warnings } = sanitizeInvoice(rawData);
+    console.log(`[Parse Perf] Sanitize Invoice: ${Date.now() - t_san0}ms`);
 
-    // Tự động suy luận và điền trường MST hoặc Tên bên bán còn thiếu
-    const enriched = await autoEnrichSupplierData({
-      supplierTaxCode: typeof invoice.supplierTaxCode === 'string' ? invoice.supplierTaxCode : undefined,
-      supplierName: typeof invoice.supplierName === 'string' ? invoice.supplierName : undefined
-    });
+    // Local OCR is deliberately source-preserving: the shared sanitizer can
+    // derive a missing amount from total + VAT rate for legacy XML/VLM flows,
+    // but an image must never gain a tax value that was not printed. Keep only
+    // numeric fields actually returned by the OCR entity parser.
+    if (process.env.DOCUMENT_IMAGE_ENGINE === 'local-ocr') {
+      for (const field of ['preTaxAmount', 'taxAmount', 'totalAmount'] as const) {
+        if (!(field in rawData)) delete invoice[field];
+      }
+    }
+
+    // Tự động đối chiếu CSDL & Danh bạ chuỗi bán lẻ để điền MST hoặc Tên bên bán (bỏ qua LLM để đạt tốc độ < 1s)
+    const t_enr0 = Date.now();
+    const enriched = process.env.DOCUMENT_IMAGE_ENGINE === 'local-ocr'
+      ? { enrichedField: undefined, supplierTaxCode: undefined, supplierName: undefined }
+      : await autoEnrichSupplierData({
+          supplierTaxCode: typeof invoice.supplierTaxCode === 'string' ? invoice.supplierTaxCode : undefined,
+          supplierName: typeof invoice.supplierName === 'string' ? invoice.supplierName : undefined,
+          skipAi: true
+        });
+    console.log(`[Parse Perf] Auto Enrich Supplier: ${Date.now() - t_enr0}ms`);
     if (enriched.enrichedField) {
       invoice.supplierTaxCode = enriched.supplierTaxCode || invoice.supplierTaxCode;
       invoice.supplierName = enriched.supplierName || invoice.supplierName;
     }
 
     // Xác định các trường bóc tách bị mờ / không chắc chắn và Bounding Boxes để highlight trực tiếp trên hóa đơn
-    const uncertainFields: string[] = [];
+    const uncertainFields: string[] = [...localUncertainFields];
     const fieldWarnings: Record<string, string> = {};
     const ocrHighlights: Array<{
       text: string;
@@ -836,38 +482,107 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Kiểm định Đẳng thức Toán học Bất biến & Checksum MST (Kiểm định 100% chính xác)
-    const mathCheck = validateInvoiceMathematics(invoice);
-
+    const inferredFields = Object.keys(invoice).filter(key => !['isImageBlurry','isAdjustment','sellerStatus'].includes(key) && (rawData[key] === undefined || rawData[key] === null || (sourceReadFields !== undefined && !sourceReadFields.includes(key))));
+    for (const key of inferredFields) if (!uncertainFields.includes(key)) uncertainFields.push(key);
+    // Balanced zeros and absent identities are not evidence of successful OCR.
+    const requiredSourceFields = ['invoiceNumber','invoiceDate','supplierTaxCode','supplierName','itemName','preTaxAmount','taxRate','taxAmount','totalAmount'];
+    if (sourceType !== 'XML') requiredSourceFields.push('buyerTaxCode');
+    for (const key of requiredSourceFields) {
+      if (invoice[key] === undefined || invoice[key] === null || invoice[key] === '') {
+        if (!uncertainFields.includes(key)) uncertainFields.push(key);
+        fieldWarnings[key] = 'Chưa đọc được từ chứng từ gốc; cần bổ sung và xác minh.';
+      }
+    }
+    const absentFields = requiredSourceFields.filter((key) => invoice[key] === undefined || invoice[key] === null || invoice[key] === '');
+    // A ten/13-digit shape alone is not enough evidence for an MST. Reject
+    // OCR strings that fail the public checksum and keep them editable; a
+    // directory lookup or supplier name must never silently repair a printed
+    // tax code.
+    for (const key of ['supplierTaxCode', 'buyerTaxCode'] as const) {
+      const value = invoice[key];
+      if (typeof value === 'string' && value && !validateTaxCode(value).isValid) {
+        if (!uncertainFields.includes(key)) uncertainFields.push(key);
+        fieldWarnings[key] = 'Mã số thuế đọc được không vượt qua kiểm tra chữ số; cần đối chiếu bản gốc.';
+      }
+    }
+    if (sourceType !== 'XML' && Number(invoice.preTaxAmount || 0) === 0 && Number(invoice.totalAmount || 0) === 0) {
+      for (const key of ['preTaxAmount','taxAmount','totalAmount']) {
+        if (!uncertainFields.includes(key)) uncertainFields.push(key);
+        fieldWarnings[key] = 'Không có số tiền đáng tin cậy từ OCR; số 0 cần xác minh.';
+      }
+    }
+    // Run the arithmetic check only after source/uncertainty guards have been
+    // assembled. A mathematically balanced value from a weak OCR token is not
+    // evidence that the printed invoice is correct.
+    const mathCheck = validateInvoiceMathematics(invoice, {
+      untrustedFields: uncertainFields,
+      sourceType
+    });
     const combinedWarnings = [...initialWarnings, ...warnings, ...mathCheck.notes];
     if (enriched.notes) combinedWarnings.unshift(enriched.notes);
 
+    const confidence = Object.fromEntries(
+      Object.keys(invoice).map((key) => [
+        key,
+        uncertainFields.includes(key)
+          ? 0.6
+          : sourceType === 'XML'
+          ? 1
+          : Math.min(0.95, Math.max(0.05, extractedFieldConfidences[key] ?? 0.85))
+      ])
+    );
+    const evidenceSource = sourceType === 'XML'
+      ? 'XML'
+      : sourceType === 'PDF' && sourceReadFields
+      ? 'PDF_TEXT'
+      : sourceType === 'IMAGE' && extractedOcrDetails
+      ? 'OCR'
+      : sourceType === 'IMAGE'
+      ? 'VLM'
+      : 'USER';
+    const fieldEvidence = Object.fromEntries(
+      Object.keys(invoice).map((key) => [key, {
+        source: inferredFields.includes(key) ? 'INFERRED' : evidenceSource,
+        status: !mathCheck.isBalanced && ['preTaxAmount', 'taxAmount', 'totalAmount'].includes(key)
+          ? 'CONFLICT'
+          : uncertainFields.includes(key)
+          ? 'UNCERTAIN'
+          : 'VERIFIED',
+        confidence: confidence[key] ?? 0,
+        text: typeof rawData[key] === 'string' ? rawData[key] as string : undefined
+      }])
+    );
+    for (const key of absentFields) {
+      fieldEvidence[key] = {
+        source: evidenceSource,
+        status: 'ABSENT',
+        confidence: 0,
+        text: undefined
+      };
+    }
+    const conflicts = mathCheck.isBalanced ? [] : combinedWarnings.filter((warning) => /không khớp|không xác nhận|mâu thuẫn/i.test(warning));
+
     const result = DocumentExtractionSchema.parse({
       invoice,
-      confidence: Object.fromEntries(
-        Object.keys(invoice).map((key) => [
-          key,
-          uncertainFields.includes(key)
-            ? 0.6
-            : sourceType === 'XML'
-            ? 1
-            : mathCheck.isBalanced && ['totalAmount', 'preTaxAmount', 'taxAmount'].includes(key)
-            ? 0.98
-            : 0.85
-        ])
-      ),
+      confidence,
       needsReview: !mathCheck.isBalanced || Boolean(invoice.isImageBlurry) || uncertainFields.length > 0,
       sourceType,
       artifactId,
       sourceHash,
       warnings: combinedWarnings,
       uncertainFields,
+      absentFields,
+      conflicts,
       fieldWarnings,
+      fieldEvidence,
       ocrHighlights
     });
 
-    return NextResponse.json(result);
+    getDatabase().prepare('INSERT OR REPLACE INTO extraction_reviews (artifact_id,payload_json) VALUES (?,?)').run(artifactId,JSON.stringify({...result, invoice:rawData, inferredFields, extractionVersion, cachedResult:result}));
+    return extractionResponse(result,started);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể đọc chứng từ' }, { status: 400 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể đọc chứng từ' }, { status: error instanceof Error && error.message === 'AUTH_REQUIRED' ? 401 : 400 });
   }
 }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }

@@ -1,3 +1,5 @@
+import { RequestError, requestErrorResponse } from '@/lib/server/http';
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRequestUser } from '@/lib/server/auth';
 import { getDatabase } from '@/lib/server/db';
@@ -5,6 +7,7 @@ import { InvoiceInput, RefereeDecision } from '@/lib/schemas';
 import { generateCanonicalVoucher } from '@/lib/accounting/ledgerMapper';
 import { formatMisaAmisPayload } from '@/lib/accounting/adapters/misaAdapter';
 import { formatFastAccountingPayload } from '@/lib/accounting/adapters/fastAdapter';
+import { generateUniversalCsv, generateUniversalXml } from '@/lib/accounting/adapters/universalXmlExporter';
 import { CanonicalLedgerVoucher, LedgerSyncRequest, LedgerSyncResult } from '@/lib/accounting/types';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +20,7 @@ function parseJson<T>(value: unknown, fallback: T): T {
   }
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     requireRequestUser(request);
     const db = getDatabase();
@@ -36,6 +39,7 @@ export async function GET(request: NextRequest) {
         WHERE e2.invoice_id = i.id
         ORDER BY datetime(e2.created_at) DESC LIMIT 1
       )
+      WHERE i.status = 'APPROVED'
       ORDER BY datetime(i.updated_at) DESC
       LIMIT 100
     `).all() as Array<Record<string, unknown>>;
@@ -71,19 +75,19 @@ export async function GET(request: NextRequest) {
       vouchers
     });
   } catch (err) {
-    return NextResponse.json(
-      { success: false, error: err instanceof Error ? err.message : 'Lỗi lấy sổ kế toán' },
-      { status: 500 }
-    );
+    return requestErrorResponse(err, 'Lỗi lấy sổ kế toán');
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const user = requireRequestUser(request);
     const body = (await request.json()) as LedgerSyncRequest;
     const { targetSystem = 'MISA_AMIS', voucherIds, regime = 'CIRCULAR_99_200' } = body;
 
+    if (!['MISA_AMIS', 'FAST_ACCOUNTING', 'UNIVERSAL_XML', 'UNIVERSAL_EXCEL'].includes(targetSystem)) throw new RequestError('Adapter kế toán không hợp lệ.');
+    if (!['CIRCULAR_133', 'CIRCULAR_99_200'].includes(regime)) throw new RequestError('Chế độ kế toán không hợp lệ.');
+    if (voucherIds !== undefined && (!Array.isArray(voucherIds) || voucherIds.some(id => typeof id !== 'string'))) throw new RequestError('Danh sách chứng từ không hợp lệ.');
     const db = getDatabase();
     const rows = db.prepare(`
       SELECT
@@ -96,6 +100,7 @@ export async function POST(request: NextRequest) {
         WHERE e2.invoice_id = i.id
         ORDER BY datetime(e2.created_at) DESC LIMIT 1
       )
+      WHERE i.status = 'APPROVED'
       ORDER BY datetime(i.updated_at) DESC
     `).all() as Array<Record<string, unknown>>;
 
@@ -131,6 +136,10 @@ export async function POST(request: NextRequest) {
       exportedData = JSON.stringify(formatMisaAmisPayload(vouchers), null, 2);
     } else if (targetSystem === 'FAST_ACCOUNTING') {
       exportedData = JSON.stringify(formatFastAccountingPayload(vouchers), null, 2);
+    } else if (targetSystem === 'UNIVERSAL_XML') {
+      exportedData = generateUniversalXml(vouchers);
+    } else if (targetSystem === 'UNIVERSAL_EXCEL') {
+      exportedData = generateUniversalCsv(vouchers);
     }
 
     const result: LedgerSyncResult = {
@@ -143,7 +152,7 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
       vouchers: vouchers.map((v) => ({
         ...v,
-        status: 'POSTED_TO_GL',
+        status: 'READY_TO_POST',
         targetSystem,
         postedAt: new Date().toISOString()
       })),
@@ -152,9 +161,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    return NextResponse.json(
-      { success: false, error: err instanceof Error ? err.message : 'Lỗi đồng bộ sổ sách' },
-      { status: 500 }
-    );
+    return requestErrorResponse(err, 'Lỗi đồng bộ sổ sách');
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }

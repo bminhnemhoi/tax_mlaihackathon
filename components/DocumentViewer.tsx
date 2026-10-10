@@ -60,9 +60,10 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, classNa
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-slate-600 hover:text-slate-950 cursor-pointer"
+            className="h-10 w-10 text-slate-600 hover:text-slate-950 cursor-pointer"
             onClick={() => setZoom((z) => Math.max(z - 15, 70))}
             title="Thu nhỏ"
+            aria-label="Thu nhỏ tài liệu"
           >
             <ZoomOut className="w-3.5 h-3.5" />
           </Button>
@@ -72,9 +73,10 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, classNa
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-slate-600 hover:text-slate-950 cursor-pointer"
+            className="h-10 w-10 text-slate-600 hover:text-slate-950 cursor-pointer"
             onClick={() => setZoom((z) => Math.min(z + 15, 145))}
             title="Phóng to"
+            aria-label="Phóng to tài liệu"
           >
             <ZoomIn className="w-3.5 h-3.5" />
           </Button>
@@ -82,15 +84,17 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, classNa
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-slate-600 hover:text-slate-950 cursor-pointer"
+            className="h-10 w-10 text-slate-600 hover:text-slate-950 cursor-pointer"
             onClick={() => setIsFullscreen(!isFullscreen)}
             title={isFullscreen ? 'Thu nhỏ cửa sổ' : 'Toàn màn hình'}
+            aria-label={isFullscreen ? 'Thu nhỏ cửa sổ tài liệu' : 'Mở tài liệu toàn màn hình'}
           >
             {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </Button>
 
           <button
-            className="h-7 px-2.5 text-xs font-bold border border-slate-200 bg-white hover:bg-slate-100 text-slate-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+            type="button"
+            className="min-h-10 px-3 text-xs font-bold border border-slate-200 bg-white hover:bg-slate-100 text-slate-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
             onClick={handleDownloadSource}
             disabled={!invoice.sourceArtifactId}
             title={invoice.sourceArtifactId ? 'Tải tệp gốc' : 'Chưa có tệp'}
@@ -100,7 +104,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, classNa
           </button>
 
           <button
-            className="h-7 px-2.5 text-xs font-bold border border-slate-200 bg-white hover:bg-slate-100 text-slate-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+            type="button"
+            className="min-h-10 px-3 text-xs font-bold border border-slate-200 bg-white hover:bg-slate-100 text-slate-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
             onClick={handlePrint}
             title="In hóa đơn"
           >

@@ -14,11 +14,12 @@ export function checkDuplicateInvoice(invoice: InvoiceInput): DuplicateInfo {
       SELECT id, invoice_number, invoice_date, payload_json, created_at 
       FROM invoices 
       WHERE supplier_tax_code = ? 
-        AND invoice_number = ? 
+        AND invoice_number = ?
+        AND COALESCE(json_extract(payload_json, '$.invoiceSeries'), '') = ?
         AND id != ?
       ORDER BY datetime(created_at) ASC
       LIMIT 1
-    `).get(invoice.supplierTaxCode, invoice.invoiceNumber, invoice.id) as {
+    `).get(invoice.supplierTaxCode, invoice.invoiceNumber, invoice.invoiceSeries || '', invoice.id) as {
       id: string;
       invoice_number: string;
       invoice_date: string;
@@ -54,6 +55,6 @@ export function checkDuplicateInvoice(invoice: InvoiceInput): DuplicateInfo {
     };
   } catch (err) {
     console.warn('Lỗi kiểm tra trùng lặp CSDL:', err);
-    return { isDuplicate: false };
+    throw new Error('Không thể xác minh trùng lặp; dừng xử lý để kiểm tra database.');
   }
 }

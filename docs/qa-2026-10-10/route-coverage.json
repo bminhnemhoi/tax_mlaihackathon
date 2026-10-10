@@ -1,0 +1,662 @@
+[
+  {
+    "method": "GET",
+    "route": "/api/accounting/chart-of-accounts",
+    "source": "app/api/accounting/chart-of-accounts/route.ts",
+    "cases": [
+      "CHART-CIRCULAR_133",
+      "PUBLIC-1",
+      "CHART-CIRCULAR_99_200"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/audit",
+    "source": "app/api/audit/route.ts",
+    "cases": [
+      "ANON-2",
+      "AUDIT-READ",
+      "AUDIT-VERIFY"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/audit",
+    "source": "app/api/audit/route.ts",
+    "cases": [
+      "AUDIT-WRITE"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/auth/login",
+    "source": "app/api/auth/login/route.ts",
+    "cases": [
+      "LOGIN-KTT",
+      "LOGIN-CFO",
+      "LOGIN-ACCOUNTANT",
+      "LOGIN-ACCOUNTANT",
+      "LOGIN-WRONG",
+      "LOGIN-ACCOUNTANT",
+      "LOGIN-MALFORMED"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/auth/logout",
+    "source": "app/api/auth/logout/route.ts",
+    "cases": [
+      "LOGOUT"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/auth/me",
+    "source": "app/api/auth/me/route.ts",
+    "cases": [
+      "ME-ANON",
+      "LOGGED-OUT-TOKEN",
+      "ME-KTT",
+      "EXPIRED-SESSION"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/auth/switch",
+    "source": "app/api/auth/switch/route.ts",
+    "cases": [
+      "SWITCH-INTERNAL",
+      "DEMO-SWITCH-CFO-COOKIE",
+      "DEMO-SWITCH-CFO"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/banking/sync",
+    "source": "app/api/banking/sync/route.ts",
+    "cases": [
+      "ANON-14",
+      "BANK-GET-DEMO"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/banking/sync",
+    "source": "app/api/banking/sync/route.ts",
+    "cases": [
+      "ANON-WRITE-banking",
+      "BANK-FRESH-REPEAT",
+      "BANK-REPEAT",
+      "BANK-EMPTY",
+      "BANK-UNAUTH-VALID",
+      "BANK-SLIP-MATCH",
+      "BANK-BAD",
+      "BANK-FRESH-MATCH"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/demo/session",
+    "source": "app/api/demo/session/route.ts",
+    "cases": [
+      "DEMO-PRESERVE-INTERNAL",
+      "DEMO-8cbcd3",
+      "DEMO-516c0b",
+      "DEMO-e9c18a",
+      "DEMO-PRESERVE-CFO",
+      "DEMO-a1ceb7"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/documents/artifacts/[id]",
+    "source": "app/api/documents/artifacts/[id]/route.ts",
+    "cases": [
+      "ARTIFACT-CROSS",
+      "ANON-7",
+      "ARTIFACT-MISSING",
+      "ARTIFACT-READ"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/documents/parse",
+    "source": "app/api/documents/parse/route.ts",
+    "cases": [
+      "FILE-over-15mb.xml",
+      "FILE-at-15mb.xml",
+      "OCR-REAL-multi-page.pdf",
+      "FILE-unsupported.txt",
+      "OCR-REAL-text.pdf",
+      "FILE-broken.pdf",
+      "OCR-REAL-clear.webp",
+      "FILE-missing.xml",
+      "OCR-REAL-blurred.jpg",
+      "FILE-empty.xml",
+      "PARSE-EMPTY-TEXT",
+      "FILE-invoice.xml",
+      "PARSE-RAW",
+      "OCR-REAL-scan.pdf",
+      "OCR-REAL-rotated.jpg",
+      "OCR-REAL-clear.jpg",
+      "OCR-REAL-clear.png",
+      "FILE-broken.xml",
+      "PARSE-BAD-JSON"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/dossiers/[id]/export",
+    "source": "app/api/dossiers/[id]/export/route.ts",
+    "cases": [
+      "ANON-8",
+      "OTHER-EXPORT",
+      "HTML-ESCAPE",
+      "DOSSIER-json",
+      "DOSSIER-print"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/evaluate",
+    "source": "app/api/evaluate/route.ts",
+    "cases": [
+      "FB-QA-5",
+      "FB-QA-3",
+      "FB-QA-1",
+      "ADJUSTMENT",
+      "QGEN-REAL-5",
+      "SERIESYEAR",
+      "QGEN-LOCAL-4",
+      "LIFECYCLE",
+      "DAY-SUM-1",
+      "FB-QA-2",
+      "QGEN-LOCAL-1",
+      "SIGN31",
+      "WRONGTOTAL",
+      "SELLERCLOSED",
+      "DUP1",
+      "BANK-FRESH",
+      "QGEN-REAL-2",
+      "EVAL-INVALID-DATE",
+      "LINE-MISMATCH",
+      "AUTH-1",
+      "FB-QA-9",
+      "EVAL-PAUSED",
+      "MCCQT-C",
+      "CONCURRENT-1",
+      "QGEN-REAL-1",
+      "BLUR",
+      "FB-QA-7",
+      "QGEN-LOCAL-0",
+      "EVAL-INVALID-UNCERTAIN",
+      "REPEAT",
+      "QGEN-REAL-3",
+      "BUYERWRONG",
+      "BANK-NO-SLIP",
+      "DAY-BEFORE",
+      "SIGNBEFORE",
+      "DEMO-INV",
+      "EVAL-MALFORMED-JSON",
+      "CASH-1",
+      "DUP2",
+      "FB-QA-6",
+      "FB-QA-4",
+      "FB-QA-8",
+      "FB-QA-0",
+      "EVAL-INVALID-AMOUNT",
+      "WORKFLOW-ANON",
+      "CONCURRENT-2",
+      "QGEN-LOCAL-2",
+      "SELLERUNKNOWN",
+      "QGEN-REAL-4",
+      "SPECIAL",
+      "EXPORT-HOLD",
+      "MANIFEST",
+      "MULTI",
+      "QGEN-LOCAL-5",
+      "CASH-0",
+      "SIGNDELAY",
+      "AUTH-2",
+      "CASH-2",
+      "QGEN-REAL-0",
+      "AUTH-0",
+      "LINEBAD",
+      "DAY-AT",
+      "LIFECYCLE-RERUN",
+      "DAY-SUM-2",
+      "ROUTINE",
+      "QGEN-LOCAL-3",
+      "WORKFLOW-DEMO-PUBLIC",
+      "CLOSED-KNOWN",
+      "DAY-AFTER",
+      "EVAL-INVALID-MST",
+      "MISSING",
+      "MCCQT",
+      "AUTHONLY"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/feedback",
+    "source": "app/api/feedback/route.ts",
+    "cases": [
+      "FEEDBACK-3",
+      "FEEDBACK-ROLLBACK-CFO",
+      "FEEDBACK-8",
+      "FEEDBACK-FORBIDDEN",
+      "FEEDBACK-MALFORMED",
+      "FEEDBACK-1",
+      "FEEDBACK-2",
+      "ANON-POST-2",
+      "FEEDBACK-6",
+      "FEEDBACK-7",
+      "FEEDBACK-DUPLICATE",
+      "FEEDBACK-0",
+      "FEEDBACK-4",
+      "FEEDBACK-9",
+      "FEEDBACK-5",
+      "FEEDBACK-ROLLBACK-KTT"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/health",
+    "source": "app/api/health/route.ts",
+    "cases": [
+      "PUBLIC-0"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/inbox/bulk-confirm",
+    "source": "app/api/inbox/bulk-confirm/route.ts",
+    "cases": [
+      "BULK-LEGACY"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/inbox",
+    "source": "app/api/inbox/route.ts",
+    "cases": [
+      "READ-INBOX-ACCOUNTANT",
+      "READ-INBOX-CFO",
+      "READ-INBOX-KTT",
+      "ANON-0",
+      "INBOX-DETAILS",
+      "OTHER-EMPTY"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/invoices/[id]/audit-action",
+    "source": "app/api/invoices/[id]/audit-action/route.ts",
+    "cases": [
+      "LIFECYCLE-RESUME",
+      "EXPORT-HOLD-TAX_HOLD",
+      "LIFECYCLE-OVERRIDE",
+      "AUTHONLY-UNDO",
+      "MULTI-OVERRIDE",
+      "LIFECYCLE-PAUSE",
+      "LIFECYCLE-TAX_HOLD",
+      "LIFECYCLE-REQUEST_INFORMATION",
+      "LIFECYCLE-UNDO",
+      "LIFECYCLE-PAUSE",
+      "LIFECYCLE-PAUSE",
+      "LIFECYCLE-REQUEST_INFORMATION",
+      "LIFECYCLE-PAUSE",
+      "ANON-POST-4",
+      "LIFECYCLE-UNKNOWN",
+      "LIFECYCLE-RELEASE_TAX_HOLD"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/invoices/[id]/confirm",
+    "source": "app/api/invoices/[id]/confirm/route.ts",
+    "cases": [
+      "CONFIRM-LEGACY"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/invoices/duplicates",
+    "source": "app/api/invoices/duplicates/route.ts",
+    "cases": [
+      "ANON-6",
+      "DUP-READ"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/invoices/duplicates",
+    "source": "app/api/invoices/duplicates/route.ts",
+    "cases": [
+      "DUP-REVIEW",
+      "DUP-INVALID"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/invoices/evaluate",
+    "source": "app/api/invoices/evaluate/route.ts",
+    "cases": [
+      "ALIAS-EVALUATE"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/invoices/reset",
+    "source": "app/api/invoices/reset/route.ts",
+    "cases": [
+      "RESET-INTERNAL"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/ledger/export",
+    "source": "app/api/ledger/export/route.ts",
+    "cases": [
+      "LEDGER-CIRCULAR_133-xml",
+      "LEDGER-CIRCULAR_133-json",
+      "ANON-9",
+      "HELD-EXPORT-json",
+      "HELD-EXPORT-xml",
+      "LEDGER-CIRCULAR_99_200-xml",
+      "LEDGER-CIRCULAR_99_200-json",
+      "LEDGER-CIRCULAR_133-csv",
+      "HELD-EXPORT-csv",
+      "LEDGER-CIRCULAR_99_200-csv"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/ledger/sync",
+    "source": "app/api/ledger/sync/route.ts",
+    "cases": [
+      "LEDGER-CIRCULAR_99_200",
+      "ANON-10",
+      "LEDGER-CIRCULAR_133"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/ledger/sync",
+    "source": "app/api/ledger/sync/route.ts",
+    "cases": [
+      "ADAPTER-CIRCULAR_133-FAST_ACCOUNTING",
+      "ADAPTER-CIRCULAR_99_200-UNIVERSAL_XML",
+      "ADAPTER-CIRCULAR_133-MISA_AMIS",
+      "ADAPTER-CIRCULAR_99_200-MISA_AMIS",
+      "ADAPTER-CIRCULAR_133-UNIVERSAL_XML",
+      "ADAPTER-CIRCULAR_99_200-FAST_ACCOUNTING",
+      "ADAPTER-CIRCULAR_133-UNIVERSAL_EXCEL",
+      "ADAPTER-CIRCULAR_99_200-UNIVERSAL_EXCEL",
+      "ADAPTER-INVALID"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/legal-updates/[id]",
+    "source": "app/api/legal-updates/[id]/route.ts",
+    "cases": [
+      "ANON-13",
+      "LEGAL-DETAIL"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/legal-updates/[id]",
+    "source": "app/api/legal-updates/[id]/route.ts",
+    "cases": [
+      "LEGAL-APPROVE-FORBIDDEN",
+      "LEGAL-REJECT",
+      "LEGAL-STATUS-BAD"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/legal-updates",
+    "source": "app/api/legal-updates/route.ts",
+    "cases": [
+      "LEGAL-LIST",
+      "ANON-12"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/legal-updates",
+    "source": "app/api/legal-updates/route.ts",
+    "cases": [
+      "LEGAL-SYNC-FORBIDDEN",
+      "LEGAL-SYNC"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/notifications",
+    "source": "app/api/notifications/route.ts",
+    "cases": [
+      "ANON-3",
+      "NOTIFICATIONS",
+      "NOTIFICATION-FILTER"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/notifications",
+    "source": "app/api/notifications/route.ts",
+    "cases": [
+      "NOTIFICATION-READ",
+      "NOTIFICATION-BAD",
+      "NOTIFICATION-ALL"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/policy",
+    "source": "app/api/policy/route.ts",
+    "cases": [
+      "POLICY-BASELINE",
+      "ANON-4",
+      "POLICY-DEMO-READ"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/policy",
+    "source": "app/api/policy/route.ts",
+    "cases": [
+      "POLICY-BAD-CONFIG",
+      "POLICY-DRAFT",
+      "POLICY-FORBIDDEN",
+      "ANON-POST-0",
+      "POLICY-ROLLBACK",
+      "POLICY-PUBLISH",
+      "POLICY-MISSING",
+      "POLICY-VALIDATE"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/precedents",
+    "source": "app/api/precedents/route.ts",
+    "cases": [
+      "ANON-5",
+      "PRECEDENT-LIST"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/precedents",
+    "source": "app/api/precedents/route.ts",
+    "cases": [
+      "PRECEDENT-BAD-SCOPE",
+      "PRECEDENT-FORBIDDEN",
+      "PRECEDENT-CREATE",
+      "ANON-POST-1"
+    ]
+  },
+  {
+    "method": "DELETE",
+    "route": "/api/precedents",
+    "source": "app/api/precedents/route.ts",
+    "cases": [
+      "PRECEDENT-REVOKE-KTT",
+      "PRECEDENT-REVOKE-CFO"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/reconciliation/tct",
+    "source": "app/api/reconciliation/tct/route.ts",
+    "cases": [
+      "TCT-OTHER-DEMO",
+      "TCT-READ",
+      "ANON-15",
+      "TCT-READ-AFTER-QA-WORKAROUND"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/reconciliation/tct",
+    "source": "app/api/reconciliation/tct/route.ts",
+    "cases": [
+      "TCT-MISSING-DATA",
+      "TCT-EMPTY",
+      "ANON-WRITE-reconciliation",
+      "TCT-INCOMPLETE-FRESH",
+      "TCT-BAD",
+      "TCT-UNAUTH-VALID",
+      "TCT-REPEAT"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/resolutions",
+    "source": "app/api/resolutions/route.ts",
+    "cases": [
+      "RESOLVE-KTT-SPOOF",
+      "RESOLVE-CFO",
+      "ANON-POST-3",
+      "RESOLUTION-MISSING"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/runtime",
+    "source": "app/api/runtime/route.ts",
+    "cases": [
+      "RUNTIME-READ",
+      "ANON-1"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/suppliers/lookup",
+    "source": "app/api/suppliers/lookup/route.ts",
+    "cases": [
+      "LOOKUP-INVALID",
+      "LOOKUP-REAL-1",
+      "LOOKUP-NAME-OFFLINE",
+      "LOOKUP-NO-QUERY",
+      "LOOKUP-REAL-0"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/suppliers",
+    "source": "app/api/suppliers/route.ts",
+    "cases": [
+      "SUPPLIER-query=QA",
+      "SUPPLIER-status=ACTIVE",
+      "SUPPLIER-taxCode=0000000000",
+      "SUPPLIER-riskLevel=HIGH_RISK_INVOICE",
+      "SUPPLIER-taxCode=0100000999",
+      "SUPPLIER-SEED",
+      "ANON-16"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/suppliers",
+    "source": "app/api/suppliers/route.ts",
+    "cases": [
+      "SUPPLIER-EVIDENCE",
+      "SUPPLIER-BAD",
+      "ANON-WRITE-suppliers"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/tax-forms",
+    "source": "app/api/tax-forms/route.ts",
+    "cases": [
+      "ANON-11",
+      "TAXFORM-04%2FSS-H%C4%90%C4%90T-html",
+      "TAXFORM-MISSING",
+      "TAXFORM-BAD",
+      "TAXFORM-01%2FGTGT-json",
+      "TAXFORM-04%2FSS-H%C4%90%C4%90T-json",
+      "TAXFORM-01%2FGTGT-html"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/verify",
+    "source": "app/api/verify/route.ts",
+    "cases": [
+      "LOAD-5-0",
+      "LOAD-10-6",
+      "LOAD-10-7",
+      "LOAD-5-1",
+      "VERIFY-regression_15",
+      "LOAD-10-0",
+      "LOAD-10-1",
+      "VERIFY-BAD-MODE",
+      "LOAD-10-2",
+      "PUBLIC-2",
+      "LOAD-5-4",
+      "LOAD-10-3",
+      "VERIFY-challenge_a",
+      "LOAD-1-0",
+      "LOAD-10-4",
+      "LOAD-5-2",
+      "LOAD-10-8",
+      "LOAD-10-9",
+      "VERIFY-common_4",
+      "LOAD-5-3",
+      "LOAD-10-5"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/verify",
+    "source": "app/api/verify/route.ts",
+    "cases": [
+      "VERIFY-BAD-JSON",
+      "VERIFY-CUSTOM"
+    ]
+  },
+  {
+    "method": "GET",
+    "route": "/api/webhooks/legal-update",
+    "source": "app/api/webhooks/legal-update/route.ts",
+    "cases": [
+      "PUBLIC-3"
+    ]
+  },
+  {
+    "method": "POST",
+    "route": "/api/webhooks/legal-update",
+    "source": "app/api/webhooks/legal-update/route.ts",
+    "cases": [
+      "WEBHOOK-BAD-PAYLOAD",
+      "WEBHOOK-REPEAT",
+      "WEBHOOK-NO-SECRET",
+      "WEBHOOK-VALID",
+      "WEBHOOK-BAD-SECRET"
+    ]
+  }
+]

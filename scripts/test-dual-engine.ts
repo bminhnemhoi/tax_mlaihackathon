@@ -15,7 +15,7 @@ async function main() {
       RefereeDecisionSchema.parse(result.decision);
       passed++;
       console.log(`[PASS] ${row.id}: ${result.engineUsed} - ${result.decision.status}`);
-      if (result.engineUsed === 'QWEN_AI' || result.engineUsed === 'GEMINI_AI') {
+      if (result.engineUsed === 'QWEN_AI') {
         await new Promise((r) => setTimeout(r, 600));
       }
     } catch (error) {

@@ -5,18 +5,25 @@ export const JEV_API_CONFIG = {
 };
 
 export const GEMINI_API_CONFIG = {
-  ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
-  BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
-  API_KEY: process.env.GEMINI_API_KEY || '',
-  MODEL: 'gemini-2.5-flash-lite'
+  ENDPOINT: (process.env.SHOPAIKEY_BASE_URL || process.env.AI_BASE_URL || process.env.OPENROUTER_BASE_URL || 'https://api.shopaikey.com/v1') + '/chat/completions',
+  BASE_URL: process.env.SHOPAIKEY_BASE_URL || process.env.AI_BASE_URL || process.env.OPENROUTER_BASE_URL || 'https://api.shopaikey.com/v1',
+  API_KEY: process.env.SHOPAIKEY_API_KEY || process.env.AI_API_KEY || process.env.OPENROUTER_API_KEY || '',
+  MODEL: process.env.SHOPAIKEY_MODEL || process.env.AI_MODEL || process.env.OPENROUTER_MODEL || 'gemini-2.5-flash'
+};
+
+export const OPENROUTER_API_CONFIG = {
+  ENDPOINT: (process.env.OPENROUTER_BASE_URL || GEMINI_API_CONFIG.BASE_URL) + '/chat/completions',
+  BASE_URL: process.env.OPENROUTER_BASE_URL || GEMINI_API_CONFIG.BASE_URL,
+  API_KEY: process.env.OPENROUTER_API_KEY || GEMINI_API_CONFIG.API_KEY,
+  MODEL: process.env.OPENROUTER_MODEL || GEMINI_API_CONFIG.MODEL
 };
 
 export const QWEN_API_CONFIG = {
-  ENDPOINT: (process.env.QWEN_BASE_URL || 'https://ws-0shshb54xxvk987d.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1') + '/chat/completions',
-  BASE_URL: process.env.QWEN_BASE_URL || 'https://ws-0shshb54xxvk987d.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
-  API_KEY: process.env.QWEN_API_KEY || '',
-  MODEL: process.env.QWEN_MODEL || 'qwen-plus-character',
-  FAST_MODEL: 'qwen-flash-character'
+  ENDPOINT: (process.env.QWEN_BASE_URL || GEMINI_API_CONFIG.BASE_URL) + '/chat/completions',
+  BASE_URL: process.env.QWEN_BASE_URL || GEMINI_API_CONFIG.BASE_URL,
+  API_KEY: process.env.QWEN_API_KEY || GEMINI_API_CONFIG.API_KEY,
+  MODEL: process.env.QWEN_MODEL || GEMINI_API_CONFIG.MODEL,
+  FAST_MODEL: GEMINI_API_CONFIG.MODEL
 };
 
 export const MACRO_DEFAULTS = {

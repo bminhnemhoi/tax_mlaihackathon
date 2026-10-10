@@ -1,3 +1,4 @@
+import { withRequestDatabase, isSandbox } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'node:fs';
 import { requireRequestUser } from '@/lib/server/auth';
@@ -6,15 +7,18 @@ import { MACRO_DEFAULTS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     requireRequestUser(request);
+    if (!isSandbox()) return NextResponse.json({ error: 'Reset chỉ dành cho sandbox demo.' }, { status: 403 });
     const db = getDatabase();
 
     const artifacts = db.prepare('SELECT storage_path FROM document_artifacts').all() as Array<{ storage_path: string }>;
 
     const resetTx = db.transaction(() => {
       db.exec(`
+        DELETE FROM internal_vouchers;
+        DELETE FROM invoice_revisions;
         DELETE FROM dossier_snapshots;
         DELETE FROM human_resolutions;
         DELETE FROM evaluations;
@@ -58,3 +62,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }

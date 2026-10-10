@@ -1,3 +1,6 @@
+import { requireRequestUser } from '@/lib/server/auth';
+import { RequestError, requestErrorResponse } from '@/lib/server/http';
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase, jsonNow } from '@/lib/server/db';
 import { parseBankStatement } from '@/lib/banking/bankStatementParser';
@@ -99,8 +102,9 @@ function getAllSystemInvoices(): InvoiceInput[] {
   return rows.map(r => InvoiceInputSchema.parse(JSON.parse(r.payload_json)));
 }
 
-export async function GET() {
+async function handleGET(req: NextRequest) {
   try {
+    requireRequestUser(req);
     const transactions = getAllBankTransactions();
     const matchedCount = transactions.filter(t => Boolean(t.matchedInvoiceId)).length;
     const unmatchedCount = transactions.length - matchedCount;
@@ -115,12 +119,13 @@ export async function GET() {
       }
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Lỗi truy vấn sao kê ngân hàng' }, { status: 500 });
+    return requestErrorResponse(error, 'Lỗi truy vấn sao kê ngân hàng');
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
+    const user = requireRequestUser(req);
     const body = await req.json();
     const content = body.content as string;
     const defaultBankCode = (body.bankCode as string) || 'VCB';
@@ -134,25 +139,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Không trích xuất được giao dịch nào từ tệp sao kê' }, { status: 400 });
     }
 
-    saveBankTransactions(transactions);
-
-    // Kích hoạt thuật toán tự động khớp Hóa đơn - UNC
-    const systemInvoices = getAllSystemInvoices();
-    const allTransactions = getAllBankTransactions();
-    const matchResult = matchInvoicesWithBankTransactions(systemInvoices, allTransactions);
-
-    // Áp dụng các ca tự động khớp vào DB
-    const autoMatchedApplied = applyAutoMatchToDatabase(matchResult.matchedPairs);
-
-    return NextResponse.json({
-      success: true,
-      importedCount: transactions.length,
-      autoMatchedCount: matchResult.matchedPairs.length,
-      autoMatchedApplied,
-      suggestedCount: matchResult.suggestedPairs.length,
-      matchResult
-    });
+    const result = getDatabase().transaction(() => {
+      saveBankTransactions(transactions);
+      const systemInvoices = getAllSystemInvoices();
+      const allTransactions = getAllBankTransactions();
+      const matchResult = matchInvoicesWithBankTransactions(systemInvoices, allTransactions);
+      const autoMatchedApplied = applyAutoMatchToDatabase(matchResult.matchedPairs, user);
+      return { success: true, importedCount: transactions.length,
+        autoMatchedCount: matchResult.matchedPairs.length, autoMatchedApplied,
+        suggestedCount: matchResult.suggestedPairs.length, matchResult };
+    })();
+    return NextResponse.json(result);
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Lỗi xử lý sao kê ngân hàng' }, { status: 500 });
+    return requestErrorResponse(error, 'Lỗi xử lý sao kê ngân hàng');
   }
 }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }
+
+export async function GET(req: NextRequest) { return withRequestDatabase(req, () => handleGET(req)); }

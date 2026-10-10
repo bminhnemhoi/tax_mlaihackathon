@@ -1,0 +1,76 @@
+{
+  "method": "Đọc ảnh gốc thủ công; README không được dùng làm đáp án. Các trường không nhìn thấy phải để thiếu, không suy ra thuế từ tổng tiền.",
+  "cases": [
+    {
+      "file": "07_real_bill_circle_k.jpg",
+      "invoiceNumber": "00180477",
+      "invoiceDate": "2020-08-09",
+      "totalAmount": 11500,
+      "paymentMethod": "CASH",
+      "supplierNameContains": "VinCommerce",
+      "absent": [
+        "supplierTaxCode",
+        "buyerTaxCode",
+        "taxRate",
+        "taxAmount"
+      ]
+    },
+    {
+      "file": "08_real_bill_coopfood.jpg",
+      "invoiceNumber": "09336",
+      "invoiceDate": "2019-09-23",
+      "totalAmount": 13832,
+      "paymentMethod": "CASH",
+      "supplierTaxCode": "0309129418-115",
+      "taxRate": 5,
+      "taxAmount": 658.67,
+      "supplierNameContains": "Co.op",
+      "absent": [
+        "buyerTaxCode",
+        "preTaxAmount"
+      ]
+    },
+    {
+      "file": "09_real_bill_retail_store.jpg",
+      "invoiceNumber": "00230250",
+      "invoiceDate": "2020-08-13",
+      "totalAmount": 26400,
+      "paymentMethod": "CASH",
+      "supplierNameContains": "VinCommerce",
+      "absent": [
+        "supplierTaxCode",
+        "buyerTaxCode",
+        "taxRate",
+        "taxAmount"
+      ]
+    },
+    {
+      "file": "10_real_bill_restaurant.jpg",
+      "invoiceNumber": "00177774",
+      "invoiceDate": "2019-03-24",
+      "totalAmount": 28200,
+      "paymentMethod": "CASH",
+      "supplierNameContains": "VinCommerce",
+      "absent": [
+        "supplierTaxCode",
+        "buyerTaxCode",
+        "taxRate",
+        "taxAmount"
+      ]
+    },
+    {
+      "file": "11_real_invoice_photo.jpg",
+      "invoiceNumber": "HD198735",
+      "invoiceDate": "2024-11-20",
+      "totalAmount": 1380000,
+      "supplierNameContains": "Game",
+      "absent": [
+        "supplierTaxCode",
+        "buyerTaxCode",
+        "taxRate",
+        "taxAmount",
+        "paymentMethod"
+      ]
+    }
+  ]
+}

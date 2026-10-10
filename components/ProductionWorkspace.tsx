@@ -1,4 +1,6 @@
 'use client';
+import WorkflowAuditHistory from '@/components/WorkflowAuditHistory';
+import WorkflowControls from '@/components/WorkflowControls';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -62,6 +64,11 @@ type AppUser = { id: string; email: string; displayName: string; role: 'ACCOUNTA
 type View = 'inbox' | 'receive' | 'approval' | 'dossier' | 'reports' | 'notifications' | 'reconciliation' | 'banking' | 'suppliers';
 type InboxItem = {
   id: string;
+  revision?: number;
+  taxHold?: boolean;
+  internalVoucherId?:string|null;
+  allowedActions?: Record<string, any>;
+  review?: {unresolvedFields?:string[]};
   invoiceNumber: string;
   invoiceDate: string;
   supplierTaxCode: string;
@@ -77,6 +84,7 @@ type InboxItem = {
   legalVersion: string | null;
   updatedAt: string;
   resolution: { role: string; option: string; action: string; accepted: boolean; resolvedAt: string } | null;
+  latestAudit?: { eventType: string; actorId: string; payload: Record<string, unknown>; at: string } | null;
 };
 type DuplicateGroup = { supplierTaxCode: string; invoiceNumber: string; count: number; invoiceIds: string };
 
@@ -92,13 +100,16 @@ const statusConfig: Record<string, { label: string; variant: 'success' | 'warnin
   ROUTINE_PROPOSED: { label: 'Routine', variant: 'success' },
   WAITING_CHIEF_ACCOUNTANT: { label: 'Chờ KTT', variant: 'warning' },
   WAITING_CFO: { label: 'Chờ CFO', variant: 'destructive' },
-  APPROVED: { label: 'Đã duyệt', variant: 'success' },
+  PAUSED: {label:'Đã dừng xử lý',variant:'warning'},
+  EVALUATING: {label:'Đang đánh giá',variant:'info'},
+  APPROVED: { label: 'Đã tự xử lý / phê duyệt', variant: 'success' },
   REJECTED: { label: 'Từ chối', variant: 'destructive' },
   ON_HOLD: { label: 'Tạm dừng', variant: 'secondary' },
   FORWARDED: { label: 'Đã chuyển cấp trên', variant: 'warning' }
 };
 
 const roleCanApprove = (user: AppUser, item: InboxItem) => {
+  if(item.allowedActions) return item.allowedActions.approve === true;
   if (item.status === 'WAITING_CFO' || item.status === 'FORWARDED') return user.role === 'CFO';
   if (item.status === 'WAITING_CHIEF_ACCOUNTANT') return user.role === 'CHIEF_ACCOUNTANT' || user.role === 'CFO';
   return false;
@@ -121,6 +132,8 @@ export function ProductionWorkspace({
   onLogout: () => void;
   onRoleSwitched?: (nextUser: AppUser) => void;
 }) {
+  const [auditInvoiceId,setAuditInvoiceId]=useState('');
+  const [isDemo,setIsDemo]=useState(false);
   const [view, setView] = useState<View>('inbox');
   const [items, setItems] = useState<InboxItem[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -149,21 +162,19 @@ export function ProductionWorkspace({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
   const [selectedAuditEntry, setSelectedAuditEntry] = useState<AuditEntry | null>(null);
-  const [overriddenIds, setOverriddenIds] = useState<Set<string>>(new Set());
   const [provisionalHoldIds, setProvisionalHoldIds] = useState<Set<string>>(new Set());
 
-  const toggleProvisionalTaxHold = (itemId: string) => {
-    setProvisionalHoldIds(prev => {
-      const next = new Set(prev);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-        showToast('Đã hủy cờ Tách thuế tạm tính.', 'info');
-      } else {
-        next.add(itemId);
-        showToast('Đã kích hoạt Tách thuế tạm tính theo CV 2392/TCT-CS.', 'success');
-      }
-      return next;
-    });
+  const [confirmedFindings,setConfirmedFindings]=useState<string[]>([]);
+  useEffect(()=>{setConfirmedFindings([]);setActionReason('');setSaveAsPrecedent(false);},[selected?.id,selected?.revision]);
+  const [actionReason,setActionReason] = useState('');
+  const [precedentPurpose,setPrecedentPurpose] = useState('');
+  const [precedentMaximum,setPrecedentMaximum] = useState('');
+  const toggleProvisionalTaxHold = async (itemId:string) => {
+    const item=items.find(i=>i.id===itemId);if(!item)return;
+    try {
+      const response=await fetch(`/api/invoices/${encodeURIComponent(itemId)}/audit-action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:item.taxHold?'RELEASE_TAX_HOLD':'TAX_HOLD',reason:actionReason,evaluationId:item.evaluationId,revision:item.revision})});
+      const data=await response.json();if(!response.ok)throw new Error(data.error);await loadWorkspace();showToast('Đã lưu trạng thái giữ thuế.','success');
+    }catch(e){showToast(e instanceof Error?e.message:'Không thể giữ thuế','error');}
   };
 
   const renderSlaBadge = (item: InboxItem) => {
@@ -192,13 +203,16 @@ export function ProductionWorkspace({
 
   const auditEntries: AuditEntry[] = useMemo(() => {
     return items
-      .filter((item) => item.resolution || ['APPROVED', 'REJECTED', 'FORWARDED', 'ON_HOLD'].includes(item.status) || item.decision?.status === 'ROUTINE')
+      .filter((item) => Boolean(item.latestAudit))
       .map((item) => {
         const id = `AUDIT-${item.id}`;
-        const isOverridden = overriddenIds.has(id);
+        const isOverridden = item.latestAudit?.eventType === 'INVOICE_HUMAN_OVERRIDE';
         const initialStatus = item.decision?.status || (item.status === 'ROUTINE_PROPOSED' ? 'ROUTINE' : 'ESCALATED');
         return {
           id,
+          invoiceRecordId: item.id,
+          evaluationId: item.evaluationId || undefined,
+          currentStatus: item.status,
           timestamp: item.resolution?.resolvedAt || item.updatedAt || new Date().toISOString(),
           invoiceId: item.invoice.invoiceNumber || item.id,
           supplierName: item.supplierName,
@@ -207,6 +221,8 @@ export function ProductionWorkspace({
           riskGroup: item.decision?.status === 'ESCALATED' ? item.decision.riskGroup : undefined,
           actionTaken: isOverridden
             ? 'ĐÃ GHI ĐÈ BỞI CON NGƯỜI (HUMAN OVERRIDE)'
+            : item.latestAudit?.eventType === 'ROUTINE_AUTO_APPROVED'
+            ? 'Tự duyệt Routine · chứng từ nội bộ'
             : item.resolution?.action
             ? item.resolution.action
             : item.status === 'APPROVED'
@@ -214,7 +230,7 @@ export function ProductionWorkspace({
             : item.status === 'ROUTINE_PROPOSED'
             ? 'Đề xuất tự duyệt'
             : item.status,
-          actor: (item.resolution?.role as any) || (initialStatus === 'ROUTINE' ? 'SYSTEM_REFEREE' : 'CHIEF_ACCOUNTANT'),
+          actor: ((item.latestAudit?.payload?.actorRole as any) || (item.resolution?.role as any) || (initialStatus === 'ROUTINE' ? 'SYSTEM_REFEREE' : 'CHIEF_ACCOUNTANT')),
           plainExplanation: item.decision?.plainExplanation || 'Đã kiểm tra đối chiếu qua bộ quy tắc Tax-SOP-2026',
           canOverride: true,
           isOverridden,
@@ -223,7 +239,7 @@ export function ProductionWorkspace({
           sopVersion: item.policyVersion || 'TAX-SOP-2026-v2.5'
         };
       });
-  }, [items, overriddenIds]);
+  }, [items]);
 
   const userInitials = useMemo(() => {
     const name = user.displayName?.trim() || 'Khánh';
@@ -256,8 +272,11 @@ export function ProductionWorkspace({
       }
       const inbox = await inboxRes.json();
       const runtime = await runtimeRes.json();
+      setIsDemo(runtime.demo===true);
       if (!inboxRes.ok) throw new Error(inbox.error || 'Lỗi tải Inbox');
       setItems(inbox.items || []);
+      setProvisionalHoldIds(new Set((inbox.items || []).filter((i:InboxItem)=>i.taxHold).map((i:InboxItem)=>i.id)));
+      setSelected(previous=>previous ? (inbox.items || []).find((i:InboxItem)=>i.id===previous.id) || null : null);
       setCounts(inbox.counts || {});
       if (runtime.policy?.version) setPolicyVersion(runtime.policy.version);
       if (runtime.policy?.config) setConfig(runtime.policy.config);
@@ -281,6 +300,7 @@ export function ProductionWorkspace({
 
   const approvalItems = useMemo(() => items.filter((item) => roleCanApprove(user, item)), [items, user]);
   const pendingCount = (counts.ROUTINE_PROPOSED || 0) + (counts.WAITING_CHIEF_ACCOUNTANT || 0) + (counts.WAITING_CFO || 0) + (counts.FORWARDED || 0);
+  const autoApprovedRoutineCount = items.filter((item) => item.status === 'APPROVED' && item.decision?.status === 'ROUTINE').length;
 
   const handleEvaluateResult = (decision: RefereeDecision, invoice: InvoiceInput) => {
     const localItem: InboxItem = {
@@ -292,7 +312,7 @@ export function ProductionWorkspace({
       itemName: invoice.itemName,
       totalAmount: invoice.totalAmount,
       taxAmount: invoice.taxAmount,
-      status: decision.status === 'ROUTINE' ? 'ROUTINE_PROPOSED' : (decision.requiresCFO ? 'WAITING_CFO' : 'WAITING_CHIEF_ACCOUNTANT'),
+      status: decision.status === 'ROUTINE' ? 'APPROVED' : (decision.requiresCFO ? 'WAITING_CFO' : 'WAITING_CHIEF_ACCOUNTANT'),
       invoice,
       decision,
       policyVersion,
@@ -316,7 +336,11 @@ export function ProductionWorkspace({
         invoiceId: selected.id,
         evaluationId: selected.evaluationId,
         optionId: option.id,
-        reason: option.actionDescription,
+        revision:selected.revision,
+        resolvedFindingIds:confirmedFindings,
+        reason:actionReason,
+        purpose:precedentPurpose,
+        maximumAmount:Number(precedentMaximum),
         saveAsPrecedent
       })
     });
@@ -426,7 +450,7 @@ export function ProductionWorkspace({
     { id: 'dossier', label: 'Nhật Ký & Bằng Chứng', icon: <History className="h-4 w-4" /> },
   ];
 
-  const visibleList = view === 'approval' ? approvalItems : view === 'dossier' ? items.filter((item) => ['APPROVED', 'REJECTED'].includes(item.status)) : items;
+  const visibleList = view === 'approval' ? approvalItems : [...items].sort((a,b)=>Number(['APPROVED','REJECTED'].includes(a.status))-Number(['APPROVED','REJECTED'].includes(b.status)));
 
   const filteredList = useMemo(() => {
     return visibleList.filter((item) => {
@@ -572,7 +596,7 @@ export function ProductionWorkspace({
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Ngày lập</span>
             <div className="text-base font-bold text-slate-950 mt-1">
-              {formatDate(selected.invoiceDate)}
+              {selected.review?.unresolvedFields?.includes("invoiceDate")?"Chưa xác minh":formatDate(selected.invoiceDate)}
             </div>
           </div>
         </div>
@@ -584,7 +608,7 @@ export function ProductionWorkspace({
               <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-700 shrink-0" />
               <div>
                 <h3 className="font-extrabold text-emerald-950 text-sm uppercase tracking-wider">
-                  HỢP LỆ — ĐỀ XUẤT ROUTINE
+                  KẾT QUẢ THƯỜNG QUY
                 </h3>
                 <p className="mt-1 text-sm font-semibold text-emerald-900 leading-relaxed">
                   {decision.plainExplanation}
@@ -594,15 +618,8 @@ export function ProductionWorkspace({
                 </p>
               </div>
             </div>
-            <Button
-              onClick={() => void confirmRoutine()}
-              disabled={user.role === 'ACCOUNTANT'}
-              variant="default"
-              size="lg"
-              className="w-full font-bold tracking-wide"
-            >
-              {user.role === 'ACCOUNTANT' ? 'KẾ TOÁN VIÊN CHỈ ĐỀ XUẤT (KTT / CFO DUYỆT)' : 'XÁC NHẬN HẠCH TOÁN'}
-            </Button>
+            <p className="text-sm font-semibold">{selected.status==='APPROVED'?'Đã tự xử lý và tạo chứng từ nội bộ.':'Hồ sơ đã bị can thiệp; xem trạng thái hiện hành trước khi xuất chứng từ.'}</p>
+            <p className="text-xs">Cập nhật: {new Date(selected.updatedAt).toLocaleString('vi-VN')} · Chứng từ: {selected.internalVoucherId || 'Không có chứng từ có hiệu lực'}</p>
           </div>
         )}
 
@@ -658,7 +675,7 @@ export function ProductionWorkspace({
             )}
 
             {/* Checkbox Save As Precedent */}
-            {roleCanApprove(user, selected) && (
+            {selected.allowedActions?.savePrecedent && (
               <label className="flex items-center gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer">
                 <input
                   type="checkbox"
@@ -672,13 +689,16 @@ export function ProductionWorkspace({
               </label>
             )}
 
-            {/* A/B Option Buttons - To & Rõ */}
+            <label className="block text-sm">Lý do / bằng chứng (ít nhất 8 ký tự)<textarea value={actionReason} onChange={e=>setActionReason(e.target.value)} className="mt-1 w-full rounded border p-2" /></label>
+            {saveAsPrecedent && <div className="grid gap-2"><label>Mục đích được phép<input value={precedentPurpose} onChange={e=>setPrecedentPurpose(e.target.value)} className="w-full border p-2" /></label><label>Trần tiền CFO cho phép<input type="number" min="1" value={precedentMaximum} onChange={e=>setPrecedentMaximum(e.target.value)} className="w-full border p-2" /></label></div>}
+            {decision.findings?.map(f=><label key={f.ruleId} className="flex gap-2 text-sm"><input type="checkbox" checked={confirmedFindings.includes(f.ruleId)} onChange={e=>setConfirmedFindings(prev=>e.target.checked?[...prev,f.ruleId]:prev.filter(id=>id!==f.ruleId))} />Tôi đã xử lý phát hiện: {f.ruleId} — {f.flaggedReason}</label>)}
+            {/* A/B Option Buttons */}
             <div className="grid gap-3 sm:grid-cols-2">
               {decision.options.map((option, idx) => (
                 <button
                   key={option.id}
                   onClick={() => void handleResolve(option)}
-                  disabled={!roleCanApprove(user, selected)}
+                  disabled={actionReason.trim().length<8 || (["ACCEPT_WITH_DOCS","ACCEPT_ADJUSTMENT","ACCEPT_WITH_DEFENSE_DOSSIER"].includes(option.resultingAction) ? (!selected.allowedActions?.approve || decision.findings?.some(f=>!confirmedFindings.includes(f.ruleId))) : !selected.allowedActions?.requestInformation)}
                   className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-950 hover:shadow-subtle text-left transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer group"
                 >
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
@@ -701,7 +721,7 @@ export function ProductionWorkspace({
                 </div>
                 <p className="text-xs text-blue-900 mt-1 leading-relaxed">
                   {provisionalHoldIds.has(selected.id)
-                    ? 'Đã tạm giữ thuế GTGT (chưa kê khai khấu trừ kỳ này), giải phóng chi phí an toàn chờ giải trình.'
+                    ? 'Đã tạm giữ thuế GTGT (chưa kê khai khấu trừ kỳ này), hồ sơ chờ xác minh và đánh giá lại.'
                     : 'Nếu cận hạn nộp tờ khai, tạm loại số tiền thuế GTGT này ra khỏi kỳ kê khai hiện tại để tránh bị xử phạt truy thu.'}
                 </p>
               </div>
@@ -727,6 +747,7 @@ export function ProductionWorkspace({
           </div>
         )}
 
+        <WorkflowControls key={`${selected.id}:${selected.revision}`} item={selected} user={user} onRefresh={loadWorkspace} />
         {/* Export actions */}
         {(selected.status === 'APPROVED' || selected.status === 'REJECTED') && (
           <div className="flex gap-2 pt-4 border-t border-slate-100">
@@ -750,14 +771,7 @@ export function ProductionWorkspace({
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-subtle">
       <div className="hidden grid-cols-[36px_1.5fr_1fr_1fr_0.8fr] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-600 md:grid items-center">
         <div className="flex items-center justify-center">
-          <button
-            type="button"
-            onClick={toggleSelectAllRoutine}
-            title={allRoutineSelected ? 'Bỏ chọn' : 'Chọn tất cả ca Routine'}
-            className="text-slate-600 hover:text-slate-950 cursor-pointer"
-          >
-            {allRoutineSelected ? <CheckSquare className="h-4 w-4 text-slate-950" /> : <Square className="h-4 w-4" />}
-          </button>
+          <span aria-hidden="true">#</span>
         </div>
         <span>Hóa đơn</span>
         <span>Nhà cung cấp</span>
@@ -772,7 +786,7 @@ export function ProductionWorkspace({
       )}
 
       {list.map((item) => {
-        const isRoutine = item.status === 'ROUTINE_PROPOSED';
+        const isRoutine = false;
         const isChecked = selectedRoutineIds.has(item.id);
         const isSelected = selected?.id === item.id;
 
@@ -850,13 +864,20 @@ export function ProductionWorkspace({
   };
 
   return (
-    <div className="relative min-h-screen bg-slate-50/70 text-slate-900 selection:bg-brand-lime selection:text-slate-950 flex flex-col md:flex-row">
+    <div className={`relative ${view === 'receive' ? 'min-h-screen md:h-screen md:overflow-hidden' : 'min-h-screen'} bg-slate-50/70 text-slate-900 selection:bg-brand-lime selection:text-slate-950 flex flex-col md:flex-row`}>
       
+      <nav className="flex md:hidden flex-wrap gap-2 border-b bg-white p-3" aria-label="Điều hướng chính">{navItems.filter(i=>i.id!=='approval').map(i=><button key={i.id} onClick={()=>setView(i.id)} className={`rounded border p-2 text-xs ${view===i.id?'bg-slate-950 text-white':''}`}>{i.label}</button>)}<a className="rounded border p-2 text-xs" href="/verify">Verify</a>
+        <details className="w-full rounded border p-2 text-xs"><summary className="cursor-pointer font-semibold">Mở rộng & SOP</summary>
+          <div className="mt-2 flex flex-wrap gap-2">{([{id:'banking',label:'Ngân hàng'},{id:'reconciliation',label:'TCT'},{id:'suppliers',label:'Nhà cung cấp'},{id:'reports',label:'Báo cáo thử nghiệm'}] as const).map(i=><button key={i.id} onClick={()=>setView(i.id)} className="min-h-10 rounded border px-3">{i.label}</button>)}
+            <button className="min-h-10 rounded border px-3" onClick={()=>setLedgerSyncOpen(true)}>ERP · Xuất payload</button>
+            <button className="min-h-10 rounded border px-3" onClick={(event)=>{ event.currentTarget.focus(); setPolicyOpen(true); }}>Tiền Lệ & SOP</button>
+          </div>
+        </details></nav>
       {/* Collapsible Left Sidebar (Fixed Icon Coordinates & Persistent Slots) */}
       <aside
         id="stage-slideover-sidebar"
         data-state={isSidebarCollapsed ? 'closed' : 'open'}
-        className={`sticky top-0 h-screen flex flex-col bg-[#f9f9f9] text-slate-900 border-r border-slate-200/80 transition-[width] duration-200 ease-out shrink-0 z-40 select-none overflow-hidden ${
+        className={`hidden md:flex sticky top-0 h-screen flex-col bg-[#f9f9f9] text-slate-900 border-r border-slate-200/80 transition-[width] duration-200 ease-out shrink-0 z-40 select-none overflow-hidden ${
           isSidebarCollapsed ? 'w-[56px]' : 'w-[260px]'
         }`}
       >
@@ -980,12 +1001,13 @@ export function ProductionWorkspace({
               );
             })}
 
+            <details className="my-3 rounded border p-2 text-xs"><summary className="cursor-pointer font-semibold">Mở rộng · demo / xuất payload</summary><p className="my-2 text-slate-600">Ngân hàng/TCT/nhà cung cấp là nguồn demo. ERP chỉ tạo payload, chưa gửi hệ thống kế toán.</p>{([{id:'banking',label:'Ngân hàng'},{id:'reconciliation',label:'TCT'},{id:'suppliers',label:'Nhà cung cấp'},{id:'reports',label:'Báo cáo thử nghiệm'}] as const).map(i=><button key={i.id} onClick={()=>setView(i.id)} className="block w-full rounded p-2 text-left hover:bg-slate-100">{i.label}</button>)}<button onClick={()=>setLedgerSyncOpen(true)} className="block p-2">ERP · Xuất payload</button></details>
             {/* Mục Cấu hình SOP (cho Kế toán trưởng & CFO) */}
             {(user.role === 'CHIEF_ACCOUNTANT' || user.role === 'CFO') && (
               <div className="relative group/navitem flex items-center h-9 w-[240px]">
                 <button
                   type="button"
-                  onClick={() => setPolicyOpen(true)}
+                  onClick={(event) => { event.currentTarget.focus(); setPolicyOpen(true); }}
                   className={`flex h-9 items-center rounded-lg text-[13px] font-medium text-slate-700 hover:bg-black/5 hover:text-slate-950 transition-all duration-200 cursor-pointer overflow-hidden ${
                     isSidebarCollapsed ? 'w-9' : 'w-[240px]'
                   }`}
@@ -1052,16 +1074,16 @@ export function ProductionWorkspace({
       </aside>
 
       {/* Right Content Area: Top Header + Main Workspace */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+      <div className={`flex-1 flex flex-col min-w-0 ${view === 'receive' ? 'h-full min-h-0' : 'min-h-screen'}`}>
         
         {/* Top Header */}
         <header className="border-b border-slate-200 bg-white sticky top-0 z-30 shadow-subtle shrink-0">
-          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <div className="mx-auto flex max-w-[1440px] items-center justify-between flex-wrap gap-3 px-4 py-3 sm:px-6">
             
             {/* Left: Role Switcher & Live Engine Beacon */}
             <div className="flex items-center gap-3">
               <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200">
-                {(['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'] as const).map((r) => {
+                {(isDemo ? ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'] as const : [user.role]).map((r) => {
                   const isActive = user.role === r;
                   return (
                     <button
@@ -1081,7 +1103,7 @@ export function ProductionWorkspace({
 
               <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-50/80 border border-emerald-200 text-emerald-800 text-xs font-semibold">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>AI Referee Active · SOP 2026</span>
+                <span>Quy tắc tất định · SOP 2026</span>
               </div>
             </div>
 
@@ -1090,7 +1112,7 @@ export function ProductionWorkspace({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPolicyOpen(true)}
+                onClick={(event) => { event.currentTarget.focus(); setPolicyOpen(true); }}
                 className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 border-slate-300 hover:bg-slate-100 h-8 px-3 shadow-xs"
                 title="Bảng Quản trị Tiền lệ & Quy chế SOP (FR-6)"
               >
@@ -1139,28 +1161,29 @@ export function ProductionWorkspace({
             }}
           />
         ) : (
-          <main className="flex-1 p-4 sm:p-6 max-w-[1440px] w-full mx-auto space-y-5">
+          <main className={`${view === 'receive' ? 'flex-1 min-h-0 overflow-hidden flex flex-col p-2 sm:p-3 space-y-0' : 'flex-1 p-4 sm:p-6 space-y-5'} max-w-[1440px] w-full mx-auto`}>
             
             {/* Action & Reset Bar */}
-            <div className="flex items-center justify-between gap-3">
+            {view !== 'receive' && <div className="flex items-center justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-slate-950">
-                  {view === 'receive' ? 'Tiếp Nhận Chứng Từ' : view === 'approval' ? 'Hồ Sơ Chờ Duyệt' : view === 'dossier' ? 'Nhật Ký Kiểm Toán & Hồ Sơ Bằng Chứng (Audit Trail)' : view === 'reports' ? 'Báo Cáo Thuế' : view === 'reconciliation' ? 'Đối Soát Cổng TCT' : view === 'banking' ? 'Đối Soát Sổ Phụ Ngân Hàng' : view === 'suppliers' ? 'Danh Mục Nhà Cung Cấp' : 'Bàn Làm Việc Kế Toán'}
+                  {view === 'approval' ? 'Hồ Sơ Chờ Duyệt' : view === 'dossier' ? 'Nhật Ký Kiểm Toán & Hồ Sơ Bằng Chứng (Audit Trail)' : view === 'reports' ? 'Báo Cáo Thuế' : view === 'reconciliation' ? 'Đối Soát Cổng TCT' : view === 'banking' ? 'Đối Soát Sổ Phụ Ngân Hàng' : view === 'suppliers' ? 'Danh Mục Nhà Cung Cấp' : 'Bàn Làm Việc Kế Toán'}
                 </h1>
               </div>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => void handleResetWorkspace()}
-                disabled={isResetting}
+                disabled={isResetting || !isDemo}
                 className="font-bold text-xs h-9 px-3 text-rose-700 hover:text-rose-800 hover:bg-rose-50 border-rose-200"
                 title="Reset về trạng thái chưa có hóa đơn nào được gửi lên"
               >
                 <RotateCcw className={`h-3.5 w-3.5 mr-1.5 ${isResetting ? 'animate-spin' : ''}`} />
                 <span>{isResetting ? 'Đang reset...' : 'Reset'}</span>
               </Button>
-            </div>
+            </div>}
 
+            {['reports','reconciliation','banking','suppliers'].includes(view) && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm">Mở rộng sử dụng dữ liệu demo hoặc adapter xuất payload. Chưa xác nhận kết nối ERP, ngân hàng, TCT hoặc cập nhật pháp luật trực tiếp.</p>}
             {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">{error}</div>}
             
             {loading && (
@@ -1186,8 +1209,8 @@ export function ProductionWorkspace({
                     <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Tự duyệt Routine</span>
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   </div>
-                  <div className="text-3xl font-extrabold font-numeric text-emerald-700 mt-1.5">{counts.ROUTINE_PROPOSED || 0}</div>
-                  <div className="text-[11px] text-emerald-700/70 font-medium mt-1">Hợp lệ 100% theo chuẩn SOP</div>
+                  <div className="text-3xl font-extrabold font-numeric text-emerald-700 mt-1.5">{autoApprovedRoutineCount}</div>
+                  <div className="text-[11px] text-emerald-700/70 font-medium mt-1">Đã duyệt nội bộ, chờ kế toán xuất sổ</div>
                 </div>
 
                 <div className="p-4 rounded-xl bg-white border border-amber-100 shadow-subtle hover:border-amber-300 transition-colors">
@@ -1212,7 +1235,7 @@ export function ProductionWorkspace({
 
             {/* Receive Form View */}
             {!loading && view === 'receive' && (
-              <Card className="p-6 sm:p-8 shadow-card">
+              <Card className="flex-1 min-h-0 p-2 sm:p-3 shadow-card overflow-hidden">
                 <InteractiveInputForm onEvaluateResult={handleEvaluateResult} dynamicConfig={config} />
               </Card>
             )}
@@ -1223,7 +1246,7 @@ export function ProductionWorkspace({
                 <Card className="p-6">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Chính sách hiện hành</span>
                   <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">{policyVersion}</p>
-                  <Button size="sm" variant="outline" onClick={() => setPolicyOpen(true)} className="mt-4 font-bold">
+                  <Button size="sm" variant="outline" onClick={(event) => { event.currentTarget.focus(); setPolicyOpen(true); }} className="mt-4 font-bold">
                     Quản trị quy tắc SOP →
                   </Button>
                 </Card>
@@ -1279,25 +1302,34 @@ export function ProductionWorkspace({
             {/* Dossier / Audit Trail View (Tiêu chí 6: 20 Điểm) */}
             {!loading && view === 'dossier' && (
               <div className="space-y-4">
+                <label className="block text-sm">Chọn hồ sơ để xem đầu vào và lịch sử<select className="mt-1 w-full rounded border p-2" value={auditInvoiceId} onChange={e=>setAuditInvoiceId(e.target.value)}><option value="">Chọn hồ sơ</option>{items.map(i=><option key={i.id} value={i.id}>{i.invoiceNumber} · {i.supplierName} · {i.status}</option>)}</select></label>
+                {auditInvoiceId && <WorkflowAuditHistory key={`${auditInvoiceId}:${items.find(i=>i.id===auditInvoiceId)?.revision}`} invoiceId={auditInvoiceId} />}
                 <AuditTrailTable
                   entries={auditEntries}
                   onViewDossier={(entry) => setSelectedAuditEntry(entry)}
-                  onOverride={(id) => {
-                    setOverriddenIds((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(id)) next.delete(id);
-                      else next.add(id);
-                      return next;
-                    });
-                    showToast('Đã can thiệp ghi đè phán quyết. Chuỗi băm kiểm toán SHA-256 đã cập nhật.', 'info');
+                  onOverride={async (entry, targetStatus, reason) => {
+                    try {
+                      const response = await fetch(`/api/invoices/${encodeURIComponent(entry.invoiceRecordId || '')}/audit-action`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'OVERRIDE', targetStatus, reason,revision:items.find(i=>i.id===entry.invoiceRecordId)?.revision,evaluationId:items.find(i=>i.id===entry.invoiceRecordId)?.evaluationId })
+                      });
+                      const data = await response.json();
+                      if (!response.ok) throw new Error(data.error || 'Không thể ghi đè quyết định');
+                      showToast('Đã ghi đè và lưu vào nhật ký kiểm toán.', 'success');
+                      await loadWorkspace();
+                    } catch (err) { showToast(err instanceof Error ? err.message : 'Không thể ghi đè', 'error'); }
                   }}
-                  onUndo={(id) => {
-                    setOverriddenIds((prev) => {
-                      const next = new Set(prev);
-                      next.delete(id);
-                      return next;
-                    });
-                    showToast('Đã hoàn tác quyết định kiểm toán.', 'success');
+                  onUndo={async (entry, reason) => {
+                    try {
+                      const response = await fetch(`/api/invoices/${encodeURIComponent(entry.invoiceRecordId || '')}/audit-action`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'UNDO', reason,revision:items.find(i=>i.id===entry.invoiceRecordId)?.revision,evaluationId:items.find(i=>i.id===entry.invoiceRecordId)?.evaluationId })
+                      });
+                      const data = await response.json();
+                      if (!response.ok) throw new Error(data.error || 'Không thể hoàn tác');
+                      showToast('Đã ghi nhận bút toán hoàn tác trong audit.', 'success');
+                      await loadWorkspace();
+                    } catch (err) { showToast(err instanceof Error ? err.message : 'Không thể hoàn tác', 'error'); }
                   }}
                 />
               </div>
@@ -1322,7 +1354,7 @@ export function ProductionWorkspace({
                   </div>
 
                   <div className="grid gap-6 xl:grid-cols-2 items-start">
-                    <DocumentViewer invoice={selected.invoice} onClose={() => setShowDocumentPreview(false)} />
+                    {selected.review?.unresolvedFields?.length && !selected.invoice.sourceArtifactId ? <div className="rounded border border-amber-200 bg-amber-50 p-4 text-sm">Chưa có chứng từ gốc. Các trường {selected.review.unresolvedFields.join(', ')} đang chờ xác minh; giá trị tạm dùng để kiểm tra không phải dữ liệu đọc từ hóa đơn.</div> : <DocumentViewer invoice={selected.invoice} onClose={() => setShowDocumentPreview(false)} />}
                     <div>{renderReview()}</div>
                   </div>
                 </div>

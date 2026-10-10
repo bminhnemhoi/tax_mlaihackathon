@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { getDatabase, jsonNow } from '@/lib/server/db';
 import { CorporatePrecedent, CorporatePrecedentSchema, InvoiceInput } from '@/lib/schemas';
 
@@ -48,7 +49,9 @@ export function findPrecedentForInvoice(
     for (const row of rows) {
       // Khớp chính xác riskPattern cụ thể, loại bỏ khớp bao quát để tránh bypass sai luật
       if (row.riskPattern === riskPattern) {
-        return CorporatePrecedentSchema.parse(row);
+        const scope = db.prepare('SELECT purpose, maximum_amount maximumAmount, current_threshold currentThreshold, version thresholdVersion FROM precedent_scopes WHERE precedent_id=?').get(row.id) as {purpose:string;maximumAmount:number;currentThreshold:number;thresholdVersion:number}|undefined;
+        if (!scope || Math.abs(invoice.totalAmount) > scope.currentThreshold || !invoice.itemName.toLocaleLowerCase('vi-VN').includes(scope.purpose.toLocaleLowerCase('vi-VN'))) continue;
+        return CorporatePrecedentSchema.parse({...row,...scope});
       }
     }
 
@@ -71,6 +74,10 @@ export function createPrecedent(params: {
   rationale: string;
   approvedBy: string;
   effectiveMonths?: number;
+  purpose?: string;
+  maximumAmount?: number;
+  currentThreshold?: number;
+  originEventId?: string;
 }): CorporatePrecedent {
   // 1. Chỉ CFO mới có quyền tạo tiền lệ quy chế nội bộ
   const isCfo = params.approvedBy === 'CFO' || params.approvedBy.includes('(CFO)') || params.approvedBy.toUpperCase().includes('CFO');
@@ -89,12 +96,17 @@ export function createPrecedent(params: {
     throw new Error('Vi phạm Tường lửa Pháp lý: Tuyệt đối không được phép tạo tiền lệ cho quy định Luật thuế định chế cứng (Statutory Tax Law)');
   }
 
+  if(!params.riskPattern.startsWith('INTERNAL_POLICY_')) throw new Error('Chỉ tạo tiền lệ cho quy tắc nội bộ cụ thể.');
   const db = getDatabase();
-  const id = `PREC-${Date.now().toString(36).toUpperCase()}`;
+  const id = `PREC-${crypto.randomUUID()}`;
   const now = jsonNow();
   const effectiveFrom = now.slice(0, 10);
 
   const months = params.effectiveMonths || 6;
+  if (!Number.isInteger(months) || months < 1 || months > 12) throw new Error('Thời hạn tiền lệ từ 1 đến 12 tháng.');
+  const maximumAmount = params.maximumAmount ?? 0;
+  const threshold = params.currentThreshold ?? 0;
+  if (!Number.isFinite(maximumAmount) || maximumAmount < 0 || !Number.isFinite(threshold) || threshold < 0 || threshold > maximumAmount) throw new Error('Ngưỡng phải nằm trong hạn mức CFO.');
   const d = new Date();
   d.setMonth(d.getMonth() + months);
   const effectiveTo = d.toISOString().slice(0, 10);
@@ -126,7 +138,8 @@ export function createPrecedent(params: {
     )
   `).run(precedent);
 
-  return precedent;
+  db.prepare('INSERT INTO precedent_scopes (precedent_id,purpose,maximum_amount,current_threshold,origin_event_id) VALUES (?,?,?,?,?)').run(id,params.purpose?.trim() || 'CHƯA CẤP PHẠM VI',maximumAmount,threshold,params.originEventId || null);
+  return {...precedent,purpose:params.purpose,maximumAmount,currentThreshold:threshold,thresholdVersion:1};
 }
 
 /**
@@ -146,7 +159,7 @@ export function listCorporatePrecedents(): CorporatePrecedent[] {
       ORDER BY datetime(created_at) DESC
     `).all() as any[];
 
-    return rows.map(r => CorporatePrecedentSchema.parse(r));
+    return rows.map(r => { const scope=db.prepare('SELECT purpose,maximum_amount maximumAmount,current_threshold currentThreshold,version thresholdVersion FROM precedent_scopes WHERE precedent_id=?').get(r.id) as object|undefined; return CorporatePrecedentSchema.parse({...r,...scope}); });
   } catch (err) {
     console.warn('Lỗi lấy danh sách tiền lệ:', err);
     return [];

@@ -1,3 +1,4 @@
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'node:fs';
 import { requireRequestUser } from '@/lib/server/auth';
@@ -5,7 +6,7 @@ import { getDatabase } from '@/lib/server/db';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+async function handleGET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     requireRequestUser(request);
     const { id } = await context.params;
@@ -33,3 +34,5 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     return NextResponse.json({ error: 'Không thể tải chứng từ gốc' }, { status: 500 });
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }

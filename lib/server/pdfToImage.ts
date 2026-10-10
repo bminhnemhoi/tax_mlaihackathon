@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execSync } from 'node:child_process';
 import crypto from 'node:crypto';
+import sharp from 'sharp';
 
 /**
  * Trích xuất text trực tiếp từ Digital PDF (hóa đơn điện tử PDF vector).
@@ -62,58 +63,33 @@ sys.stdout.write(text.strip())
 
 /**
  * Tối ưu hóa kích thước và độ phân giải hình ảnh trước khi gửi sang mô hình Vision.
- * Giảm payload từ nhiều MB xuống còn ~200KB - 300KB, tăng tốc độ OCR lên gấp 5 lần.
+ * Mặc định scale về cạnh tối đa 1000px và nén JPEG quality 80. Có thể thử profile
+ * nhanh hơn bằng DOCUMENT_IMAGE_MAX_DIM=800 và DOCUMENT_IMAGE_JPEG_QUALITY=70,
+ * nhưng phải chạy lại bộ accuracy trước khi bật production.
  */
-export function optimizeImageBuffer(
+export async function optimizeImageBuffer(
   imageBuffer: Buffer,
   mimeType: string
-): { buffer: Buffer; mimeType: string } {
-  // Nếu ảnh đã nhỏ sẵn (< 400KB), không cần can thiệp
-  if (imageBuffer.length < 400 * 1024) {
+): Promise<{ buffer: Buffer; mimeType: string }> {
+  // Small PNGs are often clean scans with sharp text. Re-encoding them as JPEG
+  // can introduce ringing around digits and makes the OCR result worse while
+  // saving almost no upload time.
+  if (imageBuffer.byteLength <= 128 * 1024 && mimeType === 'image/png') {
     return { buffer: imageBuffer, mimeType };
   }
-
-  const tmpId = crypto.randomUUID();
-  const ext = mimeType.includes('png') ? 'png' : 'jpg';
-  const tmpInputPath = path.join(os.tmpdir(), `tax-referee-opt-${tmpId}.${ext}`);
-  const tmpOutputPath = path.join(os.tmpdir(), `tax-referee-opt-${tmpId}.jpg`);
-
+  const maxDimension = Math.min(1600, Math.max(480, Number(process.env.DOCUMENT_IMAGE_MAX_DIM || 1000)));
+  const jpegQuality = Math.min(92, Math.max(55, Number(process.env.DOCUMENT_IMAGE_JPEG_QUALITY || 80)));
   try {
-    fs.writeFileSync(tmpInputPath, imageBuffer);
-
-    // Sử dụng Apple ImageIO sips (tích hợp sẵn trên macOS, tốc độ < 30ms)
-    execSync(
-      `sips -Z 1600 -s format jpeg -s formatOptions 82 "${tmpInputPath}" --out "${tmpOutputPath}"`,
-      {
-        timeout: 4000,
-        stdio: 'ignore'
-      }
-    );
-
-    if (fs.existsSync(tmpOutputPath) && fs.statSync(tmpOutputPath).size > 0) {
-      const optimizedBuffer = fs.readFileSync(tmpOutputPath);
-      return { buffer: optimizedBuffer, mimeType: 'image/jpeg' };
-    }
-  } catch (err: any) {
-    console.warn('[Image Optimizer] Lỗi tối ưu ảnh bằng sips, sử dụng ảnh gốc:', err?.message);
-  } finally {
-    if (fs.existsSync(tmpInputPath)) {
-      try {
-        fs.unlinkSync(tmpInputPath);
-      } catch {
-        // ignore
-      }
-    }
-    if (fs.existsSync(tmpOutputPath)) {
-      try {
-        fs.unlinkSync(tmpOutputPath);
-      } catch {
-        // ignore
-      }
-    }
+    const buffer = await sharp(imageBuffer, { limitInputPixels: 40_000_000 })
+      .rotate()
+      .resize({ width: maxDimension, height: maxDimension, fit: 'inside', withoutEnlargement: true })
+      .flatten({ background: '#ffffff' })
+      .jpeg({ quality: jpegQuality, mozjpeg: true })
+      .toBuffer();
+    return { buffer, mimeType: 'image/jpeg' };
+  } catch {
+    return { buffer: imageBuffer, mimeType };
   }
-
-  return { buffer: imageBuffer, mimeType };
 }
 
 /**

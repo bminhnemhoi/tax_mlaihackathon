@@ -41,9 +41,9 @@ export function BankStatementView({
       if (data.success) {
         setTransactions(data.transactions || []);
         setStats({
-          total: data.total || 0,
-          matchedCount: data.matchedCount || 0,
-          unmatchedCount: data.unmatchedCount || 0
+          total: data.summary?.total || 0,
+          matchedCount: data.summary?.matchedCount || 0,
+          unmatchedCount: data.summary?.unmatchedCount || 0
         });
       } else {
         setError(data.error || 'Không thể tải sao kê ngân hàng');
@@ -64,24 +64,24 @@ export function BankStatementView({
     setError('');
     try {
       // Mẫu sao kê Vietcombank & Techcombank chuẩn
-      const sampleCsv = `NGAY_GD,SO_TIEN,SO_TK,NOI_DUNG,BENEFICIARY_MST
-2026-10-02,11000000,1029384756,"Chuyen khoan thanh toan tien cuoc vien thong Viettel HD 0000001",0100109106
-2026-10-03,5500000,9988776655,"Thanh toan tien thiet bi may in van phong MISA MST 0101243150",0101243150
-2026-10-04,3300000,1122334455,"Thanh toan tien giay in van phong pham cho tap hoa Minh Hang",0109988776`;
+      const sampleCsv = `date,referenceNo,debitAmount,beneficiaryAccount,description,beneficiaryTaxCode
+2026-10-02,QA-VCB-001,11000000,1029384756,"Chuyen khoan thanh toan tien cuoc vien thong Viettel HD 0000001",0100109106
+2026-10-03,QA-VCB-002,5500000,9988776655,"Thanh toan tien thiet bi may in van phong MISA MST 0101243150",0101243150
+2026-10-04,QA-VCB-003,3300000,1122334455,"Thanh toan tien giay in van phong pham cho tap hoa Minh Hang",0109988776`;
 
       const res = await fetch('/api/banking/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bankCode: 'VIETCOMBANK',
-          fileContent: sampleCsv,
+          content: sampleCsv,
           mimeType: 'text/csv',
           autoApply: true
         })
       });
       const result = await res.json();
       if (result.success) {
-        setToastMsg(`Đã đồng bộ ${result.totalTransactions} giao dịch và khớp tự động ${result.autoMatchedCount} hóa đơn!`);
+        setToastMsg(`Đã đồng bộ ${result.importedCount} giao dịch và khớp tự động ${result.autoMatchedCount} hóa đơn!`);
         await loadTransactions();
       } else {
         setError(result.error || 'Lỗi xử lý sao kê');

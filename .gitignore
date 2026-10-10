@@ -60,3 +60,17 @@ __pycache__/
 deepseek_auth.json
 deepseek-agent/deepseek_auth.json
 deepseek-agent/*.log
+
+/.next-production/
+/.next-local-ocr/
+/backups/
+
+# Generated QA captures, downloaded fixtures and model response dumps
+/docs/qa-2026-10-10/evidence/
+/docs/qa-2026-10-10/fix-evidence/
+/docs/qa-2026-10-10/fixtures/
+/docs/qa-2026-10-10/internet-*/
+/docs/qa-2026-10-10/local-ocr-evidence/
+/docs/qa-2026-10-10/performance-evidence/
+
+/.codex-finalizer/

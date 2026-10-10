@@ -1,3 +1,4 @@
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRequestUser } from '@/lib/server/auth';
 import { getDatabase } from '@/lib/server/db';
@@ -72,7 +73,7 @@ function form04(row: InvoiceRow, reason: string) {
   };
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     requireRequestUser(request);
     const form = request.nextUrl.searchParams.get('form');
@@ -107,3 +108,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể tạo bản nháp biểu mẫu' }, { status: 500 });
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }

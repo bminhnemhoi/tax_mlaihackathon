@@ -15,11 +15,12 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface AuditTrailTableProps {
   entries: AuditEntry[];
-  onUndo: (id: string) => void;
-  onOverride: (id: string) => void;
+  onUndo: (entry: AuditEntry, reason: string) => void;
+  onOverride: (entry: AuditEntry, targetStatus: string, reason: string) => void;
   onViewDossier: (entry: AuditEntry) => void;
 }
 
@@ -30,6 +31,10 @@ export const AuditTrailTable: React.FC<AuditTrailTableProps> = ({
   onViewDossier,
 }) => {
   const [filter, setFilter] = React.useState<'ALL' | 'ROUTINE' | 'ESCALATED' | 'OVERRIDDEN'>('ALL');
+  const [actionEntry, setActionEntry] = React.useState<AuditEntry | null>(null);
+  const [actionKind, setActionKind] = React.useState<'OVERRIDE' | 'UNDO'>('OVERRIDE');
+  const [targetStatus, setTargetStatus] = React.useState('ON_HOLD');
+  const [reason, setReason] = React.useState('');
 
   const countRoutine = entries.filter((e) => e.actor === 'SYSTEM_REFEREE').length;
   const countEscalated = entries.filter((e) => e.actor !== 'SYSTEM_REFEREE').length;
@@ -201,7 +206,7 @@ export const AuditTrailTable: React.FC<AuditTrailTableProps> = ({
                       <Button
                         size="icon"
                         variant="outline"
-                        onClick={() => onOverride(entry.id)}
+                        onClick={() => { setActionEntry(entry); setActionKind(entry.isOverridden ? 'UNDO' : 'OVERRIDE'); setReason(''); }}
                         className={`h-7 w-7 border text-xs ${
                           entry.isOverridden
                             ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
@@ -216,7 +221,7 @@ export const AuditTrailTable: React.FC<AuditTrailTableProps> = ({
                       <Button
                         size="icon"
                         variant="outline"
-                        onClick={() => onUndo(entry.id)}
+                        onClick={() => { setActionEntry(entry); setActionKind('UNDO'); setReason(''); }}
                         className="h-7 w-7 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-700 border-slate-200 hover:border-rose-200"
                         title="Hoàn tác quyết định kiểm toán này"
                       >
@@ -244,6 +249,41 @@ export const AuditTrailTable: React.FC<AuditTrailTableProps> = ({
           </p>
         </div>
       )}
+      <Dialog open={Boolean(actionEntry)} onOpenChange={(open) => !open && setActionEntry(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{actionKind === 'UNDO' ? 'Hoàn tác thao tác gần nhất' : 'Ghi đè trạng thái hóa đơn'}</DialogTitle>
+            <DialogDescription>
+              {actionKind === 'UNDO' ? 'Hệ thống sẽ khôi phục trạng thái trước đó và lưu một sự kiện hoàn tác mới. Nếu gói đã được nhập vào phần mềm kế toán, hãy ghi bút toán đảo ở đó.' : 'Quyết định gốc vẫn được giữ trong audit; thao tác này chỉ đổi trạng thái nghiệp vụ.'}
+            </DialogDescription>
+          </DialogHeader>
+          {actionEntry && <div className="space-y-3">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+              <div className="font-bold text-slate-800">Hóa đơn {actionEntry.invoiceId}</div>
+              <div className="mt-1 text-slate-500">Trạng thái hiện tại: {actionEntry.currentStatus || 'Không rõ'}</div>
+            </div>
+            {actionKind === 'OVERRIDE' && <label className="block space-y-1.5 text-xs font-semibold text-slate-700">
+              Trạng thái cần chuyển
+              <select value={targetStatus} onChange={(event) => setTargetStatus(event.target.value)} className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm">
+                <option value="APPROVED">Duyệt</option><option value="ON_HOLD">Tạm dừng</option><option value="REJECTED">Từ chối</option>
+              </select>
+            </label>}
+            <label className="block space-y-1.5 text-xs font-semibold text-slate-700">
+              Lý do (tối thiểu 8 ký tự)
+              <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} className="w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal" placeholder="Ghi căn cứ cho thao tác này..." />
+            </label>
+          </div>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActionEntry(null)}>Hủy</Button>
+            <Button disabled={reason.trim().length < 8} variant={actionKind === 'UNDO' ? 'destructive' : 'default'} onClick={() => {
+              if (!actionEntry) return;
+              if (actionKind === 'UNDO') onUndo(actionEntry, reason.trim());
+              else onOverride(actionEntry, targetStatus, reason.trim());
+              setActionEntry(null);
+            }}>{actionKind === 'UNDO' ? 'Ghi nhận hoàn tác' : 'Lưu ghi đè'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

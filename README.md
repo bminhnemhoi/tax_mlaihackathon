@@ -1,9 +1,11 @@
+> **Cập nhật Chung kết 09/10/2026:** luồng thường quy tự xử lý; Verify dùng database độc lập và fixture tổng hợp. Chạy `npm run test:acceptance`; đọc [runbook](docs/runbook-final.md), [build log](docs/build-log-1-page.md) và [bằng chứng cần thu](docs/evidence/user-study-protocol.md). Các claim thời gian/độ chính xác, lời chứng người dùng và mô tả Bulk Confirm trong tài liệu lịch sử chưa phải bằng chứng nghiệm thu hiện hành. Live URL, OCR thực và thử nghiệm ba người dùng còn cần xác nhận.
+
 # TAX REFEREE · TÁC TỬ ĐIỀU PHỐI CHUYỂN TIẾP TRONG QUẢN TRỊ THUẾ DOANH NGHIỆP
 
 > **Dự án dự thi Cuộc thi MLAI Hackathon 2026**  
 > **Bảng 1: OrganizationAI · Đề bài A: The Escalation Referee (Bộ điều phối chuyển tiếp con người)**  
 > **Repository:** [https://github.com/khanhle1406/Tax-Referee.git](https://github.com/khanhle1406/Tax-Referee.git)  
-> **Phiên bản:** v3.0 Production Ready (Google Gemini Vision · Alibaba Cloud Qwen · Sổ Cái Kế Toán TT99/TT133 · UI/UX Pro Max)  
+> **Phiên bản:** Bản hoàn thiện Chung kết Đề A; đang nghiệm thu triển khai và bằng chứng người dùng.
 > **Trải nghiệm trực tiếp:** [http://localhost:3000](http://localhost:3000)
 
 ---
@@ -45,7 +47,7 @@ Trước làn sóng siết chặt quản lý thuế bằng hóa đơn điện t�
 │    + Luật 48/2024, NĐ 254/2026, NQ 204/2025, TT 219     │
 │    + Giám sát Hệ số K (CV 2392) & Trùng lặp HĐ         │
 │  - Engine 2: AI Intelligence Cascade                   │
-│    + Vision OCR: Google Gemini 2.5 Flash Lite (VLM)     │
+│    + Vision OCR: Qwen 3.7 Flash Multimodal (OpenRouter) │
 │    + Suy luận & Q-Gen: Alibaba Cloud Qwen-Plus-Char     │
 │    + Tăng tốc phân loại: TypeSafe AI Jev System One    │
 └──────────────────────────┬─────────────────────────────┘
@@ -124,8 +126,10 @@ cp .env.example .env.local
 
 Cấu hình các API key trong `.env.local`:
 ```ini
-# Google Gemini API (OCR Đọc ảnh hóa đơn)
-GEMINI_API_KEY=your_gemini_api_key_here
+# OpenRouter API (Đọc ảnh hóa đơn Vision OCR với Qwen 3.7 Flash)
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_MODEL=qwen/qwen3.7-flash
 
 # Alibaba Cloud Model Studio (Qwen - Tầng suy luận Q-Gen)
 QWEN_API_KEY=your_qwen_api_key_here
@@ -184,7 +188,7 @@ Tax-Referee/
 │   │   ├── audit/                   # API tra cứu nhật ký chuỗi băm kiểm toán SHA-256
 │   │   ├── auth/                    # API xác thực phiên đăng nhập 3 vai trò (RBAC)
 │   │   ├── banking/                 # API đối soát sổ phụ ngân hàng
-│   │   ├── documents/               # API bóc tách đa định dạng (XML local, PDF/Ảnh Gemini Vision)
+│   │   ├── documents/               # API bóc tách đa định dạng (XML local, PDF/Ảnh Qwen Vision)
 │   │   ├── dossiers/                # API xuất Hồ sơ Phòng vệ Thuế 1-Click
 │   │   ├── evaluate/                # API thẩm định kép (Policy Engine + Qwen AI)
 │   │   ├── inbox/                   # API quản lý hộp thư và duyệt hàng loạt (Bulk Confirm)
@@ -241,14 +245,13 @@ Tax-Referee/
 │   ├── reset-demo-data.ts           # Script dọn dẹp và reset dữ liệu demo
 │   └── test-regression-manifest.ts  # Runner kiểm thử hồi quy 5 fixtures
 ├── services/
-│   ├── aiCoordinator.ts             # Điều phối AI thông minh (Gemini Vision + Qwen)
+│   ├── aiCoordinator.ts             # Điều phối AI thông minh (OpenRouter Qwen Vision + Qwen-Plus)
 │   ├── bankMatcherService.ts        # Khớp lệnh thanh toán không dùng tiền mặt với sao kê
-│   ├── geminiService.ts             # Module kết nối Google Gemini Vision OCR
 │   ├── jevService.ts                # Bộ điều phối thẩm định kép (Dual-Engine Orchestrator)
-│   ├── localOcrService.ts           # Dịch vụ OCR cục bộ tốc độ cao
+│   ├── localOcrService.ts           # Dịch vụ OCR cục bộ tốc độ cao (Apple Silicon NPU)
 │   ├── policyEngine.ts              # Trọng tài tiền kiểm quy chế nội bộ (Ground Truth)
 │   ├── precedentService.ts          # Dịch vụ quản lý tiền lệ CFO
-│   ├── qwenService.ts               # Module kết nối Alibaba Cloud Qwen AI suy luận & Q-Gen
+│   ├── qwenService.ts               # Module kết nối Qwen AI (Qwen 3.7 Flash Vision + Qwen-Plus Q-Gen)
 │   ├── supplierService.ts           # Dịch vụ quản lý nhà cung cấp và rủi ro
 │   └── taxLookupService.ts          # Tra cứu thông tin người nộp thuế
 ├── .env.example                     # Tệp mẫu cấu hình môi trường

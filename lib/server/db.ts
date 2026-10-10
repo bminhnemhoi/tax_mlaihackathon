@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import Database from 'better-sqlite3';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -5,7 +6,7 @@ import path from 'node:path';
 import { DEFAULT_POLICY_CONFIG, MACRO_DEFAULTS } from '@/lib/constants';
 import { MacroState, MacroStateSchema, PolicyBundle, PolicyBundleSchema, SystemPolicyConfigSchema } from '@/lib/schemas';
 
-const dataDirectory = path.join(process.cwd(), 'data', 'runtime');
+const dataDirectory = process.env.TAX_REFEREE_DATA_DIR || path.join(process.cwd(), 'data', 'runtime');
 const databasePath = process.env.TAX_REFEREE_DB_PATH || path.join(dataDirectory, 'tax-referee.sqlite');
 
 let database: Database.Database | null = null;
@@ -227,6 +228,40 @@ function applyMigrations(db: Database.Database): void {
     `);
     record.run(11, now());
   }
+
+  if (!applied.has(12)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS internal_vouchers (
+        id TEXT PRIMARY KEY,
+        invoice_id TEXT NOT NULL UNIQUE,
+        evaluation_id TEXT NOT NULL,
+        regime TEXT NOT NULL,
+        voucher_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_internal_vouchers_evaluation ON internal_vouchers(evaluation_id);
+    `);
+    record.run(12, now());
+  }
+
+  if (!applied.has(13)) {
+    for (const [column, sql] of [
+      ['revision', 'INTEGER NOT NULL DEFAULT 1'], ['paused_from', 'TEXT'],
+      ['tax_hold', 'INTEGER NOT NULL DEFAULT 0'], ['source_review_json', "TEXT NOT NULL DEFAULT '{}'"],
+    ]) if (!hasColumn(db, 'invoices', column)) db.exec(`ALTER TABLE invoices ADD COLUMN ${column} ${sql}`);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS invoice_revisions (id TEXT PRIMARY KEY, invoice_id TEXT NOT NULL, revision INTEGER NOT NULL, payload_json TEXT NOT NULL, review_json TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(invoice_id, revision));
+      CREATE TABLE IF NOT EXISTS macro_baseline (id INTEGER PRIMARY KEY, payload_json TEXT NOT NULL);
+      INSERT OR IGNORE INTO macro_baseline SELECT id,json_set(payload_json,'$.totalPurchases',json_extract(payload_json,'$.totalPurchases')-(SELECT COALESCE(SUM(json_extract(payload_json,'$.preTaxAmount')),0) FROM invoices WHERE status='APPROVED'),'$.totalDeductibleTax',json_extract(payload_json,'$.totalDeductibleTax')-(SELECT COALESCE(SUM(approved_deductible_tax),0) FROM invoices WHERE status='APPROVED')) FROM macro_state;
+      CREATE TABLE IF NOT EXISTS precedent_scopes (precedent_id TEXT PRIMARY KEY, purpose TEXT NOT NULL, maximum_amount REAL NOT NULL, current_threshold REAL NOT NULL, version INTEGER NOT NULL DEFAULT 1, origin_event_id TEXT);
+      CREATE TABLE IF NOT EXISTS precedent_feedback (id TEXT PRIMARY KEY, precedent_id TEXT NOT NULL, invoice_id TEXT NOT NULL, evaluation_id TEXT NOT NULL, amount REAL NOT NULL, should_escalate INTEGER NOT NULL, reason TEXT NOT NULL, actor_id TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(precedent_id, invoice_id, evaluation_id));
+      CREATE TABLE IF NOT EXISTS threshold_versions (id TEXT PRIMARY KEY, precedent_id TEXT NOT NULL, version INTEGER NOT NULL, previous_threshold REAL NOT NULL, threshold REAL NOT NULL, sample_count INTEGER NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS extraction_reviews (artifact_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL);
+    `);
+    record.run(13, now());
+  }
+
 }
 
 function initializeDatabase(db: Database.Database): void {
@@ -488,6 +523,8 @@ function initializeDatabase(db: Database.Database): void {
       .run(JSON.stringify(initialState), now());
   }
 
+  db.exec('INSERT OR IGNORE INTO macro_baseline SELECT id, payload_json FROM macro_state');
+
   const policy = db.prepare('SELECT version FROM policy_versions WHERE status = ? ORDER BY created_at DESC LIMIT 1').get('PUBLISHED') as { version?: string } | undefined;
   if (!policy?.version) {
     const config = SystemPolicyConfigSchema.parse(DEFAULT_POLICY_CONFIG);
@@ -517,8 +554,11 @@ function initializeDatabase(db: Database.Database): void {
 }
 
 export function getDatabase(): Database.Database {
+  const scoped = databaseContext.getStore();
+  if (scoped) return scoped.db;
   if (!database) {
     fs.mkdirSync(dataDirectory, { recursive: true });
+    if (databasePath !== ':memory:') fs.mkdirSync(path.dirname(path.resolve(databasePath)), { recursive: true });
     database = new Database(databasePath);
     initializeDatabase(database);
   }
@@ -553,4 +593,37 @@ export function hashPayload(payload: unknown): string {
 
 export function jsonNow(): string {
   return now();
+}
+
+
+const databaseContext = new AsyncLocalStorage<{ db: Database.Database; sandbox: boolean; id: string }>();
+const demoDatabases = new Map<string, { db: Database.Database; touched: number }>();
+export function isSandbox(): boolean { return databaseContext.getStore()?.sandbox === true; }
+export function artifactRoot(): string { return path.join(dataDirectory, 'artifacts', databaseContext.getStore()?.id || 'internal'); }
+export function withIsolatedDatabase<T>(fn: () => T): T {
+  const db = new Database(':memory:');
+  initializeDatabase(db);
+  try { return databaseContext.run({ db, sandbox: true, id: crypto.randomUUID() }, fn); } finally { db.close(); }
+}
+export async function runIsolated<T>(fn: () => Promise<T>): Promise<T> {
+  const db = new Database(':memory:'); initializeDatabase(db);
+  try { return await databaseContext.run({ db, sandbox: true, id: crypto.randomUUID() }, fn); }
+  finally { db.close(); }
+}
+export async function withDemoDatabase<T>(id: string, fn: () => Promise<T>): Promise<T> {
+  let entry = demoDatabases.get(id);
+  if (!entry) {
+    const cutoff = Date.now() - 8 * 60 * 60 * 1000;
+    for (const [key, old] of demoDatabases) if (old.touched < cutoff) { old.db.close(); demoDatabases.delete(key); }
+    if (demoDatabases.size >= 40) throw new Error('Demo đang đầy; vui lòng thử lại sau.');
+    const demoDirectory=path.join(dataDirectory,'demo');fs.mkdirSync(demoDirectory,{recursive:true});
+    const db = new Database(path.join(demoDirectory,`${id}.sqlite`)); initializeDatabase(db);
+    entry = { db, touched: Date.now() }; demoDatabases.set(id, entry);
+  }
+  entry.touched = Date.now();
+  return databaseContext.run({ db: entry.db, sandbox: true, id }, fn);
+}
+export async function withRequestDatabase<T>(request: { cookies?: { get(name: string): { value: string } | undefined } }, fn: () => Promise<T>): Promise<T> {
+  const id = request.cookies?.get('tax_referee_demo')?.value;
+  return id && /^[a-f0-9-]{36}$/.test(id) ? withDemoDatabase(id, fn) : fn();
 }

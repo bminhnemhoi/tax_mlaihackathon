@@ -1,3 +1,5 @@
+import { allowedActions, readRecord } from '@/services/workflowService';
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRequestUser } from '@/lib/server/auth';
 import { getDatabase } from '@/lib/server/db';
@@ -12,7 +14,7 @@ function json<T>(value: unknown, fallback: T): T {
   }
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     const user = requireRequestUser(request);
     const rows = getDatabase().prepare(`
@@ -23,16 +25,21 @@ export async function GET(request: NextRequest) {
         e.id AS evaluation_id, e.decision_json, e.policy_version, e.legal_version, e.created_at AS evaluated_at,
         r.actor_role AS resolution_role, r.option_id AS resolution_option,
         r.resulting_action, r.accepted, r.created_at AS resolved_at
+        , a.event_type AS latest_audit_type, a.actor_id AS latest_audit_actor,
+        a.payload_json AS latest_audit_payload, a.created_at AS latest_audit_at
       FROM invoices i
       LEFT JOIN evaluations e ON e.id = (
         SELECT e2.id FROM evaluations e2
         WHERE e2.invoice_id = i.id
-        ORDER BY datetime(e2.created_at) DESC LIMIT 1
+        ORDER BY e2.rowid DESC LIMIT 1
       )
       LEFT JOIN human_resolutions r ON r.id = (
         SELECT r2.id FROM human_resolutions r2
-        WHERE r2.invoice_id = i.id
+        WHERE r2.invoice_id = i.id AND r2.evaluation_id=e.id
         ORDER BY datetime(r2.created_at) DESC LIMIT 1
+      )
+      LEFT JOIN audit_events a ON a.id = (
+        SELECT a2.id FROM audit_events a2 WHERE a2.entity_id = i.id ORDER BY a2.rowid DESC LIMIT 1
       )
       ORDER BY datetime(i.updated_at) DESC
       LIMIT 200
@@ -43,15 +50,8 @@ export async function GET(request: NextRequest) {
       const decision = json<Record<string, unknown> | null>(row.decision_json, null);
       const resolved = row.resolved_at != null;
       const persistedStatus = String(row.invoice_status || '');
-      const status = ['APPROVED', 'REJECTED', 'ON_HOLD'].includes(persistedStatus)
-        ? persistedStatus
-        : resolved
-        ? (Number(row.accepted) === 1 ? 'APPROVED' : 'REJECTED')
-        : decision?.status === 'ROUTINE'
-          ? 'ROUTINE_PROPOSED'
-          : decision?.status === 'ESCALATED'
-            ? (decision.requiresCFO ? 'WAITING_CFO' : 'WAITING_CHIEF_ACCOUNTANT')
-            : String(row.invoice_status || 'RECEIVED');
+      const status = persistedStatus || 'RECEIVED';
+      const workflowRecord = readRecord(String(row.id));
 
       return {
         id: String(row.id),
@@ -64,6 +64,11 @@ export async function GET(request: NextRequest) {
         totalAmount: Number(invoice.totalAmount || 0),
         taxAmount: Number(invoice.taxAmount || 0),
         status,
+        revision: workflowRecord.revision,
+        internalVoucherId:(getDatabase().prepare('SELECT id FROM internal_vouchers WHERE invoice_id=?').get(String(row.id)) as {id:string}|undefined)?.id || null,
+        taxHold: Boolean(workflowRecord.tax_hold),
+        review: JSON.parse(workflowRecord.source_review_json),
+        allowedActions: allowedActions(workflowRecord, user),
         decision,
         evaluationId: row.evaluation_id ? String(row.evaluation_id) : null,
         contentHash: String(row.content_hash),
@@ -77,6 +82,10 @@ export async function GET(request: NextRequest) {
           action: String(row.resulting_action || ''),
           accepted: Number(row.accepted) === 1,
           resolvedAt: String(row.resolved_at)
+        } : null,
+        latestAudit: row.latest_audit_type ? {
+          eventType: String(row.latest_audit_type), actorId: String(row.latest_audit_actor || ''),
+          payload: json<Record<string, unknown>>(row.latest_audit_payload, {}), at: String(row.latest_audit_at || '')
         } : null
       };
     }).filter((item) => !item.id.startsWith('TC-'));
@@ -94,3 +103,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Không thể tải Inbox' }, { status: 500 });
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }

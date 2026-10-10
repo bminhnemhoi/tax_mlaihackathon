@@ -1,5 +1,9 @@
 # Danh Sách Hóa Đơn & Chứng Từ Thực Tế (Tải Trực Tiếp Từ Internet)
 
+> Bộ file hiện tại là tập nguồn đang được kiểm kê. Chỉ các mẫu có
+> `licenseStatus=REDISTRIBUTABLE` và nhãn độc lập trong `manifest.json` mới
+> được dùng để công bố độ chính xác. Không dùng README hoặc tên file làm đáp án.
+
 Tất cả các tệp trong thư mục này đều được **tải trực tiếp từ internet** (các kho lưu trữ mã nguồn mở, bộ dữ liệu thi thị giác máy tính quốc gia MC-OCR 2021, thư viện chuẩn hóa hóa đơn điện tử Việt Nam) — **hoàn toàn không dùng script tự sinh**.
 
 ---
@@ -45,5 +49,8 @@ Nguồn:
 1. Mở ứng dụng tại [http://localhost:3000](http://localhost:3000).
 2. Vào tab **Tải chứng từ** (Upload).
 3. Kéo thả bất kỳ file nào từ thư mục `input-sample/` vào khung tải:
-   - File **XML**: Được bóc tách tức thì (0ms) với độ tin cậy 100%.
-   - File **PDF / JPG**: Được phân tích tự động qua mô hình thị giác AI (Gemini OCR Vision), bóc tách đầy đủ số hóa đơn, ngày lập, tên đơn vị, số tiền và mặt hàng.
+   - File **XML**: Đọc bằng parser cấu trúc, sau đó kiểm tra MST, ngày, thuế và tổng tiền.
+   - File **PDF / JPG**: OCR local trước; chỉ gọi VLM khi thiếu bằng chứng. Trường không đọc chắc chắn phải để trống và chuyển xác minh.
+
+Kiểm tra tính toàn vẹn của bộ mẫu bằng `npm run dataset:verify`. Lệnh này không
+đánh dấu accuracy 100% nếu nguồn hoặc nhãn chưa được xác minh độc lập.

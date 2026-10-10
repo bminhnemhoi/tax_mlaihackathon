@@ -205,7 +205,7 @@ export function SupplierMasterView() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleViewEvidence(s)}
+                        onClick={(event) => { event.currentTarget.focus(); handleViewEvidence(s); }}
                         className="h-7 px-2.5 text-xs font-bold text-blue-700 hover:text-blue-800 hover:bg-blue-50 border-blue-200 gap-1"
                       >
                         <Eye className="h-3 w-3" />

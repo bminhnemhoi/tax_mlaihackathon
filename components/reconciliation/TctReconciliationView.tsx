@@ -39,8 +39,8 @@ export function TctReconciliationView({
     try {
       const res = await fetch('/api/reconciliation/tct');
       const result = await res.json();
-      if (result.success && result.reconciliation) {
-        setData(result.reconciliation);
+      if (result.success && result.report) {
+        setData(result.report);
       } else {
         setError(result.error || 'Không thể tải dữ liệu đối soát');
       }
@@ -114,8 +114,8 @@ export function TctReconciliationView({
         body: JSON.stringify(sampleTctPayload)
       });
       const result = await res.json();
-      if (result.success && result.reconciliation) {
-        setData(result.reconciliation);
+      if (result.success && result.report) {
+        setData(result.report);
       } else {
         setError(result.error || 'Lỗi khi nhập dữ liệu bảng kê TCT');
       }

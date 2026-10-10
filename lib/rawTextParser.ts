@@ -18,29 +18,26 @@ export function parseInvoiceFromRawText(text: string): {
     return { invoice, confidence: 0, extractedFields };
   }
 
-  const cleanText = text.replace(/\r/g, '').trim();
+  const cleanText = text.replace(/\r/g, '').replace(/^([^\n:]+?)\s*\/\s*[^\n:]+:/gm, '$1:').trim();
 
   // 1. Mã số thuế người bán (MST: 10 chữ số hoặc 13 chữ số có gạch nối)
-  const explicitMstMatch = cleanText.match(/(?:MST|Mã số thuế|Tax code|Tax ID|Mã thuế)[\s:.-]+([0-9]{10}(?:-[0-9]{3})?)/i);
+  const buyerMst = cleanText.match(/(?:Buyer\s*(?:tax\s*code|tax\s*id)|MST\s*(?:bên\s*mua|người\s*mua)|Mã số thuế\s*(?:bên\s*mua|người\s*mua))[\s:.-]+([0-9]{10}(?:-?[0-9]{3})?)/i);
+  if (buyerMst) { invoice.buyerTaxCode=buyerMst[1]; extractedFields.push('buyerTaxCode'); }
+  const sellerMst = cleanText.match(/(?:Seller\s*(?:tax\s*code|tax\s*id)|MST\s*(?:bên\s*bán|người\s*bán)|Mã số thuế\s*(?:bên\s*bán|người\s*bán))[\s:.-]+([0-9]{10}(?:-?[0-9]{3})?)/i);
+  // Generic MST is usable only when its line does not explicitly identify the buyer.
+  const genericLine = cleanText.split('\n').filter(line=>!/(?:Buyer|bên mua|người mua)/i.test(line)).join('\n');
+  const explicitMstMatch = sellerMst || genericLine.match(/(?:MST|Mã số thuế|Tax code|Tax ID|Mã thuế)[\s:.-]+([0-9]{10}(?:-?[0-9]{3})?)/i);
   if (explicitMstMatch) {
-    invoice.supplierTaxCode = explicitMstMatch[1];
-    extractedFields.push('supplierTaxCode');
+    invoice.supplierTaxCode = explicitMstMatch[1]; extractedFields.push('supplierTaxCode');
   } else {
-    // Chỉ nhận dãy 10 số độc lập khi vượt qua kiểm tra Modulo 11 chuẩn Tổng cục Thuế (tránh nhận nhầm số tiền bảng kê)
-    const candidates = Array.from(cleanText.matchAll(/\b([0-9]{10}(?:-[0-9]{3})?)\b/g));
-    for (const cand of candidates) {
-      const check = validateTaxCode(cand[1]);
-      if (check.isValid && !check.reason) {
-        invoice.supplierTaxCode = cand[1];
-        extractedFields.push('supplierTaxCode');
-        break;
-      }
-    }
+    const candidates = Array.from(genericLine.matchAll(/\b([0-9]{10}(?:-[0-9]{3})?)\b/g))
+      .filter(c=>c[1]!==invoice.buyerTaxCode && validateTaxCode(c[1]).isValid && !validateTaxCode(c[1]).reason);
+    if (candidates.length === 1) { invoice.supplierTaxCode=candidates[0][1]; extractedFields.push('supplierTaxCode'); }
   }
 
   // 2. Số hóa đơn
   const invNumberMatch =
-    cleanText.match(/(?:Số HĐ|Số hoá đơn|Số hóa đơn|HĐ số|HD số|Hóa đơn số|Invoice no|Inv no|Số chứng từ|Số)[\s:.-]+([A-Za-z0-9_-]+)/i);
+    cleanText.match(/(?:Số HĐ|Số hoá đơn|Số hóa đơn|HĐ số|HD số|Hóa đơn số|Invoice number|Invoice no|Inv no|Số chứng từ|Số)[\s:.-]+([A-Za-z0-9_-]+)/i);
   if (invNumberMatch) {
     invoice.invoiceNumber = invNumberMatch[1];
     extractedFields.push('invoiceNumber');
@@ -55,7 +52,7 @@ export function parseInvoiceFromRawText(text: string): {
 
   // 3. Tên nhà cung cấp / Bên bán
   const supplierMatch =
-    cleanText.match(/(?:Đơn vị bán|Bên bán|Người bán|Nhà cung cấp|Cung cấp|Công ty|Cty|Doanh nghiệp)[\s:.-]+([^\n,;]{4,100})/i) ||
+    cleanText.match(/(?:Seller|Đơn vị bán|Bên bán|Người bán|Nhà cung cấp|Cung cấp|Công ty|Cty|Doanh nghiệp)[\s:.-]+([^\n,;]{4,100})/i) ||
     cleanText.match(/(?:Công ty [^\n,;]{4,100}|Cty [^\n,;]{4,100}|TNHH [^\n,;]{4,100}|CP [^\n,;]{4,100})/i);
   if (supplierMatch) {
     const rawName = (supplierMatch[1] || supplierMatch[0]).trim();
@@ -88,7 +85,7 @@ export function parseInvoiceFromRawText(text: string): {
 
   // 5. Mặt hàng / Dịch vụ
   const itemMatch =
-    cleanText.match(/(?:Tên hàng hóa|Hàng hóa|Mặt hàng|Nội dung|Dịch vụ|Diễn giải)[\s:.-]+([^\n,;]{3,150})/i);
+    cleanText.match(/(?:Item|Tên hàng hóa|Hàng hóa|Mặt hàng|Nội dung|Dịch vụ|Diễn giải)[\s:.-]+([^\n,;]{3,150})/i);
   if (itemMatch) {
     invoice.itemName = itemMatch[1].trim();
     extractedFields.push('itemName');
@@ -97,7 +94,7 @@ export function parseInvoiceFromRawText(text: string): {
   // 6. Số tiền: Tổng tiền & Tiền thuế
   // Tìm tổng tiền
   const totalMatch =
-    cleanText.match(/(?:Tổng cộng|Tổng tiền|Tổng thanh toán|Thành tiền|Giá trị thanh toán|Số tiền)[\s:.-]+([0-9.,]+(?:\s*(?:triệu|tr|đ|vnđ|vnd))?)/i);
+    cleanText.match(/(?:Total amount|Total|Tổng cộng|Tổng tiền|Tổng thanh toán|Thành tiền|Giá trị thanh toán|Số tiền)[\s:.-]+([0-9.,]+(?:\s*(?:triệu|tr|đ|vnđ|vnd))?)/i);
   if (totalMatch) {
     const rawVal = totalMatch[1].toLowerCase();
     let num: number | undefined;
@@ -114,7 +111,7 @@ export function parseInvoiceFromRawText(text: string): {
   }
 
   // Tìm tiền trước thuế hoặc tính ngược
-  const preTaxMatch = cleanText.match(/(?:Tiền trước thuế|Cộng tiền hàng|Trước thuế)[\s:.-]+([0-9.,]+)/i);
+  const preTaxMatch = cleanText.match(/(?:Pre-tax|Subtotal|Tiền trước thuế|Cộng tiền hàng|Trước thuế)[\s:.-]+([0-9.,]+)/i);
   if (preTaxMatch) {
     const num = parseNumberValue(preTaxMatch[1]);
     if (num && num > 0) {
@@ -124,7 +121,7 @@ export function parseInvoiceFromRawText(text: string): {
   }
 
   // Tìm thuế suất
-  const rateMatch = cleanText.match(/(?:Thuế suất|VAT|Thuế)[\s:.-]+([0-9]{1,2})\s*%/i);
+  const rateMatch = cleanText.match(/(?:Tax rate|VAT rate|Thuế suất|VAT|Thuế)[\s:.-]+([0-9]{1,2})\s*%/i);
   if (rateMatch) {
     const r = parseInt(rateMatch[1], 10);
     if ([0, 5, 8, 10].includes(r)) {
@@ -134,7 +131,7 @@ export function parseInvoiceFromRawText(text: string): {
   }
 
   // Tính thuế nếu chưa có
-  const taxMatch = cleanText.match(/(?:Tiền thuế GTGT|Thuế GTGT|Tiền thuế)[\s:.-]+([0-9.,]+)/i);
+  const taxMatch = cleanText.match(/(?:Tax amount|VAT amount|Tiền thuế GTGT|Thuế GTGT|Tiền thuế)[\s:.-]+([0-9.,]+)/i);
   if (taxMatch) {
     const num = parseNumberValue(taxMatch[1]);
     if (num && num > 0) {
@@ -155,17 +152,26 @@ export function parseInvoiceFromRawText(text: string): {
   }
 
   // 7. Hình thức thanh toán (Tiền mặt vs Chuyển khoản)
-  if (/tiền\s*mặt|tm\b|cash/i.test(cleanText)) {
+  const paymentUnknown = /(?:payment|hình thức thanh toán|thanh toán)[\s:.-]+(?:UNKNOWN|chưa xác định|không xác định)/i.test(cleanText);
+  if (!paymentUnknown && /tiền\s*mặt|tm\b|cash/i.test(cleanText)) {
     invoice.paymentMethod = 'CASH';
     invoice.hasBankSlip = false;
     extractedFields.push('paymentMethod');
-  } else if (/chuyển\s*khoản|ck\b|ngân\s*hàng|bank/i.test(cleanText)) {
+  } else if (!paymentUnknown && /chuyển\s*khoản|ck\b|ngân\s*hàng|bank/i.test(cleanText)) {
     invoice.paymentMethod = 'BANK_TRANSFER';
-    invoice.hasBankSlip = true;
     extractedFields.push('paymentMethod');
-  } else {
-    invoice.paymentMethod = 'BANK_TRANSFER';
-    invoice.hasBankSlip = true;
+    if (/ủy\s*nhiệm\s*chi|sao\s*kê|biên\s*lai\s*(?:chuyển\s*khoản|ngân\s*hàng)|chứng\s*từ\s*thanh\s*toán/i.test(cleanText)) {
+      invoice.hasBankSlip = true;
+      extractedFields.push('hasBankSlip');
+    }
+  }
+
+  if (/không\s+có\s+(?:bảng\s+kê|danh\s+sách\s+hàng)|thiếu\s+bảng\s+kê/i.test(cleanText)) {
+    invoice.hasItemManifest = false;
+    extractedFields.push('hasItemManifest');
+  } else if (/(?:có\s+)?bảng\s+kê\s+(?:chi\s+tiết\s+)?(?:hàng\s+hóa|hàng\s+hoá|dịch\s+vụ)/i.test(cleanText)) {
+    invoice.hasItemManifest = true;
+    extractedFields.push('hasItemManifest');
   }
 
   // Độ tin cậy tính trên số lượng trường quan trọng bóc tách được (tối đa 6 trường)

@@ -1,0 +1,7 @@
+'use client';
+import {useEffect,useState} from 'react';
+export default function WorkflowAuditHistory({invoiceId}:{invoiceId:string}){
+ const [events,setEvents]=useState<any[]>([]);const [error,setError]=useState('');
+ useEffect(()=>{let active=true;fetch(`/api/audit?entityId=${encodeURIComponent(invoiceId)}`).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error);if(active)setEvents(d.events || []);}).catch(e=>{if(active)setError(e.message);});return()=>{active=false;};},[invoiceId]);
+ return <section className="rounded-xl border bg-white p-4"><h3 className="font-semibold">Nhật ký đầy đủ của hồ sơ</h3>{error && <p role="alert">{error}</p>}{events.length===0 && !error && <p className="mt-2 text-sm">Chưa có sự kiện hoặc đang tải.</p>}{events.map(event=><details key={event.id} className="mt-2 rounded border p-3"><summary className="cursor-pointer text-sm">{event.createdAt} · {event.eventType} · {event.actorId || 'Hệ thống'}</summary><p className="my-2 text-sm">{event.payload?.reason} · Policy {event.payload?.policyVersion || '—'} · Revision {event.payload?.revision || '—'}</p><pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify({input:event.payload?.invoice,sourceReview:event.payload?.review,before:event.payload?.before,after:event.payload?.after,reversesEventId:event.payload?.reversesEventId,evaluationId:event.payload?.evaluationId,eventHash:event.eventHash},null,2)}</pre></details>)}</section>;
+}

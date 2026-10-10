@@ -1,3 +1,4 @@
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { requireRequestUser } from '@/lib/server/auth';
@@ -6,7 +7,7 @@ import { getDatabase, jsonNow } from '@/lib/server/db';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     requireRequestUser(request);
     const groups = getDatabase().prepare(`
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const user = requireRequestUser(request);
     if (!['CHIEF_ACCOUNTANT', 'CFO'].includes(user.role)) return NextResponse.json({ error: 'Chỉ KTT hoặc CFO được xử lý duplicate' }, { status: 403 });
@@ -70,3 +71,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể xử lý duplicate' }, { status: 400 });
   }
 }
+
+export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }
+
+export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }
