@@ -103,7 +103,10 @@ async function runTests() {
       sopClause: 'Quy chế tiếp khách và chi phí ngoại giao năm 2026',
       approvedOption: 'A',
       approvedBy: 'Trần Văn B (CFO)',
-      rationale: 'Tiền lệ tiếp khách đối tác chiến lược quý 1'
+      rationale: 'Tiền lệ tiếp khách đối tác chiến lược quý 1',
+      purpose: 'tiếp khách',
+      maximumAmount: 20_000_000,
+      currentThreshold: 20_000_000
     });
     testPrecedentId = prec.id;
     cfoPrecedentSuccess = Boolean(prec.id);
