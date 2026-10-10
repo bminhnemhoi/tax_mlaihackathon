@@ -74,3 +74,4 @@ deepseek-agent/*.log
 /docs/qa-2026-10-10/performance-evidence/
 
 /.codex-finalizer/
+/.agents/

@@ -48,7 +48,7 @@ export async function runAppleVisionOcr(
   mode: 'accurate' | 'fast' = 'accurate'
 ): Promise<LocalNeuralOcrResult> {
   const t0 = Date.now();
-  const scriptPath = path.join(process.cwd(), 'scripts', 'apple_vision_ocr.py');
+  const scriptPath = path.join(process.cwd(), 'scripts', 'ocr', 'apple_vision_ocr.py');
 
   if (!fs.existsSync(scriptPath) || !fs.existsSync(imagePath)) {
     return {

@@ -137,7 +137,7 @@ sai tên nhà cung cấp (`CUM` thành `CỤM`), còn `17.jpg` đọc thêm các
 không có trong ground truth dù tổng tiền và tên đúng. Năm request còn lại bị
 rate-limit upstream. JSONL và mã benchmark được lưu tại
 `qwen3-vl-8b-openrouter-output.jsonl` và
-`scripts/benchmark_openrouter_qwen3_vl_8b.py`.
+`scripts/benchmarks/benchmark_openrouter_qwen3_vl_8b.py`.
 
 **Quyết định không tích hợp Qwen3-VL-8B vào UI:** không đạt SLA dưới 2 giây,
 không đạt 100% trên mẫu đã chạy, và provider Alibaba không khả dụng để khóa.

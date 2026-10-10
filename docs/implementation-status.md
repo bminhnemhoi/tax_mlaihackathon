@@ -27,6 +27,6 @@
 3. Chưa có nhãn ≥20 ca độc lập và ba nhân sự thật. Mẫu CSV/JSON còn trống có chủ đích; runner từ chối tạo số liệu khi nhãn chưa khóa/không đủ ca.
 4. Chưa có đo trước/sau, xác nhận tự viết hoặc cải tiến truy vết từ feedback thật. Slide ghi rõ thiếu bằng chứng, cần cập nhật trước nộp.
 5. Video mới có kịch bản, chưa có bản ghi MP4. Build log Markdown một trang nội dung cần kiểm tra bản xuất khi nộp.
-6. Chưa kiểm chứng clone sạch trên máy thứ hai; chưa tạo commit vì working tree có nhiều thay đổi sẵn trước tác vụ. Cần rà diff và commit trước khóa bài.
+6. Chưa kiểm chứng clone sạch trên máy thứ hai. Commit hiện tại đã được tạo; vẫn cần chạy clone sạch trước khi khóa bài.
 
 Không đánh dấu hoàn tất cuộc thi chỉ từ các kiểm tra local. Các tập hồi quy dùng dữ liệu tổng hợp và trùng một số ca giữa tập; không cộng mẫu hoặc suy diễn tiết kiệm thời gian.

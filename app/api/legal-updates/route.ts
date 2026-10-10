@@ -1,6 +1,6 @@
 import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
-import { listLegalUpdates, syncLegalUpdates } from '@/services/legalUpdateService';
+import { listLegalUpdates, syncLegalUpdates } from '@/services/legal/legalUpdateService';
 import { getRequestUser } from '@/lib/server/auth';
 
 export const dynamic = 'force-dynamic';

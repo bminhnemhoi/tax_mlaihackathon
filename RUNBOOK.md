@@ -72,7 +72,7 @@ npm run test:phase1:sprint2
 npm run test:phase1:sprint3
 
 # 5. Kiểm thử Hồi quy 5 Ca Manifest Đề bài A (5 ca chuẩn - 3 Routine, 2 Escalated)
-npx tsx scripts/test-regression-manifest.ts
+npm run test:manifest
 
 # 6. Kiểm tra Toàn vẹn Kiểu dữ liệu TypeScript (0 lỗi biên dịch)
 npx tsc --noEmit

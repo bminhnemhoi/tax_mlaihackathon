@@ -28,7 +28,7 @@ Trước làn sóng siết chặt quản lý thuế bằng hóa đơn điện t�
   - `UNCERTAIN_INFO`: Thông tin chưa đủ độ chắc chắn thực tế (ảnh mờ, thiếu HĐ gốc NĐ 254, nhà cung cấp đóng MST trước ngày xuất).
   - `OUT_OF_POLICY`: Nằm ngoài phạm vi quy định (áp sai thuế suất 8%, thanh toán tiền mặt từ 5 triệu VNĐ, chi phí nhạy cảm rượu bia không phục vụ SXKD).
   - `EXCEED_AUTHORITY`: Vượt thẩm quyền phê duyệt (hóa đơn giảm giá hoặc bồi thường từ 200 triệu VNĐ, mua sắm lớn đẩy Hệ số K vào Vùng Đỏ).
-- **Hỗ trợ quyết định trong 3 giây (Actionable Human-in-the-Loop):** Tích hợp **Alibaba Cloud Qwen AI** (`qwen-plus-character`) và **TypeSafe AI (Jev)** sinh câu hỏi đóng ngữ cảnh hóa kèm đúng 2 phương án đối ứng (**Phương án A** vs **Phương án B**), chuyển tiếp đúng Kế toán trưởng (KTT) hoặc Giám đốc Tài chính (CFO) ra quyết định tức thì.
+- **Hỗ trợ quyết định trong 3 giây (Actionable Human-in-the-Loop):** Tích hợp Gemini 2.5 Flash qua provider cấu hình trong `SHOPAIKEY_*`/`AI_*` và **TypeSafe AI (Jev)** sinh câu hỏi đóng ngữ cảnh hóa kèm đúng 2 phương án đối ứng (**Phương án A** vs **Phương án B**), chuyển tiếp đúng Kế toán trưởng (KTT) hoặc Giám đốc Tài chính (CFO) ra quyết định.
 - **Cập nhật pháp luật thời gian thực (Real-time Legal Pipeline):** Tiếp nhận Webhook tức thời từ đối tác pháp lý số, tích hợp luồng RSS XML Cổng Chính phủ và Bộ Tài chính, đối soát chống báo động giả.
 - **Thiết kế chuẩn UI/UX Pro Max (Chống AI Slop):** Giao diện tối giản phong cách Swiss FinTech (Ramp/Linear-grade), loại bỏ triệt để các dải gradient hay hiệu ứng neon tùy tiện; đồng bộ 100% typography và chữ số kế toán `font-numeric` (Inter tabular lining numbers).
 
@@ -47,8 +47,8 @@ Trước làn sóng siết chặt quản lý thuế bằng hóa đơn điện t�
 │    + Luật 48/2024, NĐ 254/2026, NQ 204/2025, TT 219     │
 │    + Giám sát Hệ số K (CV 2392) & Trùng lặp HĐ         │
 │  - Engine 2: AI Intelligence Cascade                   │
-│    + Vision OCR: Qwen 3.7 Flash Multimodal (OpenRouter) │
-│    + Suy luận & Q-Gen: Alibaba Cloud Qwen-Plus-Char     │
+│    + Vision OCR: Gemini 2.5 Flash qua provider cấu hình  │
+│    + Suy luận & Q-Gen: Gemini 2.5 Flash + fallback local │
 │    + Tăng tốc phân loại: TypeSafe AI Jev System One    │
 └──────────────────────────┬─────────────────────────────┘
                            │
@@ -188,9 +188,9 @@ Tax-Referee/
 │   │   ├── audit/                   # API tra cứu nhật ký chuỗi băm kiểm toán SHA-256
 │   │   ├── auth/                    # API xác thực phiên đăng nhập 3 vai trò (RBAC)
 │   │   ├── banking/                 # API đối soát sổ phụ ngân hàng
-│   │   ├── documents/               # API bóc tách đa định dạng (XML local, PDF/Ảnh Qwen Vision)
+│   │   ├── documents/               # API bóc tách đa định dạng (XML local, PDF/Ảnh Vision)
 │   │   ├── dossiers/                # API xuất Hồ sơ Phòng vệ Thuế 1-Click
-│   │   ├── evaluate/                # API thẩm định kép (Policy Engine + Qwen AI)
+│   │   ├── evaluate/                # API thẩm định kép (Policy Engine + AI diễn giải)
 │   │   ├── inbox/                   # API quản lý hộp thư và duyệt hàng loạt (Bulk Confirm)
 │   │   ├── invoices/duplicates      # API rà soát hóa đơn trùng lặp
 │   │   ├── invoices/reset           # API khôi phục danh mục hóa đơn mẫu demo 1-click
@@ -239,19 +239,19 @@ Tax-Referee/
 │   ├── schemas.ts                   # Zod Schemas và Discriminated Unions
 │   └── utils.ts                     # Hàm tiện ích định dạng tiền tệ và thời gian
 ├── scripts/
-│   ├── benchmark_10_invoices.ts     # Script đo lường benchmark 10 hóa đơn
-│   ├── compare_ocr_vs_vlm.ts        # So sánh hiệu năng OCR và VLM
-│   ├── ingest-real-samples.ts       # Script nạp hóa đơn thực tế vào CSDL
-│   ├── reset-demo-data.ts           # Script dọn dẹp và reset dữ liệu demo
-│   └── test-regression-manifest.ts  # Runner kiểm thử hồi quy 5 fixtures
+│   ├── qa/                           # Acceptance, API, workflow và dataset checks
+│   ├── benchmarks/                   # Đo hiệu năng OCR/VLM và provider
+│   ├── ops/                          # Ingest, reset demo, legal sync và setup
+│   └── ocr/                          # Apple Vision OCR và worker local
 ├── services/
-│   ├── aiCoordinator.ts             # Điều phối AI thông minh (OpenRouter Qwen Vision + Qwen-Plus)
+│   ├── aiCoordinator.ts             # Điều phối Gemini Vision và template fallback
 │   ├── bankMatcherService.ts        # Khớp lệnh thanh toán không dùng tiền mặt với sao kê
 │   ├── jevService.ts                # Bộ điều phối thẩm định kép (Dual-Engine Orchestrator)
 │   ├── localOcrService.ts           # Dịch vụ OCR cục bộ tốc độ cao (Apple Silicon NPU)
 │   ├── policyEngine.ts              # Trọng tài tiền kiểm quy chế nội bộ (Ground Truth)
 │   ├── precedentService.ts          # Dịch vụ quản lý tiền lệ CFO
-│   ├── qwenService.ts               # Module kết nối Qwen AI (Qwen 3.7 Flash Vision + Qwen-Plus Q-Gen)
+│   ├── qwenService.ts               # Adapter Qwen tùy chọn cho tra cứu/provider tương thích
+│   ├── legal/                       # Crawler, feed và workflow cập nhật pháp lý
 │   ├── supplierService.ts           # Dịch vụ quản lý nhà cung cấp và rủi ro
 │   └── taxLookupService.ts          # Tra cứu thông tin người nộp thuế
 ├── .env.example                     # Tệp mẫu cấu hình môi trường

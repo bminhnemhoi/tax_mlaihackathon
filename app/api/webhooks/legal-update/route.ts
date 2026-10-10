@@ -1,6 +1,6 @@
 import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
-import { processIncomingLegalUpdate } from '@/services/legalUpdateService';
+import { processIncomingLegalUpdate } from '@/services/legal/legalUpdateService';
 
 export const dynamic = 'force-dynamic';
 
