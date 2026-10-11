@@ -1,5 +1,6 @@
 'use client';
 
+import {roleLabels} from '@/lib/workflowPresentation';
 import React from 'react';
 import { History, Undo2, RotateCcw, FileText } from 'lucide-react';
 import { AuditEntry } from '@/lib/schemas';
@@ -155,7 +156,7 @@ export const AuditTrailTable: React.FC<AuditTrailTableProps> = ({
                         }
                         className="text-[10px] py-0 px-2 font-bold"
                       >
-                        {entry.actor === 'SYSTEM_REFEREE' ? 'AI Referee' : entry.actor === 'CHIEF_ACCOUNTANT' ? 'Kế toán trưởng' : 'CFO'}
+                        {roleLabels[entry.actor] || 'Vai trò chưa ghi nhận'}
                       </Badge>
 
                       {entry.isOverridden && (
@@ -206,6 +207,7 @@ export const AuditTrailTable: React.FC<AuditTrailTableProps> = ({
                       <Button
                         size="icon"
                         variant="outline"
+                        disabled={!entry.canOverride}
                         onClick={() => { setActionEntry(entry); setActionKind(entry.isOverridden ? 'UNDO' : 'OVERRIDE'); setReason(''); }}
                         className={`h-7 w-7 border text-xs ${
                           entry.isOverridden
@@ -221,6 +223,7 @@ export const AuditTrailTable: React.FC<AuditTrailTableProps> = ({
                       <Button
                         size="icon"
                         variant="outline"
+                        disabled={!entry.canUndo}
                         onClick={() => { setActionEntry(entry); setActionKind('UNDO'); setReason(''); }}
                         className="h-7 w-7 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-700 border-slate-200 hover:border-rose-200"
                         title="Hoàn tác quyết định kiểm toán này"

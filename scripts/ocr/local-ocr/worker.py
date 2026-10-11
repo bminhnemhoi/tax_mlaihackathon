@@ -46,4 +46,4 @@ async def ocr(request:Request):
   'performance':{'preprocessMs':round(prep_ms,2),'ocrMs':round(ocr_ms,2),'workerMs':round((time.perf_counter()-t)*1000,2)}}
 if __name__=='__main__':
  import uvicorn
- uvicorn.run(app,host='127.0.0.1',port=int(os.getenv('LOCAL_OCR_PORT','3004')),log_level='warning')
+ uvicorn.run(app,host=os.getenv('LOCAL_OCR_HOST','127.0.0.1'),port=int(os.getenv('LOCAL_OCR_PORT','3004')),log_level='warning')

@@ -4,6 +4,7 @@ node_modules
 data/runtime
 data/uploads
 .env*
+env.local
 !.env.example
 brainstorming
 backups

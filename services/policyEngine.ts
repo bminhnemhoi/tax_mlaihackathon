@@ -1000,7 +1000,7 @@ function evaluateInvoiceLocallyInternal(
     flaggedReason: combinedReason,
     plainExplanation: primaryFinding.plainExplanation,
     sopClause: primaryFinding.sopClause,
-    actionableQuestion,
+    actionableQuestion: `Hóa đơn ${inv.invoiceNumber} · Người xử lý: ${requiresCFO ? 'CFO' : 'Kế toán trưởng'}. ${actionableQuestion}${activeFindings.length > 1 ? ` Cần xử lý đủ ${activeFindings.length} phát hiện: ${activeFindings.map(f=>f.flaggedReason).join('; ')}. Giải quyết một phát hiện không tự giải tỏa các phát hiện còn lại.` : ''}`,
     options: primaryFinding.options,
     requiresCFO,
     lineItemAnalysis,

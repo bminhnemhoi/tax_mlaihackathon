@@ -1,5 +1,6 @@
 import { InvoiceInput, RiskGroup } from '@/lib/schemas';
 import { GEMINI_API_CONFIG } from '@/lib/constants';
+import {extractInvoiceWithResidentOcr} from './receiptOcrService';
 import {
   extractInvoiceWithGeminiVision,
   generateActionableQuestionWithGemini,
@@ -39,6 +40,17 @@ export async function extractInvoiceWithHybridPipeline(params: {
   fileName?: string;
 }): Promise<ExtractionCoordinatorResult> {
   const { fileBase64, mimeType, fileName } = params;
+  if(process.env.DOCUMENT_IMAGE_ENGINE==='local-ocr'){
+    try{
+      const local=await extractInvoiceWithResidentOcr(fileBase64);
+      if(!local.fallbackSuggested)return local;
+      if(process.env.LOCAL_OCR_QWEN_FALLBACK!=='true')return {...local,data:{...local.data,isImageBlurry:true},uncertainFields:[...new Set([...local.uncertainFields,...Object.keys(local.data)])],fallbackReason:`OCR cần đối chiếu thủ công: ${local.fallbackReasons.join('; ')}`};
+    }catch(error){
+      if(process.env.LOCAL_OCR_QWEN_FALLBACK!=='true')return {data:{isImageBlurry:true},engineUsed:'LOCAL_FALLBACK',uncertainFields:['invoiceNumber','invoiceDate','supplierTaxCode','totalAmount'],fallbackReason:error instanceof Error?error.message:'Worker OCR không sẵn sàng'};
+    }
+    const data=await extractInvoiceWithGeminiVision(fileBase64,mimeType,fileName);
+    return {data,engineUsed:'GEMINI_AI',fallbackReason:'OCR local chưa đủ bằng chứng; đã dùng Vision theo cấu hình'};
+  }
   console.log(`[AI Coordinator] Đang đọc ảnh hóa đơn trực tiếp 100% qua Gemini 2.5 Flash (không qua OCR)...`);
   const data = await extractInvoiceWithGeminiVision(fileBase64, mimeType, fileName);
   return {

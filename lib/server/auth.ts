@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { NextRequest } from 'next/server';
-import { getDatabase, jsonNow, isSandbox } from './db';
+import { getDatabase, jsonNow } from './db';
 
 export type AppRole = 'ACCOUNTANT' | 'CHIEF_ACCOUNTANT' | 'CFO';
 export type AppUser = { id: string; email: string; displayName: string; role: AppRole };
@@ -23,10 +23,8 @@ function ensureSeedUsers(): void {
   const tx = db.transaction(() => {
     for (const seed of roleSeed) {
       const configuredPassword = process.env[seed.envKey];
-      if (!configuredPassword && process.env.NODE_ENV === 'production' && !isSandbox()) {
-        throw new Error(`Thiếu secret ${seed.envKey} trong môi trường production`);
-      }
-      const password = configuredPassword || seed.fallback;
+      // MVP supports role selection. Unconfigured production passwords remain unguessable.
+      const password = configuredPassword || (process.env.NODE_ENV === 'production' ? crypto.randomBytes(32).toString('hex') : seed.fallback);
       insert.run(crypto.randomUUID(), seed.email, seed.displayName, seed.role, bcrypt.hashSync(password, 10), jsonNow());
     }
   });

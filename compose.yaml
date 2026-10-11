@@ -3,10 +3,33 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env.production
+    environment:
+      DOCUMENT_IMAGE_ENGINE: local-ocr
+      LOCAL_OCR_URL: http://ocr:3004
+    depends_on:
+      ocr:
+        condition: service_healthy
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
       - runtime:/app/data/runtime
     mem_limit: 2g
+  ocr:
+    build:
+      context: .
+      dockerfile: deployment/ocr.Dockerfile
+    restart: unless-stopped
+    mem_limit: 2g
+    environment:
+      LOCAL_OCR_HOST: 0.0.0.0
+    volumes:
+      - ocr-models:/root/.cache
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3004/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 180s
+      retries: 5
 volumes:
   runtime:
+  ocr-models:

@@ -1,4 +1,4 @@
-import { allowedActions, readRecord } from '@/services/workflowService';
+import { allowedActions, readRecord, recoverExpiredEvaluations } from '@/services/workflowService';
 import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRequestUser } from '@/lib/server/auth';
@@ -17,6 +17,7 @@ function json<T>(value: unknown, fallback: T): T {
 async function handleGET(request: NextRequest) {
   try {
     const user = requireRequestUser(request);
+    recoverExpiredEvaluations();
     const rows = getDatabase().prepare(`
       SELECT
         i.id, i.invoice_number, i.supplier_tax_code, i.invoice_date,
@@ -65,6 +66,8 @@ async function handleGET(request: NextRequest) {
         taxAmount: Number(invoice.taxAmount || 0),
         status,
         revision: workflowRecord.revision,
+        evaluatedAt: row.evaluated_at ? String(row.evaluated_at) : null,
+        dossierReady: Boolean(getDatabase().prepare('SELECT id FROM dossier_snapshots WHERE invoice_id=? AND evaluation_id=? LIMIT 1').get(String(row.id),row.evaluation_id || null)),
         internalVoucherId:(getDatabase().prepare('SELECT id FROM internal_vouchers WHERE invoice_id=?').get(String(row.id)) as {id:string}|undefined)?.id || null,
         taxHold: Boolean(workflowRecord.tax_hold),
         review: JSON.parse(workflowRecord.source_review_json),

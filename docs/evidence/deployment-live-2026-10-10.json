@@ -1,0 +1,156 @@
+{
+  "timestamp": "2026-10-10T09:42:14.028Z",
+  "origin": "https://limegreen-salamander-517622.hostingersite.com",
+  "health": 200,
+  "runs": [
+    {
+      "http": 200,
+      "runId": "7d873fc3-0190-4905-a92a-e4626ef044aa",
+      "policyHash": "52e95c1d30d2dd35a925dde5d9c14b9a46dbb67bf0d647ef093ff23e87c1f0bd",
+      "executionMode": "DETERMINISTIC_LOCAL",
+      "errorCases": 0,
+      "mode": "common_4",
+      "totalCases": 4,
+      "passedCases": 4,
+      "routineCases": 1,
+      "escalatedCases": 3,
+      "schemaValidCases": 4,
+      "allSchemaValid": true,
+      "isMatchExpected": true,
+      "totalTimeMs": 16,
+      "timestamp": "2026-10-10T09:42:13.363Z",
+      "policyVersion": "TAX-SOP-2026-v2.5",
+      "fixtureHash": "62cb32666007b9cc8b7f7d8d3fb846f3636b9a197770f25bb72dbb667d7a439a",
+      "metrics": {
+        "falseNegativeRate": 0,
+        "falseNegativeCases": 0,
+        "falsePositiveRate": 0,
+        "falsePositiveCases": 0,
+        "straightThroughProcessingRate": 25,
+        "routineCompletionRate": 100,
+        "autoApprovedRoutineCases": 1,
+        "denominators": {
+          "expectedEscalated": 3,
+          "expectedRoutine": 1,
+          "total": 4
+        },
+        "thresholdAdaptationStatus": "Bộ hồi quy tổng hợp; không phải đánh giá độc lập"
+      }
+    },
+    {
+      "http": 200,
+      "runId": "7a237278-a345-4bf0-a6b9-8f114a579725",
+      "policyHash": "52e95c1d30d2dd35a925dde5d9c14b9a46dbb67bf0d647ef093ff23e87c1f0bd",
+      "executionMode": "DETERMINISTIC_LOCAL",
+      "errorCases": 0,
+      "mode": "challenge_a",
+      "totalCases": 5,
+      "passedCases": 5,
+      "routineCases": 3,
+      "escalatedCases": 2,
+      "schemaValidCases": 5,
+      "allSchemaValid": true,
+      "isMatchExpected": true,
+      "totalTimeMs": 21,
+      "timestamp": "2026-10-10T09:42:13.524Z",
+      "policyVersion": "TAX-SOP-2026-v2.5",
+      "fixtureHash": "61e372f292efa09bce4540c859adbdf9d6f76ed600b96ccd54236b6a3af97320",
+      "metrics": {
+        "falseNegativeRate": 0,
+        "falseNegativeCases": 0,
+        "falsePositiveRate": 0,
+        "falsePositiveCases": 0,
+        "straightThroughProcessingRate": 60,
+        "routineCompletionRate": 100,
+        "autoApprovedRoutineCases": 3,
+        "denominators": {
+          "expectedEscalated": 2,
+          "expectedRoutine": 3,
+          "total": 5
+        },
+        "thresholdAdaptationStatus": "Bộ hồi quy tổng hợp; không phải đánh giá độc lập"
+      }
+    },
+    {
+      "http": 200,
+      "runId": "cf6ab387-6d53-4fc9-8687-233238ddbc9d",
+      "policyHash": "52e95c1d30d2dd35a925dde5d9c14b9a46dbb67bf0d647ef093ff23e87c1f0bd",
+      "executionMode": "DETERMINISTIC_LOCAL",
+      "errorCases": 0,
+      "mode": "regression_15",
+      "totalCases": 15,
+      "passedCases": 15,
+      "routineCases": 6,
+      "escalatedCases": 9,
+      "schemaValidCases": 15,
+      "allSchemaValid": true,
+      "isMatchExpected": true,
+      "totalTimeMs": 80,
+      "timestamp": "2026-10-10T09:42:13.729Z",
+      "policyVersion": "TAX-SOP-2026-v2.5",
+      "fixtureHash": "37b1dc7dcf03b23032937e78feec4decb27b075b105c9ee8ee4cbbf2ab04238f",
+      "metrics": {
+        "falseNegativeRate": 0,
+        "falseNegativeCases": 0,
+        "falsePositiveRate": 0,
+        "falsePositiveCases": 0,
+        "straightThroughProcessingRate": 40,
+        "routineCompletionRate": 100,
+        "autoApprovedRoutineCases": 6,
+        "denominators": {
+          "expectedEscalated": 9,
+          "expectedRoutine": 6,
+          "total": 15
+        },
+        "thresholdAdaptationStatus": "Bộ hồi quy tổng hợp; không phải đánh giá độc lập"
+      }
+    }
+  ],
+  "formats": [
+    {
+      "format": "xml",
+      "http": 200,
+      "ms": 416,
+      "artifact": true,
+      "sourceType": "XML",
+      "needsReview": false,
+      "uncertainFields": []
+    },
+    {
+      "format": "pdf",
+      "http": 200,
+      "ms": 326,
+      "artifact": true,
+      "sourceType": "PDF",
+      "needsReview": true,
+      "uncertainFields": [
+        "taxAmount"
+      ]
+    },
+    {
+      "format": "png",
+      "http": 200,
+      "ms": 7821,
+      "artifact": true,
+      "sourceType": "IMAGE",
+      "needsReview": false,
+      "uncertainFields": []
+    }
+  ],
+  "scope": "Synthetic regression and synthetic document smoke only; no human labels or user study.",
+  "release": "codex-20261010-r5",
+  "versions": {
+    "next": "15.5.27",
+    "betterSqlite3": "12.11.1"
+  },
+  "checks": {
+    "typecheck": "PASS",
+    "build": "PASS",
+    "acceptance": "PASS; 16 additional improvement checks",
+    "apiSmoke": "PASS; includes runtime, notifications, duplicates",
+    "standaloneRestartRestoreRecovery": "PASS",
+    "sqliteBackupReadback": "integrity ok; internal 0, demo 1 invoices",
+    "browserFieldConfirmation": "Partial -> WAITING_CHIEF_ACCOUNTANT revision 2; all known fields confirmed -> APPROVED revision 3 and voucher",
+    "browserReportDownload": "PASS; 5/5 exported with run ID"
+  }
+}

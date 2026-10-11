@@ -1,15 +1,13 @@
 # Build log — Tax Referee / Đề A
 
-**Ngày:** 09–10/10/2026. **Phạm vi:** Next.js + SQLite, luồng tiếp nhận → thẩm định → audit → Verify. Chưa có URL triển khai công khai được xác nhận.
+**Ngày:** 10/10/2026. **Live:** https://limegreen-salamander-517622.hostingersite.com. **Phạm vi:** Next.js/SQLite, UI xử lý ngoại lệ, policy/QGen, hậu kiểm, vận hành Hostinger.
 
-**Thay đổi:** service nghiệp vụ dùng chung; transaction cho evaluation, trạng thái, voucher, macro và audit; guard revision/evaluation; thuế được duyệt bằng 0 khi còn nghi vấn; lưu cảnh báo nguồn và revision; dừng kết quả đang chạy; hoàn tác bằng sự kiện bù; giữ thuế backend; tiền lệ có mục đích/hạn mức/thời hạn và hiệu chỉnh từ ≥10 phản hồi hậu kiểm. Verify chạy database mới, dữ liệu/policy cố định.
+**Thay đổi:** form sửa dữ liệu và xác nhận nguồn theo từng trường; audit dễ đọc với actor/reason/input/effect/policy snapshot; quyền undo từ server; SLA tuyệt đối không quay vòng. Backend lưu evidence theo giá trị, loại xác nhận khi sửa, lease/fence cho evaluation quá hạn. SOP/rule registry phản ánh logic đã triển khai; gate publish/rollback kiểm tra phân loại theo fixture thay vì chỉ schema. QGen không thay quyết định/explanation và bị chặn khi sai ngữ cảnh/options/số tiền/người nhận. Hiệu chỉnh ngưỡng kiểm tra candidate trong savepoint; retry feedback không tăng mẫu. Verify thêm run ID/hash/export/SOP; runner độc lập chống trùng và ghi ERROR riêng. Quota chứng từ và script preview/dọn demo offline.
 
-**AI hỗ trợ:** đọc mã, xây dựng service/API/UI, tạo fixture tổng hợp và kiểm thử, soạn tài liệu triển khai. LLM chỉ diễn giải câu hỏi; quy tắc tất định quyết định luồng. Không dùng AI tạo xác nhận của người tham gia.
+**AI hỗ trợ:** đọc mã, sửa service/API/UI, tạo fixture tổng hợp, kiểm thử và tài liệu. Không tạo nhãn nghiệp vụ, lời chứng người dùng hoặc số liệu tiết kiệm giả.
 
-**Kiểm tra đã chạy:** TypeScript; production build; standalone restart và offline snapshot/restore tại máy; 4/4 ca chung, 5/5 Đề A, 15/15 hồi quy; 20 kiểm tra an toàn gồm gửi lặp, stale revision, nhiều vi phạm, bổ sung bằng chứng, dừng giữa xử lý, hoàn tác macro/voucher và giới hạn/rollback ngưỡng. Các bộ dữ liệu có ca trùng; đây là hồi quy tổng hợp, không chứng minh độ chính xác thực tế hay thời gian tiết kiệm.
+**Kiểm tra:** typecheck và production build đạt; Verify 4/4, 5/5, 15/15; 20 workflow, 2 AI fallback, 4 review, 39 QA mock, 16 kiểm tra cải tiến. Standalone restart, phục hồi evaluation hết hạn/retry và offline snapshot/restore đạt. Các tập Verify có ca trùng, không phải holdout độc lập.
 
-**Điểm cắt giảm:** ERP trực tiếp, đa doanh nghiệp, tự cập nhật luật. Adapter mở rộng phải được công bố mức giả lập/xuất payload. Không coi schema hợp lệ là PASS nghiệp vụ.
+**Triển khai:** fix native install bằng ghim better-sqlite3 12.11.1; build host bị EAGAIN nên dùng bundle local + dependency Linux. Passenger một instance, env/SQLite/chứng từ ngoài release, Python user-level. HTTPS health, ba vai trò, demo isolation, pause/stale409/undo, Verify và XML/PDF/ảnh tổng hợp live đạt. SQLite backup đọc lại integrity ok. Ảnh tổng hợp một lần mất khoảng 7,8s; không claim OCR dưới 2s.
 
-**Còn cần bằng chứng:** Docker/Linux + HTTPS/restart/restore trên VPS thực; OCR API trên chứng từ độc lập; ≥20 ca do nghiệp vụ gán nhãn; ba người dùng thật, đo trước/sau, xác nhận tự viết và cải tiến gắn feedback; ghi video ≤3 phút. Bộ slide 5 trang phải bổ sung số liệu đo thực trước khi khóa bài.
-
-**Lịch khóa:** 15/10; diễn tập 16–17/10. Giữ lịch sử Git hiện có; tạo commit theo giai đoạn sau khi rà soát diff, không gộp các thay đổi có sẵn thành một claim hoàn thành.
+**Còn cần:** nhãn độc lập do nghiệp vụ khóa; chấm mù câu hỏi; ba người dùng, đo trước/sau, feedback và retest; hoàn thiện số liệu slide/video ≤3 phút. Worker Docker đã đóng gói nhưng chưa được nghiệm thu trên môi trường Docker thực. Adapter ERP/TCT/ngân hàng chỉ là phạm vi demo/xuất payload.

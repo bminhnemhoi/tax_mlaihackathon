@@ -1,4 +1,4 @@
-import { withRequestDatabase, isSandbox } from '@/lib/server/db';
+import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { appendAuditEvent } from '@/lib/server/audit';
 import { AppRole, getRequestUser, switchRole } from '@/lib/server/auth';
@@ -6,7 +6,6 @@ import { AppRole, getRequestUser, switchRole } from '@/lib/server/auth';
 export const dynamic = 'force-dynamic';
 
 async function handlePOST(req: NextRequest) {
-  if (!isSandbox()) return NextResponse.json({ error: 'Chuyển vai trò chỉ khả dụng trong demo riêng.' }, { status: 403 });
   const currentUser = getRequestUser(req);
   if (!currentUser) return NextResponse.json({ error: 'Vui lòng đăng nhập trước khi chuyển vai trò' }, { status: 401 });
   // Luôn cho phép chuyển vai trò theo yêu cầu (không bao giờ khóa)

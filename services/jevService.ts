@@ -1,6 +1,7 @@
 import { InvoiceInput, MacroState, RefereeDecision, RiskGroup, SystemPolicyConfig } from '@/lib/schemas';
 import { evaluateInvoiceLocally } from './policyEngine';
 import { generateActionableQuestionWithUnifiedAI } from './aiCoordinator';
+import { isGroundedQuestion } from './questionGuard';
 
 export type DualEngineType = 'QWEN_AI' | 'JEV_AND_QWEN_AI' | 'JEV_AI' | 'LOCAL_FALLBACK' | 'GEMINI_AI' | 'JEV_AND_GEMINI_AI';
 
@@ -51,10 +52,11 @@ export async function queryJevReferee(
       localDecision.flaggedReason,
       localDecision.sopClause
     );
+    if (!isGroundedQuestion(invoice,localDecision,generated)) throw new Error('Câu hỏi AI chưa khớp bằng chứng, thẩm quyền và phương án; sử dụng câu hỏi quy chế.');
     const enrichedDecision: RefereeDecision = {
       ...localDecision,
       // Risk group, authority and A/B actions remain deterministic from local policy.
-      plainExplanation: generated.plainExplanation,
+      plainExplanation: localDecision.plainExplanation,
       actionableQuestion: generated.actionableQuestion,
       flaggedReason: localDecision.flaggedReason,
       options: localDecision.options,

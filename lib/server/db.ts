@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_POLICY_CONFIG, MACRO_DEFAULTS } from '@/lib/constants';
+import { executablePolicySummary, implementedPolicyRules } from '@/data/policyContract';
 import { MacroState, MacroStateSchema, PolicyBundle, PolicyBundleSchema, SystemPolicyConfigSchema } from '@/lib/schemas';
 
 const dataDirectory = process.env.TAX_REFEREE_DATA_DIR || path.join(process.cwd(), 'data', 'runtime');
@@ -260,6 +261,34 @@ function applyMigrations(db: Database.Database): void {
       CREATE TABLE IF NOT EXISTS extraction_reviews (artifact_id TEXT PRIMARY KEY, payload_json TEXT NOT NULL);
     `);
     record.run(13, now());
+  }
+
+  if (!applied.has(14)) {
+    for (const [column, sql] of [
+      ['evaluation_attempt_id', 'TEXT'], ['evaluation_deadline', 'TEXT'], ['evaluation_policy_json', 'TEXT']
+    ]) if (!hasColumn(db, 'invoices', column)) db.exec(`ALTER TABLE invoices ADD COLUMN ${column} ${sql}`);
+    record.run(14, now());
+  }
+
+  if (!applied.has(15)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS capture_sessions (
+        id TEXT PRIMARY KEY,
+        token_hash TEXT NOT NULL,
+        owner_user_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('WAITING','UPLOADED','PROCESSING','READY','FAILED','EXPIRED','CANCELLED')),
+        artifact_id TEXT,
+        error_message TEXT,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        uploaded_at TEXT,
+        completed_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_capture_sessions_owner ON capture_sessions(owner_user_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_capture_sessions_expiry ON capture_sessions(expires_at);
+    `);
+    record.run(15, now());
   }
 
 }
@@ -534,10 +563,10 @@ function initializeDatabase(db: Database.Database): void {
       createdAt: now(),
       effectiveFrom: '2025-07-01',
       sourceDocumentVersions: ['48/2024/QH15', '204/2025/QH15', 'TAX-SOP-2026-v2.5'],
-      policyText: '',
-      rules: [],
+      policyText: executablePolicySummary(config),
+      rules: implementedPolicyRules(config),
       config,
-      contentHash: hashContent(config)
+      contentHash: hashContent({config, policyText: executablePolicySummary(config), rules: implementedPolicyRules(config)})
     };
     db.prepare(`
       INSERT INTO policy_versions (version, status, effective_from, payload_json, content_hash, created_at, published_at)

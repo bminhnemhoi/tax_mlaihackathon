@@ -1,1 +1,6 @@
-{"status":"AWAITING_HUMAN_LABELS","minimumCases":20,"cases":[],"instructions":"Mỗi ca: id, invoice, expectedStatus, expectedRiskGroup, expectedRequiresCFO, rationale, labeledBy, labeledAt. Khóa nhãn trước khi chạy; không dùng fixture Verify."}
+{
+  "status": "AWAITING_HUMAN_LABELS",
+  "minimumCases": 20,
+  "cases": [],
+  "instructions": "Mỗi ca: id, invoice, expectedStatus, expectedRiskGroup, expectedRequiresCFO, rationale, labeledBy, labeledAt, provenance. Điền companyTaxCode và lockedAt; khóa nhãn trước khi chạy. Không dùng fixture Verify; trainingInvoiceHashes kê các ca dùng hiệu chỉnh. Câu hỏi trong báo cáo cần người chấm mù."
+}

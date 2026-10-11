@@ -1,12 +1,7 @@
-'use client';
-import React,{useEffect,useState} from 'react';
-import Link from 'next/link';
-import {ProductionWorkspace} from '@/components/ProductionWorkspace';
-type User={id:string;email:string;displayName:string;role:'ACCOUNTANT'|'CHIEF_ACCOUNTANT'|'CFO'};
-export default function HomePage(){
- const [user,setUser]=useState<User|null>(null);const [busy,setBusy]=useState(true);const [error,setError]=useState('');const [email,setEmail]=useState('');const [password,setPassword]=useState('');
- useEffect(()=>{fetch('/api/auth/me').then(r=>r.ok?r.json():null).then(d=>setUser(d?.user || null)).catch(()=>setError('Không thể kết nối máy chủ.')).finally(()=>setBusy(false));},[]);
- async function demo(){setBusy(true);setError('');try{const r=await fetch('/api/demo/session',{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.error);setUser(d.user);}catch(e){setError(e instanceof Error?e.message:'Không thể mở demo');}finally{setBusy(false);}}
- if(user)return <ProductionWorkspace user={user} onRoleSwitched={setUser} onLogout={()=>{void fetch('/api/auth/logout',{method:'POST'}).then(()=>setUser(null));}}/>;
- return <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10"><section className="w-full max-w-xl space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-9"><div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">OrganizationAI · Đề A</p><h1 className="mt-2 text-3xl font-bold tracking-tight">Tax Referee</h1><p className="mt-3 text-slate-600">Tự xử lý hóa đơn thường quy, dừng đúng lúc để con người quyết định.</p></div><p className="rounded-lg bg-slate-50 p-4 text-sm font-medium">Chạy Verify, sau đó thử hóa đơn của bạn.</p><div className="grid gap-3 sm:grid-cols-2"><Link href="/verify" className="rounded-lg bg-slate-950 px-5 py-3 text-center font-semibold text-white">Chạy Verify</Link><button disabled={busy} onClick={demo} className="rounded-lg border border-slate-300 px-5 py-3 font-semibold disabled:opacity-50">{busy?'Đang kết nối…':'Thử dữ liệu mới'}</button></div><p className="text-xs leading-relaxed text-slate-500">Demo riêng từng phiên, không cần tạo tài khoản. Dữ liệu demo được tách khỏi workspace nội bộ và lưu riêng trong thời hạn phiên. Tích hợp ERP hiện xuất payload, chưa gửi tới hệ thống kế toán.</p>{error && <p role="alert" className="text-sm text-red-700">{error}</p>}<details className="border-t pt-4"><summary className="cursor-pointer text-sm font-semibold">Đăng nhập nội bộ</summary><form className="mt-4 space-y-3" onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});const d=await r.json();if(!r.ok)throw new Error(d.error);setUser(d.user);}catch(e){setError(e instanceof Error?e.message:'Lỗi đăng nhập');}finally{setBusy(false);}}}><label className="block text-sm">Email<input required type="email" autoComplete="username" className="mt-1 w-full rounded-lg border p-3" value={email} onChange={e=>setEmail(e.target.value)}/></label><label className="block text-sm">Mật khẩu<input required type="password" autoComplete="current-password" className="mt-1 w-full rounded-lg border p-3" value={password} onChange={e=>setPassword(e.target.value)}/></label><button disabled={busy} className="rounded-lg bg-slate-950 px-4 py-3 text-sm text-white">Đăng nhập</button></form></details></section></main>;
+import HomePage from '@/components/HomePage';
+
+export const dynamic = 'force-dynamic';
+
+export default function Page() {
+  return <HomePage />;
 }

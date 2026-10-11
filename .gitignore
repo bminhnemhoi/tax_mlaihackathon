@@ -27,6 +27,7 @@ yarn-error.log*
 # Environment files
 .env*.local
 .env
+env.local
 !.env.example
 
 # Vercel & Turbopack

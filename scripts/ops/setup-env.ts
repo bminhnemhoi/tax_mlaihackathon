@@ -17,7 +17,7 @@ export function loadLocalEnv() {
           if (eqIdx !== -1) {
             const key = trimmed.slice(0, eqIdx).trim();
             const val = trimmed.slice(eqIdx + 1).trim();
-            if (key && !process.env[key]) {
+            if (key && !Object.prototype.hasOwnProperty.call(process.env, key)) {
               process.env[key] = val;
             }
           }

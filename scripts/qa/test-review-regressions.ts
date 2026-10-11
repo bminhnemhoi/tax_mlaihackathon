@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { NextRequest } from 'next/server';
 import { getActivePolicy, getDatabase, runIsolated } from '../../lib/server/db';
 import { getUserFromToken, switchRole } from '../../lib/server/auth';
+import { POST as internalLogin } from '../../app/api/auth/login/route';
+import { POST as changeRole } from '../../app/api/auth/switch/route';
 import { POST as openDemo } from '../../app/api/demo/session/route';
 import { POST as evaluate } from '../../app/api/evaluate/route';
 import { GET as inbox } from '../../app/api/inbox/route';
@@ -32,6 +34,24 @@ async function checkSession(demo: boolean) {
 async function main() {
   // Run with TAX_REFEREE_DB_PATH=:memory: so the internal-session check cannot touch user data.
   assert.equal(process.env.TAX_REFEREE_DB_PATH, ':memory:');
+  for (const role of ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO']) {
+    const req = new NextRequest('http://localhost/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', cookie: 'tax_referee_demo=12345678-1234-1234-1234-123456789abc' },
+      body: JSON.stringify({ role })
+    });
+    const response = await internalLogin(req);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).user.role, role);
+    const token = response.cookies.get('tax_referee_session')!.value;
+    assert.equal(getUserFromToken(token)?.role, role, 'Role login must create an internal session despite a demo cookie');
+    assert.equal(response.cookies.get('tax_referee_demo')?.value, '');
+    const switched = await changeRole(request('/api/auth/switch', token, { role: 'CFO' }));
+    assert.equal(switched.status, 200);
+    assert.equal((await switched.json()).user.role, 'CFO');
+  }
+  assert.equal((await internalLogin(request('/api/auth/login', '', { role: 'ADMIN' }))).status, 400);
+  assert.equal((await changeRole(request('/api/auth/switch', '', { role: 'CFO' }))).status, 401);
+  console.log('PASS MVP: ba vai trò đăng nhập nội bộ, tách demo, đổi vai trò và từ chối role sai/phiên thiếu');
   await checkSession(false);
   await runIsolated(async () => {
     await checkSession(true);

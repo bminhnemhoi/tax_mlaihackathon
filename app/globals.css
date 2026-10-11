@@ -68,6 +68,77 @@ body {
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
+@keyframes invoice-scan-sweep {
+  0% { transform: translateY(-110%); opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateY(110%); opacity: 0; }
+}
+
+@keyframes invoice-scan-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+@keyframes invoice-sparkle-pulse {
+  0%, 100% { opacity: .2; transform: scale(.72); }
+  50% { opacity: .95; transform: scale(1); }
+}
+
+.invoice-scan-sweep {
+  animation: invoice-scan-sweep 1.65s cubic-bezier(.2,.7,.25,1) infinite;
+}
+
+.invoice-scan-shimmer {
+  background-size: 200% 100%;
+  animation: invoice-scan-shimmer 2.2s linear infinite;
+}
+
+.invoice-sparkle {
+  animation: invoice-sparkle-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes phone-invoice-scan-pass {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: .72; }
+  50% { opacity: .95; }
+  90% { opacity: .72; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+@keyframes phone-invoice-glint-pulse {
+  0%, 100% { opacity: .35; transform: scale(.82) rotate(45deg); }
+  50% { opacity: .9; transform: scale(1) rotate(45deg); }
+}
+
+.phone-invoice-scan-beam {
+  animation: phone-invoice-scan-pass 1.2s cubic-bezier(.22,.61,.36,1) infinite;
+}
+
+.phone-invoice-scan-beam::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, transparent, rgba(167,243,208,.72) 18%, rgba(255,255,255,.94) 50%, rgba(167,243,208,.72) 82%, transparent);
+  box-shadow: 0 0 16px 3px rgba(16,185,129,.38);
+  content: "";
+}
+
+.phone-invoice-scan-glint {
+  animation: phone-invoice-glint-pulse 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invoice-scan-sweep,
+  .invoice-scan-shimmer,
+  .invoice-sparkle,
+  .phone-invoice-scan-beam,
+  .phone-invoice-scan-glint { animation: none; }
+}
+
 .font-mono {
   font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums lining-nums;

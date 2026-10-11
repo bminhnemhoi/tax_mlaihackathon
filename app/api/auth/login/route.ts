@@ -1,16 +1,21 @@
-import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
-import { login } from '@/lib/server/auth';
+import { AppRole, login, switchRole } from '@/lib/server/auth';
+import { appendAuditEvent } from '@/lib/server/audit';
 
 export const dynamic = 'force-dynamic';
 
-async function handlePOST(req: NextRequest) {
+export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const result = login(String(body.email || ''), String(body.password || ''));
+  const hasRole = Object.prototype.hasOwnProperty.call(body, 'role');
+  if (hasRole && !['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'].includes(body.role)) {
+    return NextResponse.json({ error: 'Vai trò không hợp lệ' }, { status: 400 });
+  }
+  // Internal login intentionally ignores the demo cookie: this workspace is shared.
+  const result = hasRole ? switchRole(body.role as AppRole) : login(String(body.email || ''), String(body.password || ''));
   if (!result) return NextResponse.json({ error: 'Email hoặc mật khẩu không đúng' }, { status: 401 });
+  appendAuditEvent({ eventType: 'INTERNAL_LOGIN', entityId: result.user.id, actorId: result.user.id, payload: { role: result.user.role, mode: hasRole ? 'MVP_ROLE_SELECTION' : 'PASSWORD' } });
   const response = NextResponse.json({ user: result.user });
   response.cookies.set('tax_referee_session', result.token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60, path: '/' });
+  response.cookies.set('tax_referee_demo', '', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 0, path: '/' });
   return response;
 }
-
-export async function POST(...args: Parameters<typeof handlePOST>) { return withRequestDatabase(args[0], () => handlePOST(...args)); }

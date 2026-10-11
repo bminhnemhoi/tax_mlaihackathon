@@ -1,0 +1,169 @@
+{
+  "summary": {
+    "runId": "b3593776-cae2-4068-9783-eff38fb5aef5",
+    "policyHash": "52e95c1d30d2dd35a925dde5d9c14b9a46dbb67bf0d647ef093ff23e87c1f0bd",
+    "executionMode": "DETERMINISTIC_LOCAL",
+    "errorCases": 0,
+    "mode": "challenge_a",
+    "totalCases": 5,
+    "passedCases": 5,
+    "routineCases": 3,
+    "escalatedCases": 2,
+    "schemaValidCases": 5,
+    "allSchemaValid": true,
+    "isMatchExpected": true,
+    "totalTimeMs": 27,
+    "timestamp": "2026-10-10T09:42:12.331Z",
+    "policyVersion": "TAX-SOP-2026-v2.5",
+    "fixtureHash": "61e372f292efa09bce4540c859adbdf9d6f76ed600b96ccd54236b6a3af97320",
+    "metrics": {
+      "falseNegativeRate": 0,
+      "falseNegativeCases": 0,
+      "falsePositiveRate": 0,
+      "falsePositiveCases": 0,
+      "straightThroughProcessingRate": 60,
+      "routineCompletionRate": 100,
+      "autoApprovedRoutineCases": 3,
+      "denominators": {
+        "expectedEscalated": 2,
+        "expectedRoutine": 3,
+        "total": 5
+      },
+      "thresholdAdaptationStatus": "Bộ hồi quy tổng hợp; không phải đánh giá độc lập"
+    }
+  },
+  "results": [
+    {
+      "testId": "A-01",
+      "sourceFile": "Văn phòng phẩm chuyển khoản",
+      "invoiceNumber": "A-01",
+      "supplierName": "Nhà cung cấp thử nghiệm",
+      "totalAmount": 1100000,
+      "expectedStatus": "ROUTINE",
+      "actualStatus": "ROUTINE",
+      "requiresCFO": false,
+      "schemaValid": true,
+      "isMatchExpected": true,
+      "workflowValid": true,
+      "actualWorkflowStatus": "APPROVED",
+      "internalVoucherCreated": true,
+      "auditRecorded": true,
+      "approvedTax": 100000,
+      "plainExplanation": "Hóa đơn đáp ứng đầy đủ điều kiện 3H (Hợp pháp - Hợp lệ - Hợp lý), đúng thuế suất, thanh toán không tiền mặt hợp lệ và nằm trong hạn mức thường quy.",
+      "provenance": "SYNTHETIC: dữ liệu và bằng chứng thanh toán/trạng thái nhà cung cấp do đội tạo cho doanh nghiệp thử nghiệm 0102030405; không phải hóa đơn thực tế.",
+      "executionTimeMs": 5
+    },
+    {
+      "testId": "A-02",
+      "sourceFile": "Văn phòng phẩm tiền mặt dưới hạn mức",
+      "invoiceNumber": "A-02",
+      "supplierName": "Nhà cung cấp thử nghiệm",
+      "totalAmount": 1100000,
+      "expectedStatus": "ROUTINE",
+      "actualStatus": "ROUTINE",
+      "requiresCFO": false,
+      "schemaValid": true,
+      "isMatchExpected": true,
+      "workflowValid": true,
+      "actualWorkflowStatus": "APPROVED",
+      "internalVoucherCreated": true,
+      "auditRecorded": true,
+      "approvedTax": 100000,
+      "plainExplanation": "Hóa đơn đáp ứng đầy đủ điều kiện 3H (Hợp pháp - Hợp lệ - Hợp lý), đúng thuế suất, thanh toán không tiền mặt hợp lệ và nằm trong hạn mức thường quy.",
+      "provenance": "SYNTHETIC: dữ liệu và bằng chứng thanh toán/trạng thái nhà cung cấp do đội tạo cho doanh nghiệp thử nghiệm 0102030405; không phải hóa đơn thực tế.",
+      "executionTimeMs": 6
+    },
+    {
+      "testId": "A-03",
+      "sourceFile": "Dịch vụ viễn thông đúng thuế suất",
+      "invoiceNumber": "A-03",
+      "supplierName": "Nhà cung cấp thử nghiệm",
+      "totalAmount": 4400000,
+      "expectedStatus": "ROUTINE",
+      "actualStatus": "ROUTINE",
+      "requiresCFO": false,
+      "schemaValid": true,
+      "isMatchExpected": true,
+      "workflowValid": true,
+      "actualWorkflowStatus": "APPROVED",
+      "internalVoucherCreated": true,
+      "auditRecorded": true,
+      "approvedTax": 400000,
+      "plainExplanation": "Hóa đơn đáp ứng đầy đủ điều kiện 3H (Hợp pháp - Hợp lệ - Hợp lý), đúng thuế suất, thanh toán không tiền mặt hợp lệ và nằm trong hạn mức thường quy.",
+      "provenance": "SYNTHETIC: dữ liệu và bằng chứng thanh toán/trạng thái nhà cung cấp do đội tạo cho doanh nghiệp thử nghiệm 0102030405; không phải hóa đơn thực tế.",
+      "executionTimeMs": 6
+    },
+    {
+      "testId": "A-04",
+      "sourceFile": "Thanh toán tiền mặt vượt hạn mức",
+      "invoiceNumber": "A-04",
+      "supplierName": "Nhà cung cấp thử nghiệm",
+      "totalAmount": 11000000,
+      "expectedStatus": "ESCALATED",
+      "actualStatus": "ESCALATED",
+      "riskGroup": "OUT_OF_POLICY",
+      "requiresCFO": false,
+      "schemaValid": true,
+      "isMatchExpected": true,
+      "workflowValid": true,
+      "actualWorkflowStatus": "WAITING_CHIEF_ACCOUNTANT",
+      "internalVoucherCreated": false,
+      "auditRecorded": true,
+      "approvedTax": 0,
+      "actionableQuestion": "Hóa đơn A-04 · Người xử lý: Kế toán trưởng. Hóa đơn A-04 trị giá 11.000.000₫ thanh toán Tiền mặt. Kế toán trưởng chọn phương án: Yêu cầu nộp Ủy nhiệm chi ngân hàng / Loại trừ thuế GTGT & Chuyển sang Chỉ tiêu B4.",
+      "options": [
+        {
+          "id": "A",
+          "label": "Yêu cầu nộp Ủy nhiệm chi ngân hàng",
+          "actionDescription": "Tạm treo hóa đơn, yêu cầu nhân viên thanh toán bổ sung UNC",
+          "resultingAction": "REQUEST_INFORMATION"
+        },
+        {
+          "id": "B",
+          "label": "Loại trừ thuế GTGT & Chuyển sang Chỉ tiêu B4",
+          "actionDescription": "Chỉ ghi nhận chi phí nội bộ, loại toàn bộ tiền thuế và chi phí khỏi quyết toán thuế",
+          "resultingAction": "REJECT_TAX_DEDUCTION"
+        }
+      ],
+      "plainExplanation": "Luật thuế quy định hóa đơn từng lần từ 5 triệu VNĐ trở lên bắt buộc phải có chứng từ thanh toán không dùng tiền mặt (Ủy nhiệm chi ngân hàng) để được khấu trừ. Tuyệt đối không áp dụng tiền lệ tự duyệt cho vi phạm luật định.",
+      "provenance": "SYNTHETIC: dữ liệu và bằng chứng thanh toán/trạng thái nhà cung cấp do đội tạo cho doanh nghiệp thử nghiệm 0102030405; không phải hóa đơn thực tế.",
+      "executionTimeMs": 6
+    },
+    {
+      "testId": "A-05",
+      "sourceFile": "Khoản mua vượt thẩm quyền",
+      "invoiceNumber": "A-05",
+      "supplierName": "Nhà cung cấp thử nghiệm",
+      "totalAmount": 275000000,
+      "expectedStatus": "ESCALATED",
+      "actualStatus": "ESCALATED",
+      "riskGroup": "EXCEED_AUTHORITY",
+      "requiresCFO": true,
+      "schemaValid": true,
+      "isMatchExpected": true,
+      "workflowValid": true,
+      "actualWorkflowStatus": "WAITING_CFO",
+      "internalVoucherCreated": false,
+      "auditRecorded": true,
+      "approvedTax": 0,
+      "actionableQuestion": "Hóa đơn A-05 · Người xử lý: CFO. Khoản chi Giấy in văn phòng trị giá 275.000.000₫ vượt trần KTT. CFO có chấp thuận phê duyệt chi và khấu trừ thuế?",
+      "options": [
+        {
+          "id": "A",
+          "label": "CFO Phê duyệt chi",
+          "actionDescription": "Chấp thuận chi phí và đưa vào khấu trừ thuế hợp lệ",
+          "resultingAction": "ACCEPT_WITH_DOCS"
+        },
+        {
+          "id": "B",
+          "label": "Yêu cầu thẩm tra hợp đồng",
+          "actionDescription": "Tạm dừng hạch toán để thẩm tra điều khoản thanh toán",
+          "resultingAction": "REJECT_TAX_DEDUCTION"
+        }
+      ],
+      "plainExplanation": "Khoản chi lớn vượt thẩm quyền tự duyệt của Kế toán trưởng, cần chữ ký phê duyệt chi của Giám đốc Tài chính (CFO) hoặc Tổng Giám đốc.",
+      "provenance": "SYNTHETIC: dữ liệu và bằng chứng thanh toán/trạng thái nhà cung cấp do đội tạo cho doanh nghiệp thử nghiệm 0102030405; không phải hóa đơn thực tế.",
+      "executionTimeMs": 4
+    }
+  ]
+}

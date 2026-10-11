@@ -1,5 +1,32 @@
 import crypto from 'node:crypto';
 import { getDatabase, jsonNow } from './db';
+import { eventLabels, fieldLabels, roleLabels, workflowStatusLabels } from '@/lib/workflowPresentation';
+
+export function presentAuditEvent(event: Record<string, unknown>) {
+  const payload = (event.payload || {}) as Record<string, any>;
+  const actor = event.actorId ? getDatabase().prepare('SELECT display_name,role FROM users WHERE id=?').get(String(event.actorId)) as {display_name:string;role:string}|undefined : undefined;
+  const actorRole = payload.actorRole || actor?.role;
+  const changes:Array<{field:string;label:string;before:unknown;after:unknown}>=[];
+  for(const [field,label] of [['status','Trạng thái hồ sơ'],['approvedTax','Thuế được duyệt'],['taxHold','Giữ thuế'],['voucher','Chứng từ nội bộ']]) {
+    const before=payload.before?.[field],after=payload.after?.[field];
+    if(JSON.stringify(before)===JSON.stringify(after))continue;
+    const value=(v:any)=>field==='status' ? workflowStatusLabels[v] || v : field==='voucher' ? v?.id || 'Chưa có' : field==='taxHold' ? v?'Đang giữ':'Không giữ' : v;
+    changes.push({field,label:field==='status'?'Trạng thái hồ sơ':label,before:value(before),after:value(after)});
+  }
+  if(event.eventType==='EVALUATION_STARTED' && payload.revision>1){
+    const previous=getDatabase().prepare('SELECT payload_json FROM invoice_revisions WHERE invoice_id=? AND revision=?').get(String(event.entityId),payload.revision-1) as {payload_json:string}|undefined;
+    if(previous){const old=JSON.parse(previous.payload_json);for(const field of Object.keys(fieldLabels)){
+      if(JSON.stringify(old[field])!==JSON.stringify(payload.invoice?.[field]))changes.push({field,label:fieldLabels[field],before:old[field],after:payload.invoice?.[field]});
+    }}
+  }
+  return {...event,presentation:{title:eventLabels[String(event.eventType)] || String(event.eventType),
+    actorName:payload.actorName || actor?.display_name || (event.actorId ? String(event.actorId) : 'Hệ thống'),
+    actorRole:actorRole ? roleLabels[actorRole] || actorRole : event.actorId?'Vai trò chưa ghi nhận':'Hệ thống',
+    reason:payload.reason || payload.rationale || 'Sự kiện chưa có diễn giải.',changes,
+    artifactId:payload.invoice?.sourceArtifactId || null,
+    policyVersion:payload.policyVersion || null,policyHash:payload.policyHash || null,
+    revision:payload.revision || null,evaluationId:payload.evaluationId || null,reversesEventId:payload.reversesEventId || null}};
+}
 
 export type AuditEventInput = {
   eventType: string;
@@ -43,7 +70,7 @@ export function listAuditEvents(limit = 100): Array<Record<string, unknown>> {
            payload_json as payload, previous_hash as previousHash, event_hash as eventHash, created_at as createdAt
     FROM audit_events ORDER BY rowid DESC LIMIT ?
   `).all(Math.min(Math.max(limit, 1), 500)) as Array<Record<string, unknown>>;
-  return rows.map((row) => ({ ...row, payload: JSON.parse(String(row.payload)) }));
+  return rows.map((row) => presentAuditEvent({ ...row, payload: JSON.parse(String(row.payload)) }));
 }
 
 export function listAuditEventsForEntity(entityId: string, limit = 5000): Array<Record<string, unknown>> {
@@ -55,7 +82,7 @@ export function listAuditEventsForEntity(entityId: string, limit = 5000): Array<
     ORDER BY rowid ASC
     LIMIT ?
   `).all(entityId, Math.min(Math.max(limit, 1), 10000)) as Array<Record<string, unknown>>;
-  return rows.map((row) => ({ ...row, payload: JSON.parse(String(row.payload)) }));
+  return rows.map((row) => presentAuditEvent({ ...row, payload: JSON.parse(String(row.payload)) }));
 }
 
 export function verifyAuditChain(): { valid: boolean; checked: number; legacy: boolean; warning?: string; error?: string } {

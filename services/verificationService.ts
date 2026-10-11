@@ -2,7 +2,9 @@ import {runIsolated,getDatabase, getActivePolicy, hashPayload} from '@/lib/serve
 import {RefereeDecisionSchema} from '@/lib/schemas';
 import {evaluateWorkflow,readRecord} from './workflowService';
 import {challengeCases,commonCases,regressionCases,demoCompanyTaxCode,VerificationCase} from '@/data/verification/challengeCases';
+import crypto from 'node:crypto';
 export async function runVerification(mode='challenge_a') {
+ if(!['common_4','challenge_a','regression_15'].includes(mode))throw new Error('Bộ kiểm thử không hợp lệ.');
  const cases=mode==='common_4'?commonCases:mode==='regression_15'?regressionCases:challengeCases;
  return runIsolated(async()=>{
  const db=getDatabase();const policy=getActivePolicy();policy.config.companyTaxCode=demoCompanyTaxCode;
@@ -20,6 +22,6 @@ export async function runVerification(mode='challenge_a') {
  const expectedE=cases.filter(c=>c.expectedStatus==='ESCALATED').length;const expectedR=cases.length-expectedE;
  const fn=results.filter(r=>r.expectedStatus==='ESCALATED' && r.actualStatus==='ROUTINE').length;const fp=results.filter(r=>r.expectedStatus==='ROUTINE' && r.actualStatus==='ESCALATED').length;
  const auto=results.filter(r=>r.actualStatus==='ROUTINE' && r.workflowValid).length;
- return {summary:{mode,totalCases:cases.length,passedCases:results.filter(r=>r.isMatchExpected).length,routineCases:results.filter(r=>r.actualStatus==='ROUTINE').length,escalatedCases:results.filter(r=>r.actualStatus==='ESCALATED').length,schemaValidCases:results.filter(r=>r.schemaValid).length,allSchemaValid:results.every(r=>r.schemaValid),isMatchExpected:results.every(r=>r.isMatchExpected),totalTimeMs:Date.now()-start,timestamp:new Date().toISOString(),policyVersion:policy.version,fixtureHash:hashPayload(cases),metrics:{falseNegativeRate:expectedE?fn/expectedE*100:0,falseNegativeCases:fn,falsePositiveRate:expectedR?fp/expectedR*100:0,falsePositiveCases:fp,straightThroughProcessingRate:auto/cases.length*100,routineCompletionRate:expectedR?results.filter(r=>r.expectedStatus==='ROUTINE' && r.actualStatus==='ROUTINE' && r.workflowValid).length/expectedR*100:0,autoApprovedRoutineCases:auto,denominators:{expectedEscalated:expectedE,expectedRoutine:expectedR,total:cases.length},thresholdAdaptationStatus:'Bộ hồi quy tổng hợp; không phải đánh giá độc lập'}},results};
+ return {summary:{runId:crypto.randomUUID(),policyHash:hashPayload(policy.config),executionMode:'DETERMINISTIC_LOCAL',errorCases:results.filter(r=>r.actualStatus==='ERROR').length,mode,totalCases:cases.length,passedCases:results.filter(r=>r.isMatchExpected).length,routineCases:results.filter(r=>r.actualStatus==='ROUTINE').length,escalatedCases:results.filter(r=>r.actualStatus==='ESCALATED').length,schemaValidCases:results.filter(r=>r.schemaValid).length,allSchemaValid:results.every(r=>r.schemaValid),isMatchExpected:results.every(r=>r.isMatchExpected),totalTimeMs:Date.now()-start,timestamp:new Date().toISOString(),policyVersion:policy.version,fixtureHash:hashPayload(cases),metrics:{falseNegativeRate:expectedE?fn/expectedE*100:0,falseNegativeCases:fn,falsePositiveRate:expectedR?fp/expectedR*100:0,falsePositiveCases:fp,straightThroughProcessingRate:auto/cases.length*100,routineCompletionRate:expectedR?results.filter(r=>r.expectedStatus==='ROUTINE' && r.actualStatus==='ROUTINE' && r.workflowValid).length/expectedR*100:0,autoApprovedRoutineCases:auto,denominators:{expectedEscalated:expectedE,expectedRoutine:expectedR,total:cases.length},thresholdAdaptationStatus:'Bộ hồi quy tổng hợp; không phải đánh giá độc lập'}},results};
  });
 }

@@ -3,6 +3,8 @@ import { InvoiceInputSchema, PolicyBundle, PolicyBundleSchema, RefereeDecisionSc
 import { getActivePolicy, getDatabase, jsonNow } from '@/lib/server/db';
 import { appendAuditEvent } from '@/lib/server/audit';
 import { evaluateInvoiceLocally } from './policyEngine';
+import { executablePolicySummary, implementedPolicyRules } from '@/data/policyContract';
+import { validatePolicySafety } from './policySafety';
 
 function contentHash(payload: unknown): string {
   return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
@@ -22,10 +24,10 @@ export function createPolicyDraft(input: Partial<PolicyBundle> & { config: Syste
     effectiveFrom: input.effectiveFrom || new Date().toISOString().slice(0, 10),
     effectiveTo: input.effectiveTo,
     sourceDocumentVersions: input.sourceDocumentVersions || [],
-    policyText: input.policyText || '',
-    rules: input.rules || [],
+    policyText: input.policyText || executablePolicySummary(config),
+    rules: implementedPolicyRules(config),
     config,
-    contentHash: contentHash({ ...input, version, config })
+    contentHash: contentHash({ version, config, policyText:input.policyText || executablePolicySummary(config), rules:implementedPolicyRules(config) })
   });
 
   getDatabase().prepare(`
@@ -59,14 +61,14 @@ export function publishPolicy(version: string, actorId?: string, reason = 'Đã 
     db.prepare(`INSERT INTO policy_approvals (id, policy_version, actor_id, action, reason, created_at) VALUES (?, ?, ?, 'PUBLISH', ?, ?)`)
       .run(crypto.randomUUID(), version, actorId || null, reason, publishedAt);
   });
-  tx();
-  appendAuditEvent({ eventType: 'POLICY_PUBLISHED', entityId: version, actorId, payload: { version, reason } });
+  db.transaction(()=>{tx();appendAuditEvent({ eventType: 'POLICY_PUBLISHED', entityId: version, actorId, payload: { version, reason, validation } });})();
   return bundle;
 }
 
-export function validatePolicyBundle(bundle: PolicyBundle): { valid: boolean; errors: string[] } {
+export function validatePolicyBundle(bundle: PolicyBundle): { valid: boolean; errors: string[]; safetyCases:number; operationalCases:number } {
   const rows = getDatabase().prepare('SELECT id, payload_json FROM invoices ORDER BY datetime(updated_at) DESC LIMIT 200').all() as Array<{ id: string; payload_json: string }>;
-  const errors: string[] = [];
+  const safety=validatePolicySafety(bundle.config,bundle.version);
+  const errors: string[] = [...safety.errors];
   for (const row of rows) {
     const parsedInvoice = InvoiceInputSchema.safeParse(JSON.parse(row.payload_json));
     if (!parsedInvoice.success) {
@@ -76,8 +78,7 @@ export function validatePolicyBundle(bundle: PolicyBundle): { valid: boolean; er
     const decision = evaluateInvoiceLocally(parsedInvoice.data, bundle.config, bundle.version);
     if (!RefereeDecisionSchema.safeParse(decision).success) errors.push(`${row.id}: phán quyết không hợp lệ theo schema`);
   }
-  if (rows.length === 0) errors.push('Chưa có hóa đơn thật trong SQLite để kiểm chứng policy');
-  return { valid: errors.length === 0, errors };
+  return { valid: errors.length === 0, errors, safetyCases:safety.tested, operationalCases:rows.length };
 }
 
 export function rollbackPolicy(version: string, actorId?: string, reason = 'Rollback theo yêu cầu vận hành'): PolicyBundle {
@@ -85,6 +86,8 @@ export function rollbackPolicy(version: string, actorId?: string, reason = 'Roll
   const row = db.prepare('SELECT payload_json FROM policy_versions WHERE version = ?').get(version) as { payload_json?: string } | undefined;
   if (!row?.payload_json) throw new Error('Không tìm thấy policy để rollback');
   const bundle = PolicyBundleSchema.parse({ ...JSON.parse(row.payload_json), status: 'PUBLISHED' });
+  const validation=validatePolicyBundle(bundle);
+  if(!validation.valid)throw new Error(`Policy rollback không đạt kiểm thử: ${validation.errors.join('; ')}`);
   const timestamp = jsonNow();
   const tx = db.transaction(() => {
     db.prepare("UPDATE policy_versions SET status = 'ROLLED_BACK' WHERE status = 'PUBLISHED'").run();
@@ -93,8 +96,7 @@ export function rollbackPolicy(version: string, actorId?: string, reason = 'Roll
     db.prepare(`INSERT INTO policy_approvals (id, policy_version, actor_id, action, reason, created_at) VALUES (?, ?, ?, 'ROLLBACK', ?, ?)`)
       .run(crypto.randomUUID(), version, actorId || null, reason, timestamp);
   });
-  tx();
-  appendAuditEvent({ eventType: 'POLICY_ROLLED_BACK', entityId: version, actorId, payload: { version, reason } });
+  db.transaction(()=>{tx();appendAuditEvent({ eventType: 'POLICY_ROLLED_BACK', entityId: version, actorId, payload: { version, reason, validation } });})();
   return bundle;
 }
 

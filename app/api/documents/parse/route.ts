@@ -9,6 +9,7 @@ import path from 'node:path';
 import { extractInvoiceWithUnifiedAI, extractInvoiceWithHybridPipeline } from '@/services/aiCoordinator';
 import { DocumentExtractionSchema } from '@/lib/schemas';
 import { getDatabase, jsonNow } from '@/lib/server/db';
+import {assertArtifactCapacity,ArtifactQuotaError} from '@/lib/server/artifactQuota';
 
 import { parseNumberValue as numberValue, parseTaxRateString } from '@/lib/utils';
 import { parseInvoiceFromRawText } from '@/lib/rawTextParser';
@@ -44,7 +45,7 @@ function persistTextExtraction(rawText:string, rawInvoice:Record<string,unknown>
  const db=getDatabase();const hash=result.sourceHash;
  const prior=db.prepare('SELECT id FROM document_artifacts WHERE content_hash=?').get(hash) as {id:string}|undefined;
  const id=prior?.id || crypto.randomUUID();const directory=artifactRoot();const storage=path.join(directory,`${id}.txt`);
- if(!prior){fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(storage,rawText,{flag:'wx'});db.prepare('INSERT INTO document_artifacts (id,invoice_id,revision,original_file_name,source_type,mime_type,storage_path,content_hash,byte_size,signature_status,created_at) VALUES (?,?,1,?,?,?,?,?,?,?,?)').run(id,`pending:${id}`,'van-ban.txt','FORM','text/plain',storage,hash,Buffer.byteLength(rawText),'NOT_APPLICABLE',jsonNow());}
+ if(!prior){assertArtifactCapacity(Buffer.byteLength(rawText));fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(storage,rawText,{flag:'wx'});db.prepare('INSERT INTO document_artifacts (id,invoice_id,revision,original_file_name,source_type,mime_type,storage_path,content_hash,byte_size,signature_status,created_at) VALUES (?,?,1,?,?,?,?,?,?,?,?)').run(id,`pending:${id}`,'van-ban.txt','FORM','text/plain',storage,hash,Buffer.byteLength(rawText),'NOT_APPLICABLE',jsonNow());}
  const inferredFields=Object.keys(result.invoice).filter(k=>!extractedFields.includes(k) && !['isImageBlurry','isAdjustment'].includes(k));
  const uncertainFields=[...new Set([...(result.uncertainFields || []),...inferredFields])];
  const output={...result,artifactId:id,uncertainFields,needsReview:true};
@@ -56,8 +57,18 @@ async function handlePOST(req: NextRequest) {
   try {
     requireRequestUser(req);
     const contentType = req.headers.get('content-type') || '';
+    let capturedFile: File | null = null;
     if (contentType.includes('application/json')) {
       const body = await req.json();
+      const artifactId = typeof body.artifactId === 'string' ? body.artifactId : '';
+      if (artifactId) {
+        const artifact = getDatabase().prepare(`SELECT original_file_name,mime_type,storage_path,source_type
+          FROM document_artifacts WHERE id=?`).get(artifactId) as { original_file_name: string; mime_type: string; storage_path: string; source_type: string } | undefined;
+        if (!artifact || artifact.source_type !== 'IMAGE' || !fs.existsSync(artifact.storage_path)) {
+          return NextResponse.json({ error: 'Không tìm thấy ảnh chụp cần đọc.' }, { status: 404 });
+        }
+        capturedFile = new File([fs.readFileSync(artifact.storage_path)], artifact.original_file_name, { type: artifact.mime_type });
+      } else {
       const rawText = String(body.rawText || '').trim();
       if (!rawText) return NextResponse.json({ error: 'Nội dung văn bản trống' }, { status: 400 });
 
@@ -95,10 +106,11 @@ async function handlePOST(req: NextRequest) {
         warnings: combinedWarnings
       });
       return NextResponse.json(persistTextExtraction(rawText,parsedText.invoice as Record<string,unknown>,result,parsedText.extractedFields));
+      }
     }
 
-    const form = await req.formData();
-    const rawText = form.get('rawText');
+    const form = capturedFile ? null : await req.formData();
+    const rawText = form?.get('rawText');
     if (typeof rawText === 'string' && rawText.trim()) {
       const textHash = crypto.createHash('sha256').update(rawText.trim()).digest('hex');
       const cached = getCachedDocumentResult(textHash);
@@ -136,7 +148,7 @@ async function handlePOST(req: NextRequest) {
       return NextResponse.json(persistTextExtraction(rawText,parsedText.invoice as Record<string,unknown>,result,parsedText.extractedFields));
     }
 
-    const file = form.get('file');
+    const file = capturedFile || form?.get('file');
     if (!(file instanceof File)) return NextResponse.json({ error: 'Thiếu file chứng từ hoặc văn bản thô' }, { status: 400 });
     if (file.size > 15 * 1024 * 1024) return NextResponse.json({ error: 'File vượt quá 15MB' }, { status: 413 });
 
@@ -155,7 +167,7 @@ async function handlePOST(req: NextRequest) {
     if (!sourceType) return NextResponse.json({ error: 'Chỉ hỗ trợ file XML, PDF và ảnh hóa đơn (PNG, JPG)' }, { status: 415 });
 
     if (sourceType === 'XML') assertValidXml(buffer.toString('utf8'));
-    const cachedFile = form.get('forceRefresh') === 'true' ? null : getCachedDocumentResult(sourceHash);
+    const cachedFile = form?.get('forceRefresh') === 'true' ? null : getCachedDocumentResult(sourceHash);
     if (cachedFile && cachedFile.sourceType === sourceType) return extractionResponse(cachedFile,started,true);
 
     const existingArtifact = getDatabase().prepare('SELECT id FROM document_artifacts WHERE content_hash = ?').get(sourceHash) as { id: string } | undefined;
@@ -165,6 +177,7 @@ async function handlePOST(req: NextRequest) {
     const storagePath = path.join(artifactDirectory, `${artifactId}${extension}`);
 
     if (!existingArtifact) {
+      assertArtifactCapacity(buffer.byteLength);
       fs.mkdirSync(artifactDirectory, { recursive: true });
       fs.writeFileSync(storagePath, buffer, { flag: 'wx' });
       getDatabase().prepare(`
@@ -581,7 +594,7 @@ async function handlePOST(req: NextRequest) {
     getDatabase().prepare('INSERT OR REPLACE INTO extraction_reviews (artifact_id,payload_json) VALUES (?,?)').run(artifactId,JSON.stringify({...result, invoice:rawData, inferredFields, extractionVersion, cachedResult:result}));
     return extractionResponse(result,started);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể đọc chứng từ' }, { status: error instanceof Error && error.message === 'AUTH_REQUIRED' ? 401 : 400 });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể đọc chứng từ' }, { status: error instanceof Error && error.message === 'AUTH_REQUIRED' ? 401 : error instanceof ArtifactQuotaError ? 413 : 400 });
   }
 }
 

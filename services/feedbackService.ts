@@ -19,6 +19,11 @@ export function submitFeedback(raw:unknown,user:AppUser) {
  if(invoice.supplierTaxCode!==scope.supplier_tax_code || !invoice.itemName.toLocaleLowerCase('vi-VN').includes(scope.purpose.toLocaleLowerCase('vi-VN')) || invoice.invoiceDate<scope.effective_from || invoice.invoiceDate>scope.effective_to)throw new WorkflowError('Hồ sơ ngoài phạm vi tiền lệ.');
  if(decision.findings?.some((f:{kind:string})=>f.kind!=='INTERNAL_POLICY') || JSON.parse(row.source_review_json).unresolvedFields?.length)throw new WorkflowError('Không dùng ca luật định, dữ liệu hoặc thẩm quyền để học tiền lệ.');
  const amount=Math.abs(invoice.totalAmount);
+ const existing=db.prepare('SELECT should_escalate,reason FROM precedent_feedback WHERE precedent_id=? AND invoice_id=? AND evaluation_id=?').get(input.precedentId,row.id,input.evaluationId) as {should_escalate:number;reason:string}|undefined;
+ if(existing){
+  if(Boolean(existing.should_escalate)!==input.shouldEscalate || existing.reason!==input.reason)throw new WorkflowError('Evaluation đã có nhãn hậu kiểm khác; không ghi đè nhãn.');
+  return {...calibrateThreshold(input.precedentId,user),duplicate:true};
+ }
  db.prepare('INSERT INTO precedent_feedback VALUES (?,?,?,?,?,?,?,?,?)').run(crypto.randomUUID(),input.precedentId,row.id,input.evaluationId,amount,input.shouldEscalate?1:0,input.reason,user.id,jsonNow());
  return calibrateThreshold(input.precedentId,user);
  })();
@@ -34,15 +39,26 @@ export function calibrateThreshold(precedentId:string,user:AppUser) {
  const best=candidates[0];
  // The fixed envelope prevents statutory/data/authority findings being cleared; only this scoped internal finding changes.
  if(!best || (baseline.missed===0 && best.unnecessary>=baseline.unnecessary))return {status:'UNCHANGED',sampleCount:samples.length,threshold:scope.current_threshold};
- const config={...getActivePolicy().config,companyTaxCode:demoCompanyTaxCode};
- const probe={...challengeCases[0].invoice,id:'SAFETY-GATE',invoiceNumber:'SAFETY-GATE'};
- const adversarial=[{...probe,isImageBlurry:true},{...probe,totalAmount:probe.totalAmount+100},{...challengeCases[3].invoice,id:'SAFETY-CASH',invoiceNumber:'SAFETY-CASH'},{...challengeCases[4].invoice,id:'SAFETY-AUTH',invoiceNumber:'SAFETY-AUTH'}];
- if(!Number.isFinite(best.threshold) || best.threshold<0 || best.threshold>scope.maximum_amount || adversarial.some((inv,i)=>{const d=evaluateInvoiceLocally(inv,config);return d.status!=='ESCALATED' || !d.findings?.some(f=>f.kind===(i<2?'DATA_QUALITY':i===2?'STATUTORY':'AUTHORITY'));}))throw new WorkflowError('Bộ kiểm tra an toàn không đạt; giữ nguyên ngưỡng.');
+ const config=getActivePolicy().config;
+ const precedent=db.prepare('SELECT p.supplier_tax_code,p.effective_from,s.purpose FROM corporate_precedents p JOIN precedent_scopes s ON p.id=s.precedent_id WHERE p.id=?').get(precedentId) as {supplier_tax_code:string;effective_from:string;purpose:string};
+ const amount=Math.max(1,best.threshold);
+ const probe={...challengeCases[0].invoice,id:'SAFETY-GATE',invoiceNumber:'SAFETY-GATE',supplierTaxCode:precedent.supplier_tax_code,buyerTaxCode:config.companyTaxCode,invoiceDate:precedent.effective_from,itemName:`Chi tiếp khách rượu bia ${precedent.purpose}`,totalAmount:amount,preTaxAmount:amount/1.1,taxAmount:amount-amount/1.1};
+ const cashAmount=Math.max(config.nonCashThreshold,5_000_000)+100;
+ const authorityAmount=Math.max(config.kttApprovalLimit,275_000_000)+100;
+ const adversarial=[{...probe,isImageBlurry:true},{...probe,totalAmount:probe.totalAmount+100},{...probe,paymentMethod:'CASH' as const,hasBankSlip:false,totalAmount:cashAmount,preTaxAmount:cashAmount/1.1,taxAmount:cashAmount-cashAmount/1.1},{...probe,totalAmount:authorityAmount,preTaxAmount:authorityAmount/1.1,taxAmount:authorityAmount-authorityAmount/1.1}];
+ let safe=Number.isFinite(best.threshold) && best.threshold>=0 && best.threshold<=scope.maximum_amount;
+ // Exercise the candidate itself inside a rollback-only savepoint.
+ db.exec('SAVEPOINT threshold_candidate_gate');
+ try {
+  db.prepare('UPDATE precedent_scopes SET current_threshold=? WHERE precedent_id=?').run(best.threshold,precedentId);
+  safe=safe && !adversarial.some((inv,i)=>{const d=evaluateInvoiceLocally(inv,config);return d.status!=='ESCALATED' || !d.findings?.some(f=>f.kind===(i<2?'DATA_QUALITY':i===2?'STATUTORY':'AUTHORITY'));});
+ } finally {db.exec('ROLLBACK TO threshold_candidate_gate');db.exec('RELEASE threshold_candidate_gate');}
+ if(!safe)throw new WorkflowError('Bộ kiểm tra an toàn không đạt; giữ nguyên ngưỡng.');
  const version=scope.version+1;
  db.prepare('INSERT INTO threshold_versions VALUES (?,?,?,?,?,?,1,?)').run(crypto.randomUUID(),precedentId,version,scope.current_threshold,best.threshold,samples.length,jsonNow());
  db.prepare('UPDATE precedent_scopes SET current_threshold=?,version=? WHERE precedent_id=?').run(best.threshold,version,precedentId);
  appendAuditEvent({eventType:'THRESHOLD_ADAPTED',entityId:precedentId,actorId:user.id,payload:{version,previousThreshold:scope.current_threshold,threshold:best.threshold,sampleCount:samples.length,missed:0,unnecessary:best.unnecessary,validation:'Feedback within CFO envelope; not an independent accuracy estimate'}});
- return {status:'ADAPTED',version,threshold:best.threshold,sampleCount:samples.length};
+ return {status:'ADAPTED',version,previousThreshold:scope.current_threshold,threshold:best.threshold,sampleCount:samples.length,safetyCases:adversarial.length};
 }
 export function rollbackThreshold(precedentId:string,user:AppUser,reason='CFO phục hồi ngưỡng trước') {
  if(user.role!=='CFO')throw new WorkflowError('Rollback ngưỡng cần CFO.',403);

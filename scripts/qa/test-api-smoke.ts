@@ -7,6 +7,8 @@ async function main(){
  const call=async(path:string,body?:unknown,auth=cookie)=>{const r=await fetch(origin+path,{method:body===undefined?'GET':'POST',headers:{cookie:auth,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});return {code:r.status,data:await r.json()};};
  const inv={...challengeCases[0].invoice,id:'API-'+Date.now(),invoiceNumber:'API-'+Date.now(),buyerTaxCode:'0100109106'};
  const evaluated=await call('/api/evaluate',{invoice:inv,forceLocalOnly:true});assert.equal(evaluated.code,200);assert.equal(evaluated.data.workflow.status,'APPROVED');
+ const runtime=await call('/api/runtime');assert.equal(runtime.code,200);assert.equal(runtime.data.demo,true);assert.ok(runtime.data.policy.version);
+ for(const path of ['/api/notifications','/api/invoices/duplicates'])assert.equal((await call(path)).code,200);
  const inbox=await call('/api/inbox');assert.equal(inbox.data.items.length,1);assert.equal((await call('/api/inbox',undefined,other)).data.items.length,0);
  const row=inbox.data.items[0];assert.equal(row.allowedActions.pause,true);
  let r=await call(`/api/invoices/${inv.id}/audit-action`,{action:'PAUSE',reason:'Kiểm tra API dừng hồ sơ',revision:row.revision,evaluationId:row.evaluationId});assert.equal(r.code,200);

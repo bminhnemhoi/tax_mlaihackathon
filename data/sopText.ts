@@ -41,7 +41,7 @@ CHƯƠNG I: NGUYÊN TẮC KHẤU TRỪ THUẾ GTGT & TÍNH CHI PHÍ HỢP LÝ
 
 CHƯƠNG II: CÁC HẠNG MỤC CẤM KHẤU TRỪ & RỦI RO ĐỐI TÁC NGỪNG HOẠT ĐỘNG
 Điều 2.1: Chi Phí Phi Sản Xuất Kinh Doanh:
-          - Chi phí mua đồ uống có cồn (rượu, bia), dịch vụ vui chơi giải trí xa xỉ, chi phí cá nhân của lãnh đạo không phục vụ trực tiếp SXKD: Cấm kê khai khấu trừ thuế GTGT và phải loại trừ khỏi chi phí tính thuế TNDN (Chỉ tiêu B4).
+          - Chi phí có đồ uống có cồn hoặc hoạt động tiếp khách/giải trí: dừng để làm rõ mục đích và hồ sơ theo quy chế nội bộ. Chỉ tiền lệ CFO đúng nhà cung cấp, mục đích, trần tiền và thời hạn mới giải tỏa phát hiện nội bộ này; không bỏ qua dữ liệu chưa rõ, ràng buộc luật định hoặc thẩm quyền. Phần xác định pháp lý cần được người phụ trách nghiệp vụ kiểm tra.
           - Hóa đơn tiếp khách, hội nghị bắt buộc phải đính kèm Bảng kê chi tiết món ăn / dịch vụ.
 
 Điều 2.2: Kiểm Soát Trạng Thái Mã Số Thuế Nhà Cung Cấp:
@@ -54,7 +54,7 @@ CHƯƠNG III: MA TRẬN PHÂN CẤP THẨM QUYỀN PHÊ DUYỆT (AUTHORITY MATRI
           - Thẩm quyền tự duyệt các hóa đơn chi phí thông thường dưới 200.000.000 VNĐ.
           - Thẩm quyền xử lý các trường hợp chuyển tiếp thuộc Nhóm 1 (Uncertain Info) và Nhóm 2 (Out of Policy).
 Điều 3.3: Cấp 3 - Giám đốc Tài chính (CFO) / Tổng Giám đốc (CEO): Thẩm quyền duy nhất phê duyệt:
-          - Các hóa đơn điều chỉnh giảm doanh thu, chiết khấu thương mại, bồi thường hợp đồng từ 200.000.000 VNĐ trở lên.
+          - Mọi hóa đơn có trị tuyệt đối tổng tiền đạt hoặc vượt hạn mức KTT đang cấu hình (mặc định 200.000.000 VNĐ), bao gồm cả hóa đơn điều chỉnh âm.
           - Các quyết định chiến lược khi Tham số nguồn hàng K rơi vào Vùng Đỏ nguy hiểm.
 
 CHƯƠNG IV: GIÁM SÁT RỦI RO THAM SỐ NGUỒN HÀNG K (CÔNG VĂN 2392/TCT-QLRR & TT 94/2026/TT-BTC)

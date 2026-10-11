@@ -10,7 +10,7 @@ Tiếp nhận nhiều loại chứng từ, kiểm tra điều kiện và chuyể
 
 ## 3. Kết quả kiểm thử và phương pháp đo
 
-Đã chạy: 4/4 chung, 5/5 Đề A (3 thường quy + 2 chuyển tiếp), 15/15 hồi quy; 20 kiểm tra an toàn. Đây là fixture tổng hợp, có ca trùng giữa các tập. Kết quả thực tế CHƯA CÓ: ≥20 ca độc lập gán nhãn trước; ba nhân sự trực tiếp làm kế toán/tài chính, đo trước/sau và xác nhận tự viết. Không sử dụng số liệu 42 ca, 92,3% STP hoặc trích dẫn cũ chưa có nguồn.
+Đã chạy: 4/4 chung, 5/5 Đề A (3 thường quy + 2 chuyển tiếp), 15/15 hồi quy; 20 kiểm tra an toàn và 16 kiểm tra cải tiến; HTTPS/Verify/API/XML/PDF/ảnh tổng hợp live đã xác nhận. Đây là fixture tổng hợp, có ca trùng giữa các tập. Kết quả thực tế CHƯA CÓ: ≥20 ca độc lập gán nhãn trước; ba nhân sự trực tiếp làm kế toán/tài chính, đo trước/sau và xác nhận tự viết. Không sử dụng số liệu 42 ca, 92,3% STP hoặc trích dẫn cũ chưa có nguồn.
 
 ## 4. Kiến trúc và can thiệp
 
@@ -18,4 +18,4 @@ Next.js + SQLite; service nghiệp vụ dùng chung; transaction và revision/ev
 
 ## 5. Giới hạn và chốt bài
 
-OCR lỗi/key timeout cần template và trạng thái chưa xác minh. Chưa có live URL đã xác nhận; cần thử Docker/HTTPS và restart/restore trên VPS. Cần hoàn thành nghiên cứu người dùng, bổ sung số liệu slide, ghi video ≤3 phút và cải tiến gắn feedback trước 15/10. Không cam kết độ chính xác hoặc tiết kiệm thời gian khi thiếu bằng chứng.
+OCR lỗi/key timeout cần template và trạng thái chưa xác minh. Live: https://limegreen-salamander-517622.hostingersite.com. Hostinger shared chạy Passenger, bundle local và dependency Linux; worker Docker chưa nghiệm thu. Standalone local restart/restore và khôi phục evaluation hết hạn đạt; backup SQLite live đọc lại integrity ok. Cần hoàn thành nghiên cứu người dùng, bổ sung số liệu slide, ghi video ≤3 phút và cải tiến gắn feedback trước 15/10. Không cam kết độ chính xác hoặc tiết kiệm thời gian khi thiếu bằng chứng.

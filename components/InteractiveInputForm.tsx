@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useLayoutEffect } from 'react';
+import React, { useRef, useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import {
   Send,
   FilePlus,
@@ -24,13 +24,48 @@ import {
   FileCheck2,
   Plus,
   Move,
-  X
+  X,
+  Camera
 } from 'lucide-react';
-import { InvoiceInput, RefereeDecision, SystemPolicyConfig, OcrHighlight, FieldEvidence } from '@/lib/schemas';
+import { DocumentExtraction, InvoiceInput, RefereeDecision, SystemPolicyConfig, OcrHighlight, FieldEvidence } from '@/lib/schemas';
 import { formatVND, formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { CapturePhoneDialog } from '@/components/CapturePhoneDialog';
+import { toast } from 'sonner';
+
+function hasDetectedInvoice(invoice: Partial<InvoiceInput> | null | undefined): boolean {
+  if (!invoice) return false;
+  const hasIdentity = [invoice.invoiceNumber, invoice.supplierName, invoice.supplierTaxCode, invoice.itemName]
+    .some((value) => typeof value === 'string' && value.trim().length > 0);
+  const hasAmount = [invoice.preTaxAmount, invoice.taxAmount, invoice.totalAmount]
+    .some((value) => typeof value === 'number' && Number.isFinite(value) && value > 0);
+  return hasIdentity || hasAmount;
+}
+
+function emptyInvoiceInput(source?: Pick<InvoiceInput, 'sourceArtifactId' | 'sourceHash'>): InvoiceInput {
+  return {
+    id: `INV-${Date.now()}`,
+    invoiceNumber: '', invoiceDate: '', supplierTaxCode: '', supplierName: '', itemName: '',
+    preTaxAmount: 0, taxRate: undefined as unknown as InvoiceInput['taxRate'], taxAmount: 0, totalAmount: 0,
+    paymentMethod: undefined, hasBankSlip: undefined, hasItemManifest: undefined, sellerStatus: 'UNKNOWN',
+    isImageBlurry: false, isAdjustment: false, isStaffReimbursed: false,
+    ...source
+  };
+}
+
+function notifyExtractionQuality(data: DocumentExtraction): boolean {
+  const reviewFields = new Set([
+    ...Object.entries(data.fieldEvidence || {}).filter(([, evidence]) => evidence.status !== 'VERIFIED').map(([field]) => field),
+    ...(data.uncertainFields || []),
+    ...(data.absentFields || []),
+    ...(data.conflicts || []),
+    ...Object.keys(data.fieldWarnings || {})
+  ]);
+  if (reviewFields.size > 0) toast.warning(`Có ${reviewFields.size} mục cần đối chiếu.`);
+  return reviewFields.size > 0;
+}
 
 interface InteractiveInputFormProps {
   onEvaluateResult: (decision: RefereeDecision, invoice: InvoiceInput) => void;
@@ -47,6 +82,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pastedText, setPastedText] = useState<string>('');
+  const [captureDialogOpen, setCaptureDialogOpen] = useState(false);
 
   // Trạng thái xem trước chứng từ gốc (Left Column Preview)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -61,6 +97,9 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
   const [isDraggingImage, setIsDraggingImage] = useState<boolean>(false);
   const dragStartRef = useRef<{ startX: number; startY: number; initialPanX: number; initialPanY: number } | null>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const imageStageRef = useRef<HTMLDivElement>(null);
+  const [imageNaturalSize, setImageNaturalSize] = useState<{ src: string; width: number; height: number } | null>(null);
+  const [fitImageSize, setFitImageSize] = useState<{ src: string; width: number; height: number } | null>(null);
 
   const [formData, setFormData] = useState<InvoiceInput>(() => {
     return {
@@ -119,6 +158,75 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
     approvedTax?: number;
     riskGroup?: string;
   } | null>(null);
+
+  const applyCaptureExtraction = useCallback((data: DocumentExtraction): boolean => {
+    const extracted = Object.fromEntries(
+      Object.entries(data.invoice || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
+    );
+    if (!hasDetectedInvoice(data.invoice)) {
+      if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(data.artifactId ? `/api/documents/artifacts/${encodeURIComponent(data.artifactId)}` : null);
+      setPreviewFileType('IMAGE');
+      setUploadedFile(null);
+      setXmlContent(null);
+      setDocumentWarnings([]);
+      setFieldEvidence({});
+      setFieldWarnings({});
+      setUncertainFields([]);
+      setOcrHighlights([]);
+      setEvaluationRevision(undefined);
+      setLastResult(null);
+      setFormData(emptyInvoiceInput({ sourceArtifactId: data.artifactId, sourceHash: data.sourceHash }));
+      toast.error('AI chưa nhận diện được hóa đơn trong ảnh. Hãy chụp rõ hơn hoặc nhập thủ công.');
+      return false;
+    }
+    if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(data.artifactId ? `/api/documents/artifacts/${encodeURIComponent(data.artifactId)}` : null);
+    setPreviewFileType('IMAGE');
+    setUploadedFile(null);
+    setXmlContent(null);
+    setEvaluationRevision(undefined);
+    setFormData(() => ({
+      invoiceNumber: '', invoiceDate: '', supplierTaxCode: '', supplierName: '', itemName: '', preTaxAmount: 0,
+      taxRate: undefined as unknown as InvoiceInput['taxRate'], taxAmount: 0, totalAmount: 0,
+      paymentMethod: undefined, hasBankSlip: undefined, hasItemManifest: undefined, sellerStatus: 'UNKNOWN',
+      isImageBlurry: false, isAdjustment: false, ...extracted,
+      sourceArtifactId: data.artifactId, sourceHash: data.sourceHash, id: `DOC-${Date.now()}`
+    } as InvoiceInput));
+    setDocumentWarnings(data.warnings || []);
+    setUncertainFields(data.uncertainFields || []);
+    setFieldWarnings(data.fieldWarnings || {});
+    setFieldEvidence(data.fieldEvidence || {});
+    setOcrHighlights(data.ocrHighlights || []);
+    setLastResult(null);
+    setImageZoom(100);
+    setPanOffset({ x: 0, y: 0 });
+    setIsDraggingImage(false);
+    return !notifyExtractionQuality(data);
+  }, [previewUrl]);
+
+  const startCaptureProcessing = useCallback((artifactId: string) => {
+    parseRequestIdRef.current += 1;
+    parseAbortRef.current?.abort();
+    setDocumentWarnings([]);
+    setFieldEvidence({});
+    setFieldWarnings({});
+    setUncertainFields([]);
+    setOcrHighlights([]);
+    setFormErrors({});
+    setEvaluationRevision(undefined);
+    setLastResult(null);
+    setUploadedFile(null);
+    setXmlContent(null);
+    setPreviewUrl(`/api/documents/artifacts/${encodeURIComponent(artifactId)}`);
+    setPreviewFileType('IMAGE');
+    setFormData(emptyInvoiceInput({ sourceArtifactId: artifactId }));
+    setImageZoom(100);
+    setPanOffset({ x: 0, y: 0 });
+    setIsParsingDocument(true);
+  }, []);
+
+  const finishCaptureProcessing = useCallback(() => setIsParsingDocument(false), []);
 
   // Trợ lý Robot AI thân thiện (Có thể Drag di chuyển khắp màn hình)
   const [isRobotSpeechOpen, setIsRobotSpeechOpen] = useState<boolean>(false);
@@ -393,6 +501,37 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
     setImageZoom(Math.min(350, Math.max(50, newZoom)));
   };
 
+  // Calculate the image's actual fitted dimensions from the available preview
+  // area. Percentage max-heights on an auto-sized inline wrapper are not
+  // reliable in a flex layout, which caused portrait photos to render cropped
+  // or larger than the visible frame on some screens.
+  useEffect(() => {
+    const stage = imageStageRef.current;
+    if (!stage || !imageNaturalSize || imageNaturalSize.src !== previewUrl) return;
+
+    const updateFit = () => {
+      const styles = window.getComputedStyle(stage);
+      const horizontalPadding = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+      const verticalPadding = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+      const availableWidth = Math.max(1, stage.clientWidth - horizontalPadding);
+      const availableHeight = Math.max(1, stage.clientHeight - verticalPadding);
+      const scale = Math.min(
+        availableWidth / imageNaturalSize.width,
+        availableHeight / imageNaturalSize.height
+      );
+      setFitImageSize({
+        src: previewUrl,
+        width: Math.max(1, imageNaturalSize.width * scale),
+        height: Math.max(1, imageNaturalSize.height * scale)
+      });
+    };
+
+    const observer = new ResizeObserver(updateFit);
+    observer.observe(stage);
+    updateFit();
+    return () => observer.disconnect();
+  }, [imageNaturalSize, previewUrl]);
+
   // Lắng nghe sự kiện Ctrl / Command + Cuộn chuột (Wheel) để zoom mượt mà
   useEffect(() => {
     const container = imageContainerRef.current;
@@ -514,7 +653,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
       || /\.(xml|pdf|png|jpe?g|webp)$/i.test(file.name);
     if (!supported) {
       const message = 'Định dạng chưa được hỗ trợ. Hãy chọn file XML, PDF, PNG, JPG hoặc WEBP.';
-      setDocumentWarnings([message]);
+      toast.error(message);
       return;
     }
 
@@ -563,6 +702,19 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
       const data = await response.json();
       if (requestId !== parseRequestIdRef.current) return;
       if (!response.ok) throw new Error(data.error || 'Lỗi đọc chứng từ');
+      const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(file.name);
+      if (isImage && !hasDetectedInvoice(data.invoice)) {
+        setDocumentWarnings([]);
+        setFieldEvidence({});
+        setFieldWarnings({});
+        setUncertainFields([]);
+        setOcrHighlights([]);
+        setEvaluationRevision(undefined);
+        setLastResult(null);
+        setFormData(emptyInvoiceInput({ sourceArtifactId: data.artifactId, sourceHash: data.sourceHash }));
+        toast.error('AI chưa nhận diện được hóa đơn trong ảnh. Hãy chụp rõ hơn hoặc nhập thủ công.');
+        return;
+      }
       extractionStartRef.current={requestId,started:extractionStartRef.current!.started,complete:true,cacheHit:Boolean(data.performance?.cacheHit)};
       const extracted = Object.fromEntries(
         Object.entries(data.invoice || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -581,16 +733,11 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
       setFieldEvidence(data.fieldEvidence || {});
       setOcrHighlights(data.ocrHighlights || []);
       setLastResult(null);
+      notifyExtractionQuality(data);
     } catch (error) {
       if (requestId !== parseRequestIdRef.current || (error instanceof Error && error.name === 'AbortError')) return;
       const msg = error instanceof Error ? error.message : 'Không thể đọc file';
-      setDocumentWarnings([msg]);
-      setRobotMessage({
-        title: 'Lỗi Bóc Tách Chứng Từ',
-        items: [msg],
-        isError: true
-      });
-      setIsRobotSpeechOpen(true);
+      toast.error(msg);
     } finally {
       if (requestId === parseRequestIdRef.current) setIsParsingDocument(false);
     }
@@ -598,8 +745,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
 
   const handleRawTextParse = async () => {
     if (!pastedText.trim()) {
-      setRobotMessage({ title: 'Chưa có văn bản để bóc tách', items: ['Vui lòng dán nội dung hóa đơn hoặc văn bản trước.'], isError: true });
-      setIsRobotSpeechOpen(true);
+      toast.error('Vui lòng dán nội dung hóa đơn hoặc văn bản trước.');
       return;
     }
     parseAbortRef.current?.abort();
@@ -629,6 +775,10 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
       const extracted = Object.fromEntries(
         Object.entries(data.invoice || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
       );
+      if (!Object.keys(extracted).length) {
+        toast.error('Không nhận diện được dữ liệu hóa đơn. Hãy kiểm tra nội dung hoặc nhập thủ công.');
+        return;
+      }
       setEvaluationRevision(undefined);
       setFormData(() => ({
         invoiceNumber:'',invoiceDate:'',supplierTaxCode:'',supplierName:'',itemName:'',preTaxAmount:0,taxRate:undefined as unknown as InvoiceInput['taxRate'],taxAmount:0,totalAmount:0,paymentMethod:undefined,hasBankSlip:undefined,hasItemManifest:undefined,sellerStatus:'UNKNOWN',isImageBlurry:false,isAdjustment:false,
@@ -643,10 +793,11 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
       setFieldEvidence(data.fieldEvidence || {});
       setOcrHighlights(data.ocrHighlights || []);
       setLastResult(null);
+      notifyExtractionQuality(data);
     } catch (error) {
       if (requestId !== parseRequestIdRef.current || (error instanceof Error && error.name === 'AbortError')) return;
       const msg = error instanceof Error ? error.message : 'Không thể bóc tách văn bản';
-      setDocumentWarnings([msg]);
+      toast.error(msg);
     } finally {
       if (requestId === parseRequestIdRef.current) setIsParsingDocument(false);
     }
@@ -759,7 +910,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
     for(const field of ['preTaxAmount','taxAmount','totalAmount'] as const) if(!Number.isFinite(formData[field])) errors[field]='Số tiền sai định dạng.';
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      requestAnimationFrame(() => document.getElementById('invoice-error-summary')?.focus());
+      toast.error('Kiểm tra các trường được đánh dấu trước khi thẩm định.');
       return;
     }
 
@@ -813,8 +964,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
 
       onEvaluateResult(decision, {...formData, id: decision.invoiceId});
     } catch (err) {
-      setRobotMessage({ title: 'Lỗi thẩm định hồ sơ', items: [err instanceof Error ? err.message : 'Lỗi thẩm định'], isError: true });
-      setIsRobotSpeechOpen(true);
+      toast.error(err instanceof Error ? err.message : 'Lỗi thẩm định hồ sơ.');
     } finally {
       setIsEvaluating(false);
     }
@@ -822,47 +972,13 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-2">
-      {Object.keys(formErrors).length > 0 && <div id="invoice-error-summary" tabIndex={-1} role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><h3 className="font-semibold">Cần sửa dữ liệu đầu vào</h3><ul className="mt-2 list-inside list-disc">{Object.entries(formErrors).map(([field,message]) => <li key={field}><a className="underline" href={`#${field}`}>{message}</a></li>)}</ul></div>}
-      {extractionTiming && <p role="status" data-testid="extraction-timing" data-elapsed-ms={extractionTiming.elapsedMs} data-cache-hit={String(extractionTiming.cacheHit)} className="text-xs text-slate-600">
+      {extractionTiming && <p role="status" data-testid="extraction-timing" data-elapsed-ms={extractionTiming.elapsedMs} data-cache-hit={String(extractionTiming.cacheHit)} className="sr-only">
         Đã điền dữ liệu sau {(extractionTiming.elapsedMs/1000).toFixed(2)} giây{extractionTiming.cacheHit ? ' · kết quả đã lưu của cùng chứng từ' : ''}. Kiểm tra các trường chưa xác minh trước khi thẩm định.
       </p>}
-      {Object.keys(fieldEvidence).length > 0 && (() => {
-        const fieldLabels: Record<string, string> = {
-          invoiceNumber: 'Số hóa đơn', invoiceDate: 'Ngày hóa đơn', supplierTaxCode: 'MST người bán',
-          supplierName: 'Tên người bán', itemName: 'Tên hàng hóa/dịch vụ', preTaxAmount: 'Tiền trước thuế',
-          taxRate: 'Thuế suất', taxAmount: 'Tiền thuế', totalAmount: 'Tổng tiền'
-        };
-        const evidenceEntries = Object.entries(fieldEvidence).filter(([, evidence]) => evidence.status !== 'VERIFIED');
-        return (
-          <div role="status" aria-label="Nguồn dữ liệu bóc tách" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-            <div className="font-semibold">Nguồn dữ liệu cần đối chiếu</div>
-            {evidenceEntries.length === 0 ? (
-              <p className="mt-1 text-emerald-800">Các trường đã đọc đều có nguồn xác minh ({Object.keys(fieldEvidence).length} trường).</p>
-            ) : (
-              <ul className="mt-1 space-y-1">
-                {evidenceEntries.map(([field, evidence]) => {
-                  const statusLabel = evidence.status === 'ABSENT' ? 'Thiếu' : evidence.status === 'CONFLICT' ? 'Mâu thuẫn' : evidence.status === 'UNCERTAIN' ? 'Chưa xác minh' : 'Suy ra';
-                  const sourceLabel = evidence.source === 'XML' ? 'XML' : evidence.source === 'PDF_TEXT' ? 'PDF có chữ' : evidence.source === 'OCR' ? 'OCR' : evidence.source === 'VLM' ? 'AI đọc ảnh' : evidence.source === 'USER' ? 'Người dùng' : 'Suy luận';
-                  return <li key={field}><strong>{fieldLabels[field] || field}</strong>: {statusLabel} · nguồn {sourceLabel} · tin cậy {Math.round(evidence.confidence * 100)}%</li>;
-                })}
-              </ul>
-            )}
-            <p className="mt-1 text-amber-800">Hệ thống giữ nguyên giá trị thiếu/mâu thuẫn và sẽ chuyển tiếp khi chưa đủ bằng chứng.</p>
-          </div>
-        );
-      })()}
-      <p role="status" className="text-xs text-slate-600">{isParsingDocument ? 'Đang đọc chứng từ…' : isEvaluating ? 'Đang kiểm tra quy tắc…' : lastResult?.status === 'ROUTINE' ? 'Đã tự xử lý và tạo chứng từ nội bộ.' : lastResult?.status === 'ESCALATED' ? 'Đã dừng để xác minh / phê duyệt.' : 'Thông tin thanh toán hoặc nhà cung cấp chưa biết sẽ được chuyển tiếp để xác minh.'}</p>
+      {(isParsingDocument || isEvaluating || lastResult) && <p role="status" className="sr-only">{isParsingDocument ? 'Đang đọc chứng từ…' : isEvaluating ? 'Đang kiểm tra quy tắc…' : lastResult?.status === 'ROUTINE' ? 'Đã tự xử lý và tạo chứng từ nội bộ.' : 'Đã dừng để xác minh / phê duyệt.'}</p>}
       {/* ================= HEADER THANH ĐIỀU HƯỚNG CHẾ ĐỘ ================= */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2">
-        <div>
-          <h2 className="text-base sm:text-lg font-bold text-slate-950 flex items-center gap-2">
-            <span>Tiếp Nhận Chứng Từ &amp; Đối Soát Trực Quan</span>
-            <Badge variant="secondary" className="text-[11px] font-mono">Bản Thể Hiện + Trích Xuất</Badge>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Cột trái: Bản thể hiện hóa đơn gốc · Cột phải: Dữ liệu bóc tách được để đối chiếu kiểm tra
-          </p>
-        </div>
+        <h2 className="text-lg font-semibold text-slate-950">Tiếp nhận chứng từ</h2>
 
         <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200 self-start sm:self-auto shrink-0">
           <button
@@ -874,7 +990,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Tải Tệp (XML / PDF / Ảnh)
+            Tải chứng từ
           </button>
           <button
             type="button"
@@ -885,7 +1001,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Dán Văn Bản Thô
+            Dán văn bản
           </button>
         </div>
       </div>
@@ -931,9 +1047,8 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                     fileInputRef.current?.click();
                   }
                 }}
-                role="button"
-                tabIndex={0}
-                aria-label="Chọn hoặc kéo thả file chứng từ XML, PDF, PNG, JPG hoặc WEBP"
+                role="region"
+                aria-label="Tiếp nhận file chứng từ"
                 className={`relative w-full h-full min-h-0 flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border-2 border-dashed transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-950 ${
                   isDragging
                     ? 'border-emerald-500 bg-emerald-50/90 scale-[1.01] shadow-md ring-4 ring-emerald-500/10'
@@ -970,7 +1085,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                     </div>
                     <div>
                       <p className="text-sm font-bold text-slate-950">
-                        {isDragging ? 'Thả file vào đây để tải lên ngay' : 'Kéo thả file XML / PDF / Ảnh chụp vào đây'}
+                        {isDragging ? 'Thả file vào đây để tải lên ngay' : 'Thả chứng từ vào đây'}
                       </p>
                       <p className="text-xs text-slate-500 mt-1">
                         hoặc <span className="font-bold underline text-slate-950">nhấn để chọn tệp</span> (.xml, .pdf, .png, .jpg)
@@ -986,6 +1101,14 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                       <span className="px-2.5 py-1 rounded-md bg-white text-slate-700 text-[11px] font-mono font-bold border border-slate-200 shadow-2xs">
                         .PNG / .JPG (Ảnh chụp)
                       </span>
+                    </div>
+                    <div className="flex flex-col gap-2 pt-2 sm:flex-row">
+                      <Button type="button" variant="outline" onClick={(event) => { event.stopPropagation(); fileInputRef.current?.click(); }} className="min-h-11 gap-2 border-slate-300 bg-white px-4 text-xs font-semibold text-slate-800 hover:bg-slate-100">
+                        <FilePlus className="h-4 w-4" />Chọn tệp
+                      </Button>
+                      <Button type="button" onClick={(event) => { event.stopPropagation(); setCaptureDialogOpen(true); }} className="min-h-11 gap-2 bg-[#183b2d] px-4 text-xs font-semibold text-white hover:bg-[#214b39]">
+                        <Camera className="h-4 w-4" />Chụp bằng điện thoại
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1111,7 +1234,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                       <ZoomIn className="h-3.5 w-3.5" />
                     </button>
 
-                    <span className="text-[11px] font-mono font-bold text-slate-700 min-w-11 text-center bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-2xs">
+                    <span className="text-[11px] font-numeric font-bold text-slate-700 min-w-11 text-center bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-2xs">
                       {imageZoom}%
                     </span>
 
@@ -1169,33 +1292,41 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                       isDraggingImage ? 'cursor-grabbing' : 'cursor-grab'
                     }`}
                   >
-                    {/* Badge nổi hiển thị trạng thái AI đang bóc tách trên nền ảnh */}
-                    {isParsingDocument && (
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-950/90 text-white border border-brand-lime shadow-lg backdrop-blur-xs pointer-events-none text-xs font-bold animate-in fade-in zoom-in-95 duration-200">
-                        <Sparkles className="h-3.5 w-3.5 text-brand-lime animate-spin shrink-0" />
-                        <span>AI đang đọc chứng từ…</span>
-                      </div>
-                    )}
-
-                    <div
-                      style={{
-                        transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${imageZoom / 100})`,
-                        transformOrigin: 'center center',
-                        transition: isDraggingImage ? 'none' : 'transform 0.08s ease-out',
-                      }}
-                      className="w-full h-full flex items-center justify-center p-3.5"
-                    >
-                      <div className="relative inline-block select-none max-w-full max-h-full">
+                    <div ref={imageStageRef} className="w-full h-full flex items-center justify-center p-3.5">
+                      {fitImageSize?.src !== previewUrl && (
+                        <img
+                          src={previewUrl}
+                          alt=""
+                          aria-hidden="true"
+                          onLoad={(event) => {
+                            const image = event.currentTarget;
+                            setImageNaturalSize({ src: previewUrl, width: image.naturalWidth, height: image.naturalHeight });
+                            handleResetZoomAndPan();
+                          }}
+                          className="pointer-events-none absolute h-px w-px opacity-0"
+                        />
+                      )}
+                      {fitImageSize?.src === previewUrl && (
+                      <div
+                        style={{
+                          width: `${fitImageSize.width}px`,
+                          height: `${fitImageSize.height}px`,
+                          transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${imageZoom / 100})`,
+                          transformOrigin: 'center center',
+                          transition: isDraggingImage ? 'none' : 'transform 0.08s ease-out',
+                        }}
+                        className="relative shrink-0 select-none"
+                      >
                         <img
                           src={previewUrl}
                           alt="Chứng từ hóa đơn"
-                          draggable={false}
-                          className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg shadow-md border border-slate-300 pointer-events-none select-none block"
-                          style={{
-                            maxWidth: '100%',
-                            maxHeight: '100%',
-                            objectFit: 'contain'
+                          onLoad={(event) => {
+                            const image = event.currentTarget;
+                            setImageNaturalSize({ src: previewUrl, width: image.naturalWidth, height: image.naturalHeight });
+                            handleResetZoomAndPan();
                           }}
+                          draggable={false}
+                          className="h-full w-full rounded-lg object-fill shadow-md border border-slate-300 pointer-events-none select-none block"
                         />
 
                         {/* TÔ HIGHLIGHT TRỰC TIẾP TRÊN BẢN HÓA ĐƠN: CHỈ CÁC THỰC THỂ ĐƯỢC LLM TRÍCH XUẤT VÀ CÓ ĐỘ TIN CẬY THẤP */}
@@ -1236,17 +1367,22 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                               </div>
                             );
                           })}
+
+                        {isParsingDocument && (
+                          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-40 overflow-hidden rounded-lg ring-1 ring-inset ring-emerald-50/70">
+                            <div className="absolute inset-0 bg-emerald-950/20" />
+                            <div className="invoice-scan-sweep absolute -inset-x-8 top-0 h-1/2 bg-gradient-to-b from-transparent via-emerald-100/45 to-transparent" />
+                            <div className="invoice-scan-shimmer absolute inset-x-0 top-1/2 h-0.5 bg-gradient-to-r from-transparent via-white to-transparent shadow-[0_0_22px_8px_rgba(167,243,208,0.75)]" />
+                            <span className="invoice-sparkle absolute left-[18%] top-[24%] h-2 w-2 rotate-45 bg-white shadow-[0_0_12px_4px_rgba(167,243,208,0.95)]" />
+                            <span className="invoice-sparkle absolute right-[21%] top-[42%] h-1.5 w-1.5 rotate-45 bg-emerald-50 shadow-[0_0_10px_3px_rgba(167,243,208,0.9)] [animation-delay:350ms]" />
+                            <span className="invoice-sparkle absolute bottom-[22%] left-[42%] h-1.5 w-1.5 rotate-45 bg-white shadow-[0_0_10px_3px_rgba(167,243,208,0.9)] [animation-delay:700ms]" />
+                            <div className="absolute inset-2 rounded-md border border-white/50" />
+                          </div>
+                        )}
                       </div>
+                      )}
                     </div>
 
-                    {/* Chỉ dẫn tương tác nổi ở góc dưới */}
-                    <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 bg-slate-900/85 backdrop-blur-xs text-white text-[10px] font-medium px-3 py-1 rounded-full shadow-md pointer-events-none flex items-center gap-2 select-none z-10">
-                      <span className="flex items-center gap-1">
-                        <kbd className="px-1 py-0.2 bg-white/20 rounded font-mono text-[9px]">Ctrl</kbd> / <kbd className="px-1 py-0.2 bg-white/20 rounded font-mono text-[9px]">⌘</kbd> + Cuộn chuột hoặc Kéo thanh trượt để zoom
-                      </span>
-                      <span className="text-white/40">•</span>
-                      <span>Kéo chuột để soi chi tiết</span>
-                    </div>
                   </div>
                 )}
 
@@ -1279,8 +1415,8 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                           </h3>
                           <div className="text-[11px] text-slate-500 italic mt-0.5">(Bản thể hiện của hóa đơn điện tử)</div>
                           <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-dashed border-slate-200 text-left text-[11px]">
-                            <div><span className="text-slate-500">Ký hiệu:</span> <span className="font-mono font-bold">{formData.invoiceSeries || 'Chưa đọc được'}</span></div>
-                            <div className="text-right"><span className="text-slate-500">Số HĐ:</span> <span className="font-mono font-extrabold text-slate-950 text-xs">{formData.invoiceNumber || '---'}</span></div>
+                            <div><span className="text-slate-500">Ký hiệu:</span> <span className="font-numeric font-bold">{formData.invoiceSeries || 'Chưa đọc được'}</span></div>
+                            <div className="text-right"><span className="text-slate-500">Số HĐ:</span> <span className="font-numeric font-extrabold text-slate-950 text-xs">{formData.invoiceNumber || '---'}</span></div>
                             <div><span className="text-slate-500">Ngày lập:</span> <span className="font-bold">{formatDate(formData.invoiceDate)}</span></div>
                             <div className="text-right"><span className="text-slate-500">Tiền tệ:</span> <span className="font-bold">VND</span></div>
                           </div>
@@ -1289,7 +1425,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                         {/* Bên bán */}
                         <div className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-[11px]">
                           <div className="font-extrabold text-slate-950 uppercase">{formData.supplierName || 'Đơn vị bán hàng'}</div>
-                          <div><span className="text-slate-500">Mã số thuế:</span> <span className="font-mono font-bold text-slate-950">{formData.supplierTaxCode || '---'}</span></div>
+                          <div><span className="text-slate-500">Mã số thuế:</span> <span className="font-numeric font-bold text-slate-950">{formData.supplierTaxCode || '---'}</span></div>
                           <div><span className="text-slate-500">Hình thức TT:</span> <span className="font-bold">{formData.paymentMethod === 'CASH' ? 'Tiền mặt' : formData.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : 'Chưa xác định'}</span></div>
                         </div>
 
@@ -1302,17 +1438,17 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                             <span className="col-span-3 text-right">Thành Tiền</span>
                           </div>
                           <div className="grid grid-cols-12 p-2.5 text-[11px] items-center border-b border-slate-100">
-                            <span className="col-span-1 text-center font-mono">1</span>
+                            <span className="col-span-1 text-center font-numeric">1</span>
                             <span className="col-span-6 font-semibold text-slate-900">{formData.itemName || 'Hàng hóa / dịch vụ'}</span>
-                            <span className="col-span-2 text-center font-mono font-bold text-slate-700">{formData.taxRate === undefined ? '—' : `${formData.taxRate}%`}</span>
-                            <span className="col-span-3 text-right font-mono font-bold text-slate-950">{formatVND(formData.preTaxAmount)}</span>
+                            <span className="col-span-2 text-center font-numeric font-bold text-slate-700">{formData.taxRate === undefined ? '—' : `${formData.taxRate}%`}</span>
+                            <span className="col-span-3 text-right font-numeric font-bold text-slate-950">{formatVND(formData.preTaxAmount)}</span>
                           </div>
                         </div>
 
                         {/* Tổng kết tiền */}
                         <div className="space-y-1 text-right text-[11px] pt-1">
-                          <div><span className="text-slate-500">Cộng tiền hàng:</span> <span className="font-mono font-bold">{formatVND(formData.preTaxAmount)}</span></div>
-                          <div><span className="text-slate-500">Tiền thuế GTGT ({formData.taxRate === undefined ? 'chưa rõ' : `${formData.taxRate}%`}):</span> <span className="font-mono font-bold">{formatVND(formData.taxAmount)}</span></div>
+                          <div><span className="text-slate-500">Cộng tiền hàng:</span> <span className="font-numeric font-bold">{formatVND(formData.preTaxAmount)}</span></div>
+                          <div><span className="text-slate-500">Tiền thuế GTGT ({formData.taxRate === undefined ? 'chưa rõ' : `${formData.taxRate}%`}):</span> <span className="font-numeric font-bold">{formatVND(formData.taxAmount)}</span></div>
                           <div className="text-sm font-extrabold text-slate-950 border-t border-slate-200 pt-1.5 mt-1">
                             Tổng thanh toán: <span className="text-blue-900 font-numeric">{formatVND(formData.totalAmount)}</span>
                           </div>
@@ -1386,19 +1522,13 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3 shrink-0">
               <div>
                 <h3 className="text-sm font-bold text-slate-950 uppercase tracking-wide">
-                  Dữ Liệu Bóc Tách Được
+                  Thông tin hóa đơn
                 </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Kiểm tra và hiệu chỉnh thông tin đối soát trước khi thẩm định
+                  Đối chiếu với chứng từ trước khi gửi.
                 </p>
               </div>
 
-              {isParsingDocument && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-lime-50 text-lime-900 border border-lime-300 text-[11px] font-bold animate-pulse">
-                  <Sparkles className="h-3 w-3 text-lime-600 animate-spin" />
-                  <span>Đang trích xuất...</span>
-                </div>
-              )}
             </div>
             {/* Form Fields: Liền mạch, nút thẩm định nằm ngay bên dưới Tổng thanh toán */}
             <form id="extraction-form" onSubmit={handleSubmit} className="space-y-2 text-xs text-slate-800">
@@ -1407,8 +1537,8 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label htmlFor="invoiceNumber" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      Số Hóa Đơn:
+                    <label htmlFor="invoiceNumber" className="block text-xs font-medium text-slate-500">
+                      Số hóa đơn
                     </label>
                   </div>
                   <input
@@ -1423,7 +1553,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                     onMouseLeave={() => setActiveHighlightField(null)}
                     onChange={(e) => handleInputChange('invoiceNumber', e.target.value)}
                     placeholder="VD: 0048123"
-                    className={`w-full px-3 py-2 rounded-lg font-mono font-bold text-xs outline-none transition-all ${
+                    className={`w-full px-3 py-2 rounded-lg font-numeric font-bold text-xs outline-none transition-all ${
                       formErrors.invoiceNumber
                         ? 'bg-rose-50 border-2 border-rose-400 ring-2 ring-rose-200 text-rose-950 focus:border-rose-600 focus:ring-rose-500'
                         : uncertainFields.includes('invoiceNumber')
@@ -1435,8 +1565,8 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label htmlFor="invoiceDate" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      Ngày Lập HĐ:
+                    <label htmlFor="invoiceDate" className="block text-xs font-medium text-slate-500">
+                      Ngày lập
                     </label>
                   </div>
                   <input
@@ -1450,7 +1580,8 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                     onMouseEnter={() => setActiveHighlightField('invoiceDate')}
                     onMouseLeave={() => setActiveHighlightField(null)}
                     onChange={(e) => handleInputChange('invoiceDate', e.target.value)}
-                    className={`w-full px-3 py-2 rounded-lg font-mono font-bold text-xs outline-none transition-all ${
+                    onInput={(e) => handleInputChange('invoiceDate', e.currentTarget.value)}
+                    className={`w-full px-3 py-2 rounded-lg font-numeric font-bold text-xs outline-none transition-all ${
                       formErrors.invoiceDate
                         ? 'bg-rose-50 border-2 border-rose-400 ring-2 ring-rose-200 text-rose-950 focus:border-rose-600 focus:ring-rose-500'
                         : uncertainFields.includes('invoiceDate')
@@ -1466,8 +1597,8 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                 <div className="grid grid-cols-12 gap-2">
                   <div className="col-span-4">
                     <div className="flex items-center justify-between mb-1">
-                      <label htmlFor="supplierTaxCode" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        Mã Số Thuế (MST):
+                      <label htmlFor="supplierTaxCode" className="block text-xs font-medium text-slate-500">
+                        MST bên bán
                       </label>
                       <div className="flex items-center gap-1">
                         {taxLookupLoading && (
@@ -1488,7 +1619,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                         onMouseLeave={() => setActiveHighlightField(null)}
                         onChange={(e) => handleInputChange('supplierTaxCode', e.target.value)}
                         placeholder="MST 10-13 số"
-                        className={`w-full px-3 py-2 rounded-lg font-mono font-bold text-xs outline-none transition-all ${
+                        className={`w-full px-3 py-2 rounded-lg font-numeric font-bold text-xs outline-none transition-all ${
                           formErrors.supplierTaxCode
                             ? 'bg-rose-50 border-2 border-rose-400 ring-2 ring-rose-200 text-rose-950 focus:border-rose-600 focus:ring-rose-500'
                             : uncertainFields.includes('supplierTaxCode')
@@ -1500,8 +1631,8 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                   </div>
                   <div className="col-span-8">
                     <div className="flex items-center justify-between mb-1">
-                      <label htmlFor="supplierName" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                        Tên Nhà Cung Cấp / Bên Bán:
+                      <label htmlFor="supplierName" className="block text-xs font-medium text-slate-500">
+                        Nhà cung cấp
                       </label>
                       <div className="flex items-center gap-1.5">
                         {taxLookupLoading && (
@@ -1539,8 +1670,8 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
               {/* Nhóm 3: Nội Dung Hàng Hóa / Dịch Vụ */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="itemName" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Nội Dung Mặt Hàng / Dịch Vụ:
+                  <label htmlFor="itemName" className="block text-xs font-medium text-slate-500">
+                    Hàng hóa / dịch vụ
                   </label>
                 </div>
                 <input
@@ -1569,8 +1700,8 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
               <div className="grid grid-cols-3 gap-2.5">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label htmlFor="preTaxAmount" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      Tiền Trước Thuế:
+                    <label htmlFor="preTaxAmount" className="block text-xs font-medium text-slate-500">
+                      Tiền trước thuế
                     </label>
                   </div>
                   <input
@@ -1584,7 +1715,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                     onMouseEnter={() => setActiveHighlightField('totalAmount')}
                     onMouseLeave={() => setActiveHighlightField(null)}
                     onChange={(e) => handleInputChange('preTaxAmount', Number(e.target.value))}
-                    className={`w-full px-3 py-2 rounded-lg font-mono font-bold text-xs outline-none transition-all ${
+                    className={`w-full px-3 py-2 rounded-lg font-numeric font-bold text-xs outline-none transition-all ${
                       formErrors.preTaxAmount
                         ? 'bg-rose-50 border-2 border-rose-400 ring-2 ring-rose-200 text-rose-950 focus:border-rose-600 focus:ring-rose-500'
                         : uncertainFields.includes('preTaxAmount') || uncertainFields.includes('totalAmount')
@@ -1595,15 +1726,15 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                 </div>
 
                 <div>
-                  <label htmlFor="taxRate" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                    Thuế Suất GTGT:
+                  <label htmlFor="taxRate" className="block text-xs font-medium text-slate-500 mb-1">
+                    Thuế suất GTGT
                   </label>
                   <select
                     id="taxRate"
                     value={formData.taxRate ?? ''}
                     aria-invalid={Boolean(formErrors.taxRate)}
                     onChange={(e) => handleInputChange('taxRate', e.target.value === '' ? undefined : Number(e.target.value))}
-                    className={`w-full px-2.5 py-2 rounded-lg bg-white border text-slate-950 font-mono font-bold text-xs focus:border-slate-950 outline-none cursor-pointer ${formErrors.taxRate ? 'border-rose-400 ring-1 ring-rose-300' : 'border-slate-200'}`}
+                    className={`w-full px-2.5 py-2 rounded-lg bg-white border text-slate-950 font-numeric font-bold text-xs focus:border-slate-950 outline-none cursor-pointer ${formErrors.taxRate ? 'border-rose-400 ring-1 ring-rose-300' : 'border-slate-200'}`}
                   >
                     <option value="">Chưa xác định</option>
                     <option value={0}>0%</option>
@@ -1614,8 +1745,8 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                 </div>
 
                 <div>
-                  <label htmlFor="paymentMethod" className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                    Hình Thức TT:
+                  <label htmlFor="paymentMethod" className="block text-xs font-medium text-slate-500 mb-1">
+                    Thanh toán
                   </label>
                   <select
                     id="paymentMethod"
@@ -1681,11 +1812,11 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                   <span>HĐ Điều chỉnh / Thay thế</span>
                 </label>
 
-                <span className="ml-auto font-mono text-slate-500">
+                <span className="ml-auto font-numeric text-slate-500">
                   Ngưỡng TM: {formatVND(dynamicConfig?.nonCashThreshold ?? 5_000_000)}
                 </span>
               </div>              <div>
-                <label htmlFor="sellerStatus" className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">Trạng thái mã số thuế bên bán:</label>
+                <label htmlFor="sellerStatus" className="mb-1 block text-xs font-medium text-slate-500">Trạng thái bên bán</label>
                 <select
                   id="sellerStatus"
                   value={formData.sellerStatus}
@@ -1711,7 +1842,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                 </div>
                 <div className="text-right flex flex-col items-end">
                   <div className="text-slate-950">
-                    TỔNG THANH TOÁN: <span id="totalAmount" className="font-extrabold text-sm text-blue-900">{formatVND(formData.totalAmount)}</span>
+                    Tổng thanh toán <span id="totalAmount" className="font-extrabold text-sm text-blue-900">{formatVND(formData.totalAmount)}</span>
                   </div>
                 </div>
               </div>
@@ -1725,7 +1856,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
                   className="w-full font-bold tracking-wide h-10 text-xs cursor-pointer shadow-xs"
                 >
                   <Sparkles className="w-4 h-4 mr-2 text-brand-lime" />
-                  <span>{isEvaluating ? 'ĐANG THẨM ĐỊNH RỦI RO...' : 'THẨM ĐỊNH HỒ SƠ & CHUYỂN TIẾP'}</span>
+                  <span>{isEvaluating ? 'Đang thẩm định…' : 'Thẩm định'}</span>
                 </Button>
               </div>
 
@@ -1736,180 +1867,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
 
       </div>
 
-      {/* ================= TRỢ LÝ ROBOT AI THÂN THIỆN ĐANG CƯỜI (DRAGGABLE TOÀN MÀN HÌNH) ================= */}
-      <div
-        style={
-          robotPos
-            ? {
-                left: `${robotPos.x}px`,
-                top: `${robotPos.y}px`,
-                right: 'auto',
-                bottom: 'auto'
-              }
-            : undefined
-        }
-        className={`fixed z-50 flex flex-col select-none touch-none ${
-          robotPos ? '' : 'bottom-6 right-6'
-        } ${
-          robotPos && robotPos.x < 420 ? 'items-start' : 'items-end'
-        }`}
-      >
-        {/* Bong bóng lời thoại của Robot khi có thông báo/cảnh báo */}
-        {isRobotSpeechOpen && (
-          <section
-            className={`relative flex max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-3xl border bg-white text-slate-900 shadow-2xl animate-in fade-in duration-200 ${
-              robotPos && robotPos.y < 350 ? 'order-last mt-3 mb-0' : 'order-first mb-3 mt-0'
-            } ${robotMessage?.isError ? 'border-amber-200' : 'border-slate-200'}`}
-            aria-label="Trợ lý Tax Referee"
-            role="status"
-            aria-live="polite"
-          >
-            <header className={`flex items-center gap-3 border-b px-4 py-3 ${robotMessage?.isError ? 'border-amber-100 bg-gradient-to-r from-amber-50 to-white' : 'border-sky-100 bg-gradient-to-r from-sky-50 to-white'}`}>
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl shadow-sm ${robotMessage?.isError ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'}`}>
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Tax Referee AI</p>
-                <h3 className="truncate text-sm font-extrabold text-slate-950">{robotMessage?.title || 'Trợ lý chứng từ'}</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsRobotSpeechOpen(false)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white hover:text-slate-800 cursor-pointer"
-                aria-label="Đóng khung chat"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </header>
-
-            <div className="min-h-0 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50/70 to-white p-4">
-              <div className={`rounded-2xl rounded-tl-sm border p-3.5 ${robotMessage?.isError ? 'border-amber-100 bg-amber-50/80' : 'border-sky-100 bg-sky-50/70'}`}>
-                <p className="mb-2 text-[11px] font-semibold text-slate-600">
-                  {robotMessage?.items.length === 1 ? 'Mình có một điểm cần bạn xem:' : `Mình đã gom còn ${robotMessage?.items.length || 0} điểm cần bạn xem:`}
-                </p>
-              {robotMessage?.items && robotMessage.items.length > 0 ? (
-                <ul className="space-y-2">
-                  {robotMessage.items.map((msg, idx) => (
-                    <li key={idx} className="flex items-start gap-2.5 text-xs leading-relaxed text-slate-800">
-                      <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${robotMessage.isError ? 'bg-amber-200 text-amber-900' : 'bg-sky-200 text-sky-900'}`}>{idx + 1}</span>
-                      <span className="pt-0.5">{msg}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-slate-600">Chưa có mục cần xử lý.</p>
-              )}
-              </div>
-              <p className="px-1 text-[10px] leading-relaxed text-slate-400">Đối chiếu các mục này với hóa đơn gốc trước khi thẩm định.</p>
-            </div>
-
-            <footer className="flex items-center justify-between border-t border-slate-100 bg-white px-4 py-2.5">
-              <span className="text-[10px] font-medium text-slate-400">Trợ lý chứng từ</span>
-              <button type="button" onClick={() => setIsRobotSpeechOpen(false)} className="rounded-xl bg-slate-950 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-slate-700 cursor-pointer">Đã xem</button>
-            </footer>
-          </section>
-        )}
-
-        {/* Bong bóng suy nghĩ khi AI đang bóc tách / trích xuất chứng từ */}
-        {isParsingDocument && (
-          <div
-            className={`relative px-3.5 py-2 rounded-2xl bg-slate-950/95 border-2 border-brand-lime shadow-xl text-brand-lime flex items-center gap-2 animate-in fade-in duration-200 ${
-              robotPos && robotPos.y < 350 ? 'order-last mt-2.5 mb-0' : 'order-first mb-2.5 mt-0'
-            }`}
-          >
-            <Sparkles className="h-4 w-4 animate-spin text-brand-lime shrink-0" />
-            <span className="text-xs font-bold text-white tracking-wide">
-              Đang bóc tách chứng từ
-            </span>
-            <span className="inline-flex items-center gap-1 font-mono text-base font-black text-brand-lime">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-lime animate-bounce [animation-delay:-0.32s]"></span>
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-lime animate-bounce [animation-delay:-0.16s]"></span>
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-lime animate-bounce"></span>
-            </span>
-            {/* Đuôi bong bóng suy nghĩ */}
-            <div
-              className={`absolute w-3 h-3 bg-slate-950 border-r-2 border-b-2 border-brand-lime transform ${
-                robotPos && robotPos.y < 350 ? '-top-1.5 right-6 rotate-[225deg]' : '-bottom-1.5 right-6 rotate-45'
-              }`}
-            />
-          </div>
-        )}
-
-        {/* Nút Hình Robot thân thiện đang cười - Hỗ trợ Drag Pan di chuyển vị trí */}
-        <div
-          onPointerDown={handleRobotPointerDown}
-          onPointerMove={handleRobotPointerMove}
-          onPointerUp={handleRobotPointerUp}
-          onPointerCancel={handleRobotPointerUp}
-          className={`group relative p-2 rounded-2xl shadow-xl transition-all duration-200 flex items-center justify-center border-2 select-none ${
-            isDraggingRobot ? 'cursor-grabbing scale-110 shadow-2xl ring-4 ring-brand-lime/40' : 'cursor-grab hover:scale-105'
-          } ${
-            isParsingDocument
-              ? 'bg-slate-950 border-brand-lime ring-4 ring-brand-lime/30 shadow-lime-500/20 shadow-2xl'
-              : robotMessage && isRobotSpeechOpen
-              ? 'bg-slate-950 border-amber-400 ring-4 ring-amber-400/20'
-              : robotMessage && !isRobotSpeechOpen
-              ? robotMessage.isError
-                ? 'bg-slate-950 border-amber-400 ring-2 ring-amber-400/20'
-                : 'bg-slate-950 border-sky-400 ring-2 ring-sky-400/20'
-              : 'bg-slate-950 border-emerald-400 hover:border-brand-lime'
-          }`}
-          title="Bấm để mở trợ lý, giữ chuột để kéo thả robot đến vị trí bất kỳ"
-        >
-          {/* SVG Robot thân thiện */}
-          <svg width="44" height="44" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0 pointer-events-none">
-            {/* Ăng-ten với đầu phát sóng (chỉ ping khi AI đang thực sự bóc tách tài liệu) */}
-            <line x1="32" y1="12" x2="32" y2="4" stroke="#A3E635" strokeWidth="3" strokeLinecap="round" />
-            <circle cx="32" cy="4" r="3.5" fill="#A3E635" className={isParsingDocument ? 'animate-ping' : ''} />
-
-            {/* Tai 2 bên */}
-            <rect x="8" y="24" width="4" height="12" rx="2" fill="#64748B" />
-            <rect x="52" y="24" width="4" height="12" rx="2" fill="#64748B" />
-
-            {/* Khung đầu bo tròn */}
-            <rect x="12" y="12" width="40" height="34" rx="12" fill="#0F172A" stroke={isParsingDocument ? '#A3E635' : '#38BDF8'} strokeWidth="2.5" />
-
-            {/* Màn hình mặt */}
-            <rect x="16" y="16" width="32" height="24" rx="8" fill="#020617" />
-
-            {isParsingDocument ? (
-              /* Trạng thái AI đang bóc tách / suy nghĩ: Hiển thị 3 dấu chấm animation nhảy động bên trong mắt */
-              <g>
-                <circle cx="24" cy="28" r="2.5" fill="#A3E635">
-                  <animate attributeName="opacity" values="0.2;1;0.2" dur="0.9s" repeatCount="indefinite" begin="0s" />
-                  <animate attributeName="cy" values="29;26;29" dur="0.9s" repeatCount="indefinite" begin="0s" />
-                </circle>
-                <circle cx="32" cy="28" r="2.5" fill="#A3E635">
-                  <animate attributeName="opacity" values="0.2;1;0.2" dur="0.9s" repeatCount="indefinite" begin="0.2s" />
-                  <animate attributeName="cy" values="29;26;29" dur="0.9s" repeatCount="indefinite" begin="0.2s" />
-                </circle>
-                <circle cx="40" cy="28" r="2.5" fill="#A3E635">
-                  <animate attributeName="opacity" values="0.2;1;0.2" dur="0.9s" repeatCount="indefinite" begin="0.4s" />
-                  <animate attributeName="cy" values="29;26;29" dur="0.9s" repeatCount="indefinite" begin="0.4s" />
-                </circle>
-              </g>
-            ) : (
-              /* Trạng thái bình thường: Mắt cười híp siêu thân thiện ^ ^ tĩnh và êm dịu */
-              <g>
-                <path d="M21 27C21 24 26 24 26 27" stroke="#38BDF8" strokeWidth="3" strokeLinecap="round" />
-                <path d="M38 27C38 24 43 24 43 27" stroke="#38BDF8" strokeWidth="3" strokeLinecap="round" />
-                <circle cx="21" cy="31" r="2.2" fill="#FB7185" />
-                <circle cx="43" cy="31" r="2.2" fill="#FB7185" />
-                <path d="M27 31C28.5 35 35.5 35 37 31" stroke="#A3E635" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-              </g>
-            )}
-
-            {/* Thân robot */}
-            <rect x="20" y="48" width="24" height="12" rx="6" fill="#1E293B" stroke={isParsingDocument ? '#A3E635' : '#38BDF8'} strokeWidth="2" />
-            <circle cx="32" cy="54" r="2.5" fill="#A3E635" />
-          </svg>
-
-          {/* Badge thông báo tĩnh thanh lịch nếu có tin nhắn mới */}
-          {robotMessage && !isRobotSpeechOpen && (
-            <span className={`absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-slate-950 shadow-sm ${robotMessage.isError ? 'bg-amber-400' : 'bg-sky-400'}`} />
-          )}
-        </div>
-      </div>
+      <CapturePhoneDialog open={captureDialogOpen} onOpenChange={setCaptureDialogOpen} onProcessingStart={startCaptureProcessing} onProcessingEnd={finishCaptureProcessing} onExtraction={applyCaptureExtraction} />
     </div>
   );
 };

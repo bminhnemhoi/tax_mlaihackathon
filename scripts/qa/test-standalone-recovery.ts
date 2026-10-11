@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn,ChildProcess} from 'node:child_process';
 import {challengeCases} from '../../data/verification/challengeCases';
+import Database from 'better-sqlite3';
 async function main(){
 const build=path.resolve(process.env.NEXT_BUILD_DIR || '.next');
 const root=await fs.mkdtemp(path.join(os.tmpdir(),'tax-referee-recovery-'));const runtime=path.join(root,'runtime'),backup=path.join(root,'backup');const port='3002',origin=`http://127.0.0.1:${port}`;let child:ChildProcess|undefined;
@@ -12,10 +13,18 @@ async function start(){child=spawn(process.execPath,[path.join(build,'standalone
 try{
  await start();let response=await fetch(origin+'/api/demo/session',{method:'POST'});assert.equal(response.status,200);const cookie=response.headers.getSetCookie().map(s=>s.split(';')[0]).join('; ');const headers={cookie,'Content-Type':'application/json'};
  const inv={...challengeCases[0].invoice,id:'RECOVERY',invoiceNumber:'RECOVERY',buyerTaxCode:'0100109106'};
+ let expectedRevision=1;
  response=await fetch(origin+'/api/evaluate',{method:'POST',headers,body:JSON.stringify({invoice:inv,forceLocalOnly:true})});assert.equal(response.status,200);
  response=await fetch(origin+'/api/documents/parse',{method:'POST',headers,body:JSON.stringify({rawText:'Hóa đơn số RESTORE123; Tổng tiền 1.100.000'})});assert.equal(response.status,200);const artifact=(await response.json()).artifactId;assert.ok(artifact);
- const check=async()=>{const r=await fetch(origin+'/api/inbox',{headers});assert.equal(r.status,200);const row=(await r.json()).items[0];assert.equal(row.status,'APPROVED');assert.ok(row.internalVoucherId);assert.equal(row.revision,1);const source=await fetch(origin+`/api/documents/artifacts/${artifact}`,{headers});assert.equal(source.status,200);assert.ok((await source.text()).includes('RESTORE123'));const audit=await fetch(origin+'/api/audit',{headers});assert.equal(audit.status,200);};
+ const check=async()=>{const r=await fetch(origin+'/api/inbox',{headers});assert.equal(r.status,200);const row=(await r.json()).items[0];assert.equal(row.status,'APPROVED');assert.ok(row.internalVoucherId);assert.equal(row.revision,expectedRevision);const source=await fetch(origin+`/api/documents/artifacts/${artifact}`,{headers});assert.equal(source.status,200);assert.ok((await source.text()).includes('RESTORE123'));const audit=await fetch(origin+'/api/audit',{headers});assert.equal(audit.status,200);};
  await check();await stop();await start();await check();console.log('PASS standalone restart: session, invoice revision, voucher, audit, artifact');
+ await stop();
+ const demoId=cookie.split('; ').find(x=>x.startsWith('tax_referee_demo='))!.split('=')[1];
+ const interrupted=new Database(path.join(runtime,'demo',demoId+'.sqlite'));
+ interrupted.prepare("UPDATE invoices SET status='EVALUATING',revision=2,approved_deductible_tax=0,evaluation_attempt_id='interrupted-process',evaluation_deadline='2000-01-01T00:00:00.000Z' WHERE id=?").run(inv.id);
+ interrupted.prepare('DELETE FROM internal_vouchers WHERE invoice_id=?').run(inv.id);interrupted.close();
+ await start();response=await fetch(origin+'/api/inbox',{headers});const recovered=(await response.json()).items[0];assert.equal(recovered.status,'ON_HOLD');assert.equal(recovered.revision,3);assert.equal(recovered.latestAudit.payload.after.approvedTax,0);assert.ok(!recovered.internalVoucherId);
+ response=await fetch(origin+'/api/evaluate',{method:'POST',headers,body:JSON.stringify({invoice:inv,forceLocalOnly:true,expectedRevision:3})});assert.equal(response.status,200);expectedRevision=4;await check();console.log('PASS standalone expired in-flight evaluation recovery and retry');
  await stop();await fs.cp(runtime,backup,{recursive:true});await fs.rm(runtime,{recursive:true});await fs.cp(backup,runtime,{recursive:true});await start();await check();console.log('PASS standalone offline snapshot/restore');
 }finally{await stop();await fs.rm(root,{recursive:true,force:true});}
 

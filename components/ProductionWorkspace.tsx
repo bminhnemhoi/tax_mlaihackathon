@@ -1,6 +1,7 @@
 'use client';
 import WorkflowAuditHistory from '@/components/WorkflowAuditHistory';
 import WorkflowControls from '@/components/WorkflowControls';
+import {caseDeadline, riskGroupLabels} from '@/lib/workflowPresentation';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -83,6 +84,9 @@ type InboxItem = {
   policyVersion: string | null;
   legalVersion: string | null;
   updatedAt: string;
+  createdAt?: string;
+  evaluatedAt?: string|null;
+  dossierReady?: boolean;
   resolution: { role: string; option: string; action: string; accepted: boolean; resolvedAt: string } | null;
   latestAudit?: { eventType: string; actorId: string; payload: Record<string, unknown>; at: string } | null;
 };
@@ -102,7 +106,7 @@ const statusConfig: Record<string, { label: string; variant: 'success' | 'warnin
   WAITING_CFO: { label: 'Chờ CFO', variant: 'destructive' },
   PAUSED: {label:'Đã dừng xử lý',variant:'warning'},
   EVALUATING: {label:'Đang đánh giá',variant:'info'},
-  APPROVED: { label: 'Đã tự xử lý / phê duyệt', variant: 'success' },
+  APPROVED: { label: 'Đã hoàn tất', variant: 'success' },
   REJECTED: { label: 'Từ chối', variant: 'destructive' },
   ON_HOLD: { label: 'Tạm dừng', variant: 'secondary' },
   FORWARDED: { label: 'Đã chuyển cấp trên', variant: 'warning' }
@@ -181,39 +185,29 @@ export function ProductionWorkspace({
     if (!['WAITING_CHIEF_ACCOUNTANT', 'WAITING_CFO', 'NEEDS_CONFIRMATION', 'FORWARDED', 'ROUTINE_PROPOSED'].includes(item.status)) {
       return null;
     }
-    const baseTime = new Date(item.updatedAt || item.invoiceDate).getTime();
-    const elapsedHours = (Date.now() - baseTime) / (1000 * 60 * 60);
-    const remainingHours = Math.max(0, 24 - (elapsedHours % 24));
-
-    if (remainingHours <= 4) {
-      return (
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200" title="Hạn xử lý giải trình SLA 24h">
-          <Clock className="h-2.5 w-2.5" />
-          SLA: {Math.ceil(remainingHours)}h (Gấp)
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Hạn xử lý giải trình SLA 24h">
-        <Clock className="h-2.5 w-2.5" />
-        SLA: {Math.ceil(remainingHours)}h
-      </span>
-    );
+    const sla=caseDeadline(item.evaluatedAt || item.createdAt || item.updatedAt);
+    if(!sla)return null;
+    const urgent=sla.overdue || sla.hours<=4;
+    return <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${urgent?'border-rose-200 bg-rose-50 text-rose-800':'border-amber-200 bg-amber-50 text-amber-800'}`} title="Mốc theo dõi nội bộ 24 giờ kể từ lượt đánh giá">
+      <Clock className="h-3 w-3" aria-hidden="true"/>{sla.overdue?`Quá hạn ${sla.hours}h`:`Còn ${sla.hours}h`}
+    </span>;
   };
+
+  const itemStatusLabel=(item:InboxItem)=>item.status==='APPROVED' ? item.decision?.status==='ROUTINE' && !item.resolution ? 'Đã tự xử lý' : 'Đã được phê duyệt' : statusConfig[item.status]?.label || item.status;
 
   const auditEntries: AuditEntry[] = useMemo(() => {
     return items
       .filter((item) => Boolean(item.latestAudit))
       .map((item) => {
         const id = `AUDIT-${item.id}`;
-        const isOverridden = item.latestAudit?.eventType === 'INVOICE_HUMAN_OVERRIDE';
+        const isOverridden = ['INVOICE_HUMAN_OVERRIDE','OVERRIDE'].includes(item.latestAudit?.eventType || '');
         const initialStatus = item.decision?.status || (item.status === 'ROUTINE_PROPOSED' ? 'ROUTINE' : 'ESCALATED');
         return {
           id,
           invoiceRecordId: item.id,
           evaluationId: item.evaluationId || undefined,
           currentStatus: item.status,
-          timestamp: item.resolution?.resolvedAt || item.updatedAt || new Date().toISOString(),
+          timestamp: item.latestAudit?.at || item.updatedAt,
           invoiceId: item.invoice.invoiceNumber || item.id,
           supplierName: item.supplierName,
           totalAmount: item.totalAmount,
@@ -222,7 +216,7 @@ export function ProductionWorkspace({
           actionTaken: isOverridden
             ? 'ĐÃ GHI ĐÈ BỞI CON NGƯỜI (HUMAN OVERRIDE)'
             : item.latestAudit?.eventType === 'ROUTINE_AUTO_APPROVED'
-            ? 'Tự duyệt Routine · chứng từ nội bộ'
+            ? 'Đã tự duyệt · chứng từ nội bộ'
             : item.resolution?.action
             ? item.resolution.action
             : item.status === 'APPROVED'
@@ -230,12 +224,13 @@ export function ProductionWorkspace({
             : item.status === 'ROUTINE_PROPOSED'
             ? 'Đề xuất tự duyệt'
             : item.status,
-          actor: ((item.latestAudit?.payload?.actorRole as any) || (item.resolution?.role as any) || (initialStatus === 'ROUTINE' ? 'SYSTEM_REFEREE' : 'CHIEF_ACCOUNTANT')),
+          actor: ((item.latestAudit?.payload?.actorRole as any) || (item.resolution?.role as any) || (item.latestAudit?.actorId ? 'UNKNOWN' : 'SYSTEM_REFEREE')),
           plainExplanation: item.decision?.plainExplanation || 'Đã kiểm tra đối chiếu qua bộ quy tắc Tax-SOP-2026',
-          canOverride: true,
+          canOverride: Boolean(item.allowedActions?.approve || (isOverridden && item.allowedActions?.undo)),
+          canUndo: Boolean(item.allowedActions?.undo),
           isOverridden,
-          taxDefenseDossierReady: true,
-          applicableRegulations: item.decision?.applicableRegulations || ['48/2024/QH15', '123/2020/NĐ-CP'],
+          taxDefenseDossierReady: item.dossierReady===true,
+          applicableRegulations: item.decision?.applicableRegulations || [],
           sopVersion: item.policyVersion || 'TAX-SOP-2026-v2.5'
         };
       });
@@ -270,8 +265,9 @@ export function ProductionWorkspace({
         onLogout();
         return;
       }
-      const inbox = await inboxRes.json();
-      const runtime = await runtimeRes.json();
+      const inbox = await inboxRes.json().catch(()=>({error:`Không thể tải Inbox (HTTP ${inboxRes.status}).`}));
+      const runtime = await runtimeRes.json().catch(()=>({error:`Không thể tải dữ liệu Workspace (HTTP ${runtimeRes.status}).`}));
+      if(!runtimeRes.ok)throw new Error(runtime.error || 'Không thể tải dữ liệu Workspace.');
       setIsDemo(runtime.demo===true);
       if (!inboxRes.ok) throw new Error(inbox.error || 'Lỗi tải Inbox');
       setItems(inbox.items || []);
@@ -444,10 +440,10 @@ export function ProductionWorkspace({
   };
 
   const navItems: Array<{ id: View; label: string; icon: React.ReactNode; count?: number }> = [
-    { id: 'inbox', label: 'Bàn Thẩm Định', icon: <Inbox className="h-4 w-4" />, count: pendingCount },
-    { id: 'receive', label: 'Tiếp Nhận Chứng Từ', icon: <FileText className="h-4 w-4" /> },
-    { id: 'approval', label: 'Hồ Sơ Chờ Duyệt', icon: <ClipboardCheck className="h-4 w-4" />, count: approvalItems.length },
-    { id: 'dossier', label: 'Nhật Ký & Bằng Chứng', icon: <History className="h-4 w-4" /> },
+    { id: 'inbox', label: 'Thẩm định', icon: <Inbox className="h-4 w-4" />, count: pendingCount },
+    { id: 'receive', label: 'Tiếp nhận', icon: <FileText className="h-4 w-4" /> },
+    { id: 'approval', label: 'Chờ duyệt', icon: <ClipboardCheck className="h-4 w-4" />, count: approvalItems.length },
+    { id: 'dossier', label: 'Nhật ký', icon: <History className="h-4 w-4" /> },
   ];
 
   const visibleList = view === 'approval' ? approvalItems : [...items].sort((a,b)=>Number(['APPROVED','REJECTED'].includes(a.status))-Number(['APPROVED','REJECTED'].includes(b.status)));
@@ -524,10 +520,8 @@ export function ProductionWorkspace({
       return (
         <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-subtle">
           <FileText className="mb-2 h-10 w-10 text-slate-300" />
-          <p className="font-bold text-slate-900 text-base">Chọn hóa đơn để xem kết quả thẩm tra</p>
-          <p className="mt-1 text-xs text-slate-500 max-w-xs">
-            Bấm vào bất kỳ dòng hóa đơn nào bên trái để đối soát.
-          </p>
+          <p className="font-bold text-slate-900 text-base">Chọn hóa đơn</p>
+
         </div>
       );
     }
@@ -540,7 +534,7 @@ export function ProductionWorkspace({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Badge variant={statusConfig[selected.status]?.variant || 'secondary'}>
-                {statusConfig[selected.status]?.label || selected.status}
+                {itemStatusLabel(selected)}
               </Badge>
               {decision?.status === 'ROUTINE' && decision.precedentApplied && (
                 <Badge variant="success">ÁP DỤNG TIỀN LỆ</Badge>
@@ -552,7 +546,7 @@ export function ProductionWorkspace({
                 <Badge variant="info">TÁCH THUẾ TẠM TÍNH (CV 2392)</Badge>
               )}
             </div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
               HĐ #{selected.invoiceNumber}
             </h2>
             <p className="text-sm font-bold text-slate-700 mt-0.5">{selected.supplierName}</p>
@@ -582,19 +576,19 @@ export function ProductionWorkspace({
         {/* 3 Stat Numbers - To, Rõ, Đậm */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Tổng thanh toán</span>
+            <span className="text-xs font-semibold text-slate-500">Tổng thanh toán</span>
             <div className="text-lg font-extrabold font-numeric text-slate-950 mt-1">
               {formatVND(selected.totalAmount)}
             </div>
           </div>
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Thuế GTGT</span>
+            <span className="text-xs font-semibold text-slate-500">Thuế GTGT</span>
             <div className="text-lg font-extrabold font-numeric text-slate-950 mt-1">
               {formatVND(selected.taxAmount)}
             </div>
           </div>
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Ngày lập</span>
+            <span className="text-xs font-semibold text-slate-500">Ngày lập</span>
             <div className="text-base font-bold text-slate-950 mt-1">
               {selected.review?.unresolvedFields?.includes("invoiceDate")?"Chưa xác minh":formatDate(selected.invoiceDate)}
             </div>
@@ -607,15 +601,10 @@ export function ProductionWorkspace({
             <div className="flex items-start gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-700 shrink-0" />
               <div>
-                <h3 className="font-extrabold text-emerald-950 text-sm uppercase tracking-wider">
-                  KẾT QUẢ THƯỜNG QUY
+                <h3 className="font-semibold text-emerald-950 text-sm">
+                  Thường quy
                 </h3>
-                <p className="mt-1 text-sm font-semibold text-emerald-900 leading-relaxed">
-                  {decision.plainExplanation}
-                </p>
-                <p className="mt-2 text-xs text-slate-700 font-numeric font-semibold">
-                  Căn cứ: Thông tư 219/2013/TT-BTC &amp; Nghị định 123/2020/NĐ-CP
-                </p>
+                <details className="mt-2 text-xs text-emerald-900"><summary className="cursor-pointer font-medium">Chi tiết đánh giá</summary><p className="mt-2 leading-relaxed">{decision.plainExplanation}</p></details>
               </div>
             </div>
             <p className="text-sm font-semibold">{selected.status==='APPROVED'?'Đã tự xử lý và tạo chứng từ nội bộ.':'Hồ sơ đã bị can thiệp; xem trạng thái hiện hành trước khi xuất chứng từ.'}</p>
@@ -629,8 +618,8 @@ export function ProductionWorkspace({
             <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-5 space-y-2">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-700" />
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-900">
-                  CẦN XỬ LÝ NGOẠI LỆ ({decision.riskGroup})
+                <span className="text-xs font-semibold text-amber-900">
+                  {riskGroupLabels[decision.riskGroup]}
                 </span>
               </div>
               <h3 className="text-base font-bold text-slate-950 leading-snug">
@@ -645,9 +634,9 @@ export function ProductionWorkspace({
             {/* Danh sách toàn bộ vi phạm (IMP-P0: Multi-finding Engine) */}
             {decision.findings && decision.findings.length > 1 && (
               <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-2.5">
-                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-600">
-                  <span>Toàn bộ phát hiện vi phạm ({decision.findings.length})</span>
-                  <span className="text-[10px] text-slate-500 font-numeric font-medium">Ưu tiên: Luật định &gt; Dữ liệu &gt; Nội bộ &gt; Thẩm quyền</span>
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                  <span>Phát hiện ({decision.findings.length})</span>
+
                 </div>
                 <div className="space-y-1.5">
                   {decision.findings.map((f, i) => (
@@ -712,12 +701,13 @@ export function ProductionWorkspace({
               ))}
             </div>
 
-            {/* Tách thuế tạm tính theo Công văn 2392/TCT-CS (FR-9.2) */}
+            <details className="rounded-xl border border-slate-200 p-3 text-xs"><summary className="cursor-pointer font-medium text-slate-700">Giữ thuế tạm thời{provisionalHoldIds.has(selected.id) ? ' · Đang giữ' : ''}</summary>
+            {/* Tách thuế tạm tính */}
             <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-1.5 text-xs font-bold text-blue-950 uppercase tracking-wide">
                   <ShieldAlert className="h-4 w-4 text-blue-700" />
-                  <span>Cơ chế Tách Thuế Tạm Tính (CV 2392/TCT-CS)</span>
+                  <span>Giữ thuế tạm thời</span>
                 </div>
                 <p className="text-xs text-blue-900 mt-1 leading-relaxed">
                   {provisionalHoldIds.has(selected.id)
@@ -735,10 +725,11 @@ export function ProductionWorkspace({
                     : 'border-blue-300 text-blue-900 hover:bg-blue-100'
                 }`}
               >
-                {provisionalHoldIds.has(selected.id) ? 'Đã Tách Thuế (CV 2392)' : 'Tách Thuế Tạm Tính'}
+                {provisionalHoldIds.has(selected.id) ? 'Đã giữ thuế' : 'Giữ thuế'}
               </Button>
             </div>
 
+            </details>
             {!roleCanApprove(user, selected) && (
               <p className="text-xs font-bold text-amber-700 text-center">
                 Đang chờ cấp thẩm quyền ({['WAITING_CFO', 'FORWARDED'].includes(selected.status) ? 'CFO' : 'Kế toán trưởng'}) phê duyệt.
@@ -769,10 +760,8 @@ export function ProductionWorkspace({
   // Inbox List Table
   const renderList = (list: InboxItem[]) => (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-subtle">
-      <div className="hidden grid-cols-[36px_1.5fr_1fr_1fr_0.8fr] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-600 md:grid items-center">
-        <div className="flex items-center justify-center">
-          <span aria-hidden="true">#</span>
-        </div>
+      <div className="hidden grid-cols-[1.5fr_1fr_1fr_0.8fr] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600 md:grid items-center">
+
         <span>Hóa đơn</span>
         <span>Nhà cung cấp</span>
         <span className="text-right">Tổng tiền (VNĐ)</span>
@@ -793,25 +782,16 @@ export function ProductionWorkspace({
         return (
           <div
             key={item.id}
+            role="button"
+            tabIndex={0}
+            aria-label={`Mở hóa đơn ${item.invoiceNumber}`}
+            aria-pressed={isSelected}
+            onKeyDown={event=>{if(event.key==='Enter' || event.key===' '){event.preventDefault();setSelected(item);}}}
             onClick={() => setSelected(item)}
-            className={`grid w-full gap-2 border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 md:grid-cols-[36px_1.5fr_1fr_1fr_0.8fr] md:items-center md:gap-3 cursor-pointer ${
+            className={`grid w-full gap-2 border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 md:grid-cols-[1.5fr_1fr_1fr_0.8fr] md:items-center md:gap-3 cursor-pointer ${
               isSelected ? 'bg-slate-100/80 font-medium' : ''
             } ${isChecked ? 'bg-amber-50/50' : ''}`}
           >
-            {/* Checkbox */}
-            <div className="flex items-center justify-center">
-              {isRoutine ? (
-                <button
-                  type="button"
-                  onClick={(e) => toggleSelectRoutine(item.id, e)}
-                  className="text-slate-500 hover:text-slate-950 cursor-pointer"
-                >
-                  {isChecked ? <CheckSquare className="h-4 w-4 text-slate-950" /> : <Square className="h-4 w-4" />}
-                </button>
-              ) : (
-                <span className="h-4 w-4 rounded border border-slate-200 bg-slate-100 block opacity-40 cursor-not-allowed" />
-              )}
-            </div>
 
             <div>
               <div className="font-bold text-sm text-slate-950 flex items-center gap-1.5 flex-wrap">
@@ -831,8 +811,8 @@ export function ProductionWorkspace({
             </div>
 
             <div className="text-center space-y-1">
-              <Badge variant={statusConfig[item.status]?.variant || 'secondary'}>
-                {statusConfig[item.status]?.label || item.status}
+              <Badge className="normal-case tracking-normal font-medium" variant={statusConfig[item.status]?.variant || 'secondary'}>
+                {itemStatusLabel(item)}
               </Badge>
               {provisionalHoldIds.has(item.id) && (
                 <span className="inline-block text-[10px] font-bold text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
@@ -867,10 +847,10 @@ export function ProductionWorkspace({
     <div className={`relative ${view === 'receive' ? 'min-h-screen md:h-screen md:overflow-hidden' : 'min-h-screen'} bg-slate-50/70 text-slate-900 selection:bg-brand-lime selection:text-slate-950 flex flex-col md:flex-row`}>
       
       <nav className="flex md:hidden flex-wrap gap-2 border-b bg-white p-3" aria-label="Điều hướng chính">{navItems.filter(i=>i.id!=='approval').map(i=><button key={i.id} onClick={()=>setView(i.id)} className={`rounded border p-2 text-xs ${view===i.id?'bg-slate-950 text-white':''}`}>{i.label}</button>)}<a className="rounded border p-2 text-xs" href="/verify">Verify</a>
-        <details className="w-full rounded border p-2 text-xs"><summary className="cursor-pointer font-semibold">Mở rộng & SOP</summary>
-          <div className="mt-2 flex flex-wrap gap-2">{([{id:'banking',label:'Ngân hàng'},{id:'reconciliation',label:'TCT'},{id:'suppliers',label:'Nhà cung cấp'},{id:'reports',label:'Báo cáo thử nghiệm'}] as const).map(i=><button key={i.id} onClick={()=>setView(i.id)} className="min-h-10 rounded border px-3">{i.label}</button>)}
+        <details className="w-full rounded border p-2 text-xs"><summary className="cursor-pointer font-semibold">Công cụ</summary>
+          <div className="mt-2 flex flex-wrap gap-2">{([{id:'banking',label:'Ngân hàng'},{id:'reconciliation',label:'TCT'},{id:'suppliers',label:'Nhà cung cấp'},{id:'reports',label:'Báo cáo'}] as const).map(i=><button key={i.id} onClick={()=>setView(i.id)} className="min-h-10 rounded border px-3">{i.label}</button>)}
             <button className="min-h-10 rounded border px-3" onClick={()=>setLedgerSyncOpen(true)}>ERP · Xuất payload</button>
-            <button className="min-h-10 rounded border px-3" onClick={(event)=>{ event.currentTarget.focus(); setPolicyOpen(true); }}>Tiền Lệ & SOP</button>
+            <button className="min-h-10 rounded border px-3" onClick={(event)=>{ event.currentTarget.focus(); setPolicyOpen(true); }}>Quy chế</button>
           </div>
         </details></nav>
       {/* Collapsible Left Sidebar (Fixed Icon Coordinates & Persistent Slots) */}
@@ -915,9 +895,7 @@ export function ProductionWorkspace({
                 isSidebarCollapsed ? 'opacity-0 pointer-events-none hidden' : 'opacity-100'
               }`}>
                 <span className="font-semibold text-[15px] tracking-tight text-slate-900">Tax Referee</span>
-                <span className="font-mono text-[9px] font-bold text-slate-500 uppercase tracking-wider bg-slate-200/70 px-1 py-0.5 rounded">
-                  Beta
-                </span>
+
               </div>
             </div>
 
@@ -1001,35 +979,7 @@ export function ProductionWorkspace({
               );
             })}
 
-            <details className="my-3 rounded border p-2 text-xs"><summary className="cursor-pointer font-semibold">Mở rộng · demo / xuất payload</summary><p className="my-2 text-slate-600">Ngân hàng/TCT/nhà cung cấp là nguồn demo. ERP chỉ tạo payload, chưa gửi hệ thống kế toán.</p>{([{id:'banking',label:'Ngân hàng'},{id:'reconciliation',label:'TCT'},{id:'suppliers',label:'Nhà cung cấp'},{id:'reports',label:'Báo cáo thử nghiệm'}] as const).map(i=><button key={i.id} onClick={()=>setView(i.id)} className="block w-full rounded p-2 text-left hover:bg-slate-100">{i.label}</button>)}<button onClick={()=>setLedgerSyncOpen(true)} className="block p-2">ERP · Xuất payload</button></details>
-            {/* Mục Cấu hình SOP (cho Kế toán trưởng & CFO) */}
-            {(user.role === 'CHIEF_ACCOUNTANT' || user.role === 'CFO') && (
-              <div className="relative group/navitem flex items-center h-9 w-[240px]">
-                <button
-                  type="button"
-                  onClick={(event) => { event.currentTarget.focus(); setPolicyOpen(true); }}
-                  className={`flex h-9 items-center rounded-lg text-[13px] font-medium text-slate-700 hover:bg-black/5 hover:text-slate-950 transition-all duration-200 cursor-pointer overflow-hidden ${
-                    isSidebarCollapsed ? 'w-9' : 'w-[240px]'
-                  }`}
-                  aria-label="Cấu hình SOP"
-                >
-                  <div className="w-9 h-9 shrink-0 flex items-center justify-center text-slate-500">
-                    <Settings2 className="h-4 w-4" />
-                  </div>
-                  <div className={`flex items-center flex-1 min-w-0 pr-2.5 whitespace-nowrap transition-opacity duration-150 ${
-                    isSidebarCollapsed ? 'opacity-0 pointer-events-none hidden' : 'opacity-100'
-                  }`}>
-                    <span className="truncate">Cấu hình SOP</span>
-                  </div>
-                </button>
-
-                {isSidebarCollapsed && (
-                  <div className="pointer-events-none absolute left-[calc(100%+8px)] z-50 hidden rounded-md bg-slate-900/90 backdrop-blur-xs px-2.5 py-1 text-[11px] font-medium text-white shadow-lg group-hover/navitem:flex items-center whitespace-nowrap animate-in fade-in-0 zoom-in-95 duration-100">
-                    Cấu hình SOP
-                  </div>
-                )}
-              </div>
-            )}
+            <details className="my-3 rounded border p-2 text-xs"><summary className="cursor-pointer font-semibold">Công cụ</summary><p className="my-2 text-slate-500">Dữ liệu demo · ERP chỉ xuất payload.</p>{([{id:'banking',label:'Ngân hàng'},{id:'reconciliation',label:'TCT'},{id:'suppliers',label:'Nhà cung cấp'},{id:'reports',label:'Báo cáo'}] as const).map(i=><button key={i.id} onClick={()=>setView(i.id)} className="block w-full rounded p-2 text-left hover:bg-slate-100">{i.label}</button>)}<button onClick={()=>setLedgerSyncOpen(true)} className="block p-2">ERP · Xuất payload</button></details>
           </div>
 
           {/* ================= FOOTER: USER AVATAR CỐ ĐỊNH ================= */}
@@ -1083,11 +1033,13 @@ export function ProductionWorkspace({
             {/* Left: Role Switcher & Live Engine Beacon */}
             <div className="flex items-center gap-3">
               <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200">
-                {(isDemo ? ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'] as const : [user.role]).map((r) => {
+                {(['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'] as const).map((r) => {
                   const isActive = user.role === r;
                   return (
                     <button
                       key={r}
+                      aria-pressed={isActive}
+                      title="Chọn vai trò trải nghiệm MVP"
                       onClick={() => void switchRole(r)}
                       className={`rounded-lg px-2.5 sm:px-3 py-1 text-xs font-bold transition cursor-pointer ${
                         isActive
@@ -1101,10 +1053,7 @@ export function ProductionWorkspace({
                 })}
               </div>
 
-              <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-50/80 border border-emerald-200 text-emerald-800 text-xs font-semibold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Quy tắc tất định · SOP 2026</span>
-              </div>
+
             </div>
 
             {/* Right: Actions, Benchmark link & logout */}
@@ -1117,7 +1066,7 @@ export function ProductionWorkspace({
                 title="Bảng Quản trị Tiền lệ & Quy chế SOP (FR-6)"
               >
                 <BookOpen className="h-3.5 w-3.5 text-blue-600" />
-                Tiền Lệ &amp; SOP
+                Quy chế
               </Button>
 
               <Link
@@ -1126,13 +1075,10 @@ export function ProductionWorkspace({
                 title="Mở bộ kiểm thử tự động 90s theo Đề bài A"
               >
                 <ArrowRight className="h-3.5 w-3.5 text-emerald-600" />
-                Kiểm Thử 90s (Benchmark)
+                Verify
               </Link>
 
-              <div className="text-right hidden sm:block">
-                <div className="text-xs font-bold text-slate-950">{user.displayName}</div>
-                <div className="text-[11px] text-slate-500 font-numeric font-medium">{user.email}</div>
-              </div>
+              <span className="hidden sm:inline text-xs text-slate-500">{isDemo ? 'Demo riêng' : 'Nội bộ'}</span>
 
               <Button
                 size="icon"
@@ -1166,11 +1112,11 @@ export function ProductionWorkspace({
             {/* Action & Reset Bar */}
             {view !== 'receive' && <div className="flex items-center justify-between gap-3">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-950">
-                  {view === 'approval' ? 'Hồ Sơ Chờ Duyệt' : view === 'dossier' ? 'Nhật Ký Kiểm Toán & Hồ Sơ Bằng Chứng (Audit Trail)' : view === 'reports' ? 'Báo Cáo Thuế' : view === 'reconciliation' ? 'Đối Soát Cổng TCT' : view === 'banking' ? 'Đối Soát Sổ Phụ Ngân Hàng' : view === 'suppliers' ? 'Danh Mục Nhà Cung Cấp' : 'Bàn Làm Việc Kế Toán'}
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+                  {view === 'approval' ? 'Chờ duyệt' : view === 'dossier' ? 'Nhật ký' : view === 'reports' ? 'Báo cáo thuế' : view === 'reconciliation' ? 'Đối soát TCT' : view === 'banking' ? 'Đối soát ngân hàng' : view === 'suppliers' ? 'Nhà cung cấp' : 'Thẩm định'}
                 </h1>
               </div>
-              <Button
+              {isDemo && <Button
                 size="sm"
                 variant="outline"
                 onClick={() => void handleResetWorkspace()}
@@ -1179,8 +1125,8 @@ export function ProductionWorkspace({
                 title="Reset về trạng thái chưa có hóa đơn nào được gửi lên"
               >
                 <RotateCcw className={`h-3.5 w-3.5 mr-1.5 ${isResetting ? 'animate-spin' : ''}`} />
-                <span>{isResetting ? 'Đang reset...' : 'Reset'}</span>
-              </Button>
+                <span>{isResetting ? 'Đang xóa…' : 'Xóa dữ liệu demo'}</span>
+              </Button>}
             </div>}
 
             {['reports','reconciliation','banking','suppliers'].includes(view) && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm">Mở rộng sử dụng dữ liệu demo hoặc adapter xuất payload. Chưa xác nhận kết nối ERP, ngân hàng, TCT hoặc cập nhật pháp luật trực tiếp.</p>}
@@ -1193,42 +1139,38 @@ export function ProductionWorkspace({
             )}
 
             {/* 4 Stat Metric Cards (Swiss FinTech Precision & High Density) */}
-            {!loading && !['receive', 'reports', 'reconciliation', 'banking', 'suppliers'].includes(view) && (
+            {!loading && ['inbox','approval'].includes(view) && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-subtle hover:border-slate-300 transition-colors">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Cần xử lý</span>
+                    <span className="text-xs font-semibold text-slate-500">Cần xử lý</span>
                     <span className="w-2 h-2 rounded-full bg-slate-400" />
                   </div>
-                  <div className="text-3xl font-extrabold font-numeric text-slate-950 mt-1.5">{pendingCount}</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-1">Toàn bộ hồ sơ trong hàng đợi</div>
+                  <div className="text-2xl font-semibold font-numeric text-slate-950 mt-1.5">{pendingCount}</div>
                 </div>
 
                 <div className="p-4 rounded-xl bg-white border border-emerald-100 shadow-subtle hover:border-emerald-300 transition-colors">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-700">Tự duyệt Routine</span>
+                    <span className="text-xs font-semibold text-emerald-700">Đã tự duyệt</span>
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
                   </div>
-                  <div className="text-3xl font-extrabold font-numeric text-emerald-700 mt-1.5">{autoApprovedRoutineCount}</div>
-                  <div className="text-[11px] text-emerald-700/70 font-medium mt-1">Đã duyệt nội bộ, chờ kế toán xuất sổ</div>
+                  <div className="text-2xl font-semibold font-numeric text-emerald-700 mt-1.5">{autoApprovedRoutineCount}</div>
                 </div>
 
                 <div className="p-4 rounded-xl bg-white border border-amber-100 shadow-subtle hover:border-amber-300 transition-colors">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-700">Chờ KTT Duyệt</span>
+                    <span className="text-xs font-semibold text-amber-700">Chờ KTT</span>
                     <span className="w-2 h-2 rounded-full bg-amber-500" />
                   </div>
-                  <div className="text-3xl font-extrabold font-numeric text-amber-700 mt-1.5">{counts.WAITING_CHIEF_ACCOUNTANT || 0}</div>
-                  <div className="text-[11px] text-amber-700/70 font-medium mt-1">Ngoại lệ thuế & tiền lệ mới</div>
+                  <div className="text-2xl font-semibold font-numeric text-amber-700 mt-1.5">{counts.WAITING_CHIEF_ACCOUNTANT || 0}</div>
                 </div>
 
                 <div className="p-4 rounded-xl bg-white border border-rose-100 shadow-subtle hover:border-rose-300 transition-colors">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Chờ CFO Phán Quyết</span>
+                    <span className="text-xs font-semibold text-rose-700">Chờ CFO</span>
                     <span className="w-2 h-2 rounded-full bg-rose-500" />
                   </div>
-                  <div className="text-3xl font-extrabold font-numeric text-rose-700 mt-1.5">{counts.WAITING_CFO || 0}</div>
-                  <div className="text-[11px] text-rose-700/70 font-medium mt-1">Vượt trần K-factor / Giá trị lớn</div>
+                  <div className="text-2xl font-semibold font-numeric text-rose-700 mt-1.5">{counts.WAITING_CFO || 0}</div>
                 </div>
               </div>
             )}
@@ -1244,15 +1186,15 @@ export function ProductionWorkspace({
             {!loading && view === 'reports' && (
               <div className="grid gap-4 md:grid-cols-2">
                 <Card className="p-6">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Chính sách hiện hành</span>
-                  <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">{policyVersion}</p>
+                  <span className="text-xs font-semibold text-slate-500">Chính sách hiện hành</span>
+                  <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{policyVersion}</p>
                   <Button size="sm" variant="outline" onClick={(event) => { event.currentTarget.focus(); setPolicyOpen(true); }} className="mt-4 font-bold">
                     Quản trị quy tắc SOP →
                   </Button>
                 </Card>
 
                 <Card className="p-6">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Hệ số K (MacroState)</span>
+                  <span className="text-xs font-semibold text-slate-500">Hệ số K (MacroState)</span>
                   <div className="mt-2 flex items-baseline justify-between">
                     <span className="text-3xl font-bold tracking-tight text-slate-950">{macro.kFactor.toFixed(2)}</span>
                     <Badge variant={macro.zone === 'SAFE_GREEN' ? 'success' : 'warning'}>
@@ -1354,7 +1296,7 @@ export function ProductionWorkspace({
                   </div>
 
                   <div className="grid gap-6 xl:grid-cols-2 items-start">
-                    {selected.review?.unresolvedFields?.length && !selected.invoice.sourceArtifactId ? <div className="rounded border border-amber-200 bg-amber-50 p-4 text-sm">Chưa có chứng từ gốc. Các trường {selected.review.unresolvedFields.join(', ')} đang chờ xác minh; giá trị tạm dùng để kiểm tra không phải dữ liệu đọc từ hóa đơn.</div> : <DocumentViewer invoice={selected.invoice} onClose={() => setShowDocumentPreview(false)} />}
+                    {!selected.invoice.sourceArtifactId ? <div className="rounded border border-amber-200 bg-amber-50 p-4 text-sm">Chưa có chứng từ gốc. Hồ sơ này được nhập trực tiếp; dữ liệu và xác nhận có trong lịch sử xử lý.{Boolean(selected.review?.unresolvedFields?.length) && ' Các trường chưa rõ cần được đối chiếu với nguồn trước khi hoàn tất.'}</div> : <DocumentViewer invoice={selected.invoice} onClose={() => setShowDocumentPreview(false)} />}
                     <div>{renderReview()}</div>
                   </div>
                 </div>
@@ -1381,7 +1323,7 @@ export function ProductionWorkspace({
       {selectedRoutineIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-xl bg-slate-950 text-white rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <div className="text-xs font-semibold text-slate-400">
               Đã chọn {selectedRoutineIds.size} ca Routine
             </div>
             <div className="text-lg font-extrabold font-numeric text-white mt-0.5">

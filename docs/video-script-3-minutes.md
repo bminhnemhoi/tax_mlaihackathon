@@ -1,6 +1,6 @@
 # Kịch bản video 180 giây
 
-Chỉ ghi màn hình bản chạy thật; không dùng các số liệu đo người dùng chưa có bằng chứng.
+URL bản chạy: https://limegreen-salamander-517622.hostingersite.com. Chỉ ghi màn hình bản chạy thật; không dùng các số liệu đo người dùng chưa có bằng chứng.
 
 | Thời gian | Màn hình | Nội dung |
 |---|---|---|

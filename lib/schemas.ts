@@ -133,6 +133,12 @@ export const InvoiceInputSchema = z.object({
 });
 export type InvoiceInput = z.infer<typeof InvoiceInputSchema>;
 
+export const SourceConfirmationSchema = z.object({
+  field: z.string().refine(field => field in InvoiceInputSchema.shape, 'Trường xác minh không hợp lệ'),
+  evidence: z.string().trim().min(8, 'Cần nguồn bằng chứng ít nhất 8 ký tự')
+}).strict();
+export type SourceConfirmation = z.infer<typeof SourceConfirmationSchema>;
+
 export const PolicyRuleSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
@@ -330,9 +336,10 @@ export const AuditEntrySchema = z.object({
   initialDecision: z.enum(['ROUTINE', 'ESCALATED']),
   riskGroup: RiskGroupEnum.optional(),
   actionTaken: z.string(),
-  actor: z.enum(['SYSTEM_REFEREE', 'CHIEF_ACCOUNTANT', 'CFO']),
+  actor: z.enum(['SYSTEM_REFEREE', 'ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO', 'UNKNOWN']),
   plainExplanation: z.string(),
   canOverride: z.boolean().default(true),
+  canUndo: z.boolean().default(false),
   isOverridden: z.boolean().default(false),
   taxDefenseDossierReady: z.boolean().default(false),
   applicableRegulations: z.array(z.string()).optional(),

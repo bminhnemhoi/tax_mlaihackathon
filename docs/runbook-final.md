@@ -20,7 +20,7 @@ Trang đầu → “Thử dữ liệu mới” mở phiên demo riêng, không c
 ## Triển khai VPS
 
 1. Cài Docker Compose, Nginx, Certbot; cấu hình DNS tới VPS.
-2. Tạo `.env.production` từ `.env.example`; ba mật khẩu nội bộ cần là secret riêng. AI key chỉ đặt phía server. Đặt `TAX_REFEREE_DATA_DIR=/app/data/runtime`, `TAX_REFEREE_DB_PATH=/app/data/runtime/tax_referee.db`. Không đưa file này vào Git.
+2. Tạo `.env.production` từ `.env.example`; MVP đăng nhập nội bộ bằng cách chọn vai trò, không cần mật khẩu. AI key chỉ đặt phía server. Đặt `TAX_REFEREE_DATA_DIR=/app/data/runtime`, `TAX_REFEREE_DB_PATH=/app/data/runtime/tax_referee.db`. Không đưa file này vào Git.
 3. `docker compose up -d --build` rồi `curl --fail http://127.0.0.1:3000/api/health`.
 4. Thay domain mẫu trong `deployment/nginx.conf`, cấp chứng chỉ trước khi bật khối HTTPS, kiểm tra `nginx -t` rồi reload.
 5. Kiểm tra `/api/health`, `/verify` và nhập mới qua domain HTTPS. Giới hạn 15MB và 30 request/phút/IP được đặt ở Nginx. Node chỉ bind host loopback qua Compose.
@@ -67,3 +67,13 @@ Runner từ chối tập trống hoặc chưa khóa. Không ghi đè báo cáo �
 Thực: SQLite, quy tắc phân luồng, revision, audit, voucher nội bộ, parser XML, API OCR nếu có key và nguồn hỗ trợ. Verify luôn local.
 
 Chưa chứng minh trực tiếp: độ chính xác OCR trên tập độc lập, nộp tờ khai, kết nối ERP/ngân hàng/TCT, tự cập nhật luật. Adapter xuất payload không đồng nghĩa đã hạch toán ERP. Các màn hình mở rộng và số liệu nền là demo, không phải bằng chứng nghiệp vụ thực tế.
+
+## Cập nhật nghiệm thu 10/10/2026
+
+Bản HTTPS đã được triển khai tại `https://limegreen-salamander-517622.hostingersite.com`. Host là shared hosting Node/Passenger; xem [runbook riêng](../deployment/HOSTINGER.md) cho bundle build local, dependency Linux, env ngoài release và vị trí runtime.
+
+Đã chạy API smoke live, Verify 4/4–5/5–15/15, đăng nhập ba vai trò và upload XML/PDF/PNG tổng hợp. Bản sao SQLite nội bộ/demo đọc lại được, integrity `ok`; đây là xác minh snapshot, chưa phải phục hồi toàn bộ môi trường từ sự cố host. Standalone local đã kiểm tra restart, lượt đánh giá bị gián đoạn hết hạn và retry, offline restore kèm chứng từ.
+
+Compose đã thêm worker OCR riêng với warm-up/health; host shared hiện dùng Vision. Không lấy kết quả một ảnh tổng hợp làm benchmark độc lập. Không chạy dọn demo khi app còn mở kết nối; dùng `cleanup-demo.py` preview trước, `--apply --offline` sau khi dừng app.
+
+Nhãn độc lập bổ sung `lockedAt`, `provenance` cho từng ca, và `trainingInvoiceHashes` nếu có tập dùng hiệu chỉnh bên ngoài fixture. Runner kiểm tra ca trùng/tập học trùng, ngày nhãn trước lúc khóa, xuất run ID, mã băm file nhãn/policy/code và ERROR riêng. Câu hỏi trong báo cáo cần người chấm mù theo rubric; runner chưa chứng minh điểm chất lượng câu hỏi.

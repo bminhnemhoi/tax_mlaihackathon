@@ -50,7 +50,7 @@ export const InboxFilterToolbar: React.FC<InboxFilterToolbarProps> = ({
             type="text"
             value={filters.searchTerm}
             onChange={(e) => onChange({ ...filters, searchTerm: e.target.value })}
-            placeholder="Tìm theo số HĐ, MST, tên NCC..."
+            aria-label="Tìm hóa đơn" placeholder="Số hóa đơn, MST, nhà cung cấp"
             className="w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-9 pr-9 py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900 transition"
           />
           {filters.searchTerm && (
@@ -82,7 +82,8 @@ export const InboxFilterToolbar: React.FC<InboxFilterToolbarProps> = ({
         </div>
       </div>
 
-      {/* Filter Selectors - To & Rõ */}
+      <details><summary className="cursor-pointer text-xs font-medium text-slate-600">Bộ lọc{(filters.riskGroup !== 'ALL' || filters.amountRange !== 'ALL' || filters.approvalStatus !== 'ALL') ? ' · Đang áp dụng' : ''}</summary>
+      {/* Filter Selectors */}
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
         <select
           value={filters.riskGroup}
@@ -90,8 +91,8 @@ export const InboxFilterToolbar: React.FC<InboxFilterToolbarProps> = ({
           aria-label="Phân loại rủi ro"
           className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs font-bold text-slate-800 hover:border-slate-400 focus:border-slate-900 focus:bg-white focus:outline-none transition cursor-pointer"
         >
-          <option value="ALL">Tất cả phân loại</option>
-          <option value="ROUTINE">Thường quy (Routine)</option>
+          <option value="ALL">Mọi phân loại</option>
+          <option value="ROUTINE">Thường quy</option>
           <option value="UNCERTAIN_INFO">Thông tin chưa rõ</option>
           <option value="OUT_OF_POLICY">Ngoài chính sách</option>
           <option value="EXCEED_AUTHORITY">Vượt thẩm quyền</option>
@@ -103,7 +104,7 @@ export const InboxFilterToolbar: React.FC<InboxFilterToolbarProps> = ({
           aria-label="Khoảng tiền"
           className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs font-bold text-slate-800 hover:border-slate-400 focus:border-slate-900 focus:bg-white focus:outline-none transition cursor-pointer"
         >
-          <option value="ALL">Mọi hạn mức tiền</option>
+          <option value="ALL">Mọi hạn mức</option>
           <option value="UNDER_5M">&lt; 5 triệu</option>
           <option value="5M_TO_20M">5 - 20 triệu</option>
           <option value="20M_TO_200M">20 - 200 triệu</option>
@@ -122,6 +123,7 @@ export const InboxFilterToolbar: React.FC<InboxFilterToolbarProps> = ({
           <option value="REJECTED">Đã từ chối</option>
         </select>
       </div>
+      </details>
     </div>
   );
 };

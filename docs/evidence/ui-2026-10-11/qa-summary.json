@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-11",
+  "release": "codex-20261011-r9",
+  "liveUrl": "https://limegreen-salamander-517622.hostingersite.com",
+  "bundle": {
+    "bytes": 1748239,
+    "sha256": "fcefff9d906db9f55daf7ad6d2bf69b9102fd0e6428f406ac1502dbac558d00e"
+  },
+  "checks": {
+    "typecheck": "PASS",
+    "build": "PASS",
+    "acceptance": "PASS",
+    "apiLocal": "PASS",
+    "apiLive": "PASS",
+    "standaloneRecovery": "PASS",
+    "diffWhitespace": "PASS"
+  },
+  "acceptance": {
+    "manifestResults": [
+      "4/4",
+      "5/5",
+      "15/15"
+    ],
+    "workflow": 20,
+    "aiFallback": 2,
+    "reviewRegressions": 5,
+    "qaRegressions": 39,
+    "challengeA": 16,
+    "independentAssessment": false
+  },
+  "responsive": {
+    "viewports": [
+      375,
+      768,
+      1024,
+      1440
+    ],
+    "desktopPanelFrom": 1280,
+    "mobileLiveAudit": {
+      "viewportWidth": 375,
+      "documentScrollWidth": 375
+    },
+    "mobileLivePolicy": {
+      "viewportWidth": 375,
+      "documentScrollWidth": 375
+    }
+  },
+  "browserVerified": [
+    "manual intake and internal voucher",
+    "CFO reason and finding confirmation gates",
+    "source edit clears confirmation",
+    "draft persists across tabs",
+    "discard dialog cancel",
+    "overlay focus trap/Escape/focus return",
+    "stale 409 refresh retains reason and does not retry",
+    "accountant readonly policy",
+    "Verify 5/5 and expanded question/options",
+    "original XML raw artifact preview",
+    "audit search remains visible with no matching rows",
+    "live root without cache-busting query",
+    "self-hosted Inter font"
+  ],
+  "deployment": {
+    "current": "versions/codex-20261011-r9",
+    "rollback": "versions/codex-20261011-r8",
+    "dependencies": "codex-20261010-r3 Linux Node22 lockfile matched",
+    "rootCacheControl": "no-store, max-age=0",
+    "hcdn": "DYNAMIC",
+    "internalCountsBefore": {
+      "invoices": 0,
+      "auditEvents": 8
+    },
+    "internalCountsAfter": {
+      "invoices": 0,
+      "auditEvents": 8
+    },
+    "runtimePreserved": true
+  },
+  "limitations": [
+    "Browser file chooser automation blocked by extension file URL permission; API upload and original browser preview passed.",
+    "Development hydration warning from ColorZilla body attribute.",
+    "Synthetic internal regression data; no independent business labels or three-person user study.",
+    "No live external ERP/bank/TCT transaction or Docker OCR worker acceptance on shared hosting.",
+    "MVP role picker does not verify identity."
+  ]
+}

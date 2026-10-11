@@ -263,7 +263,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <DialogTitle className="text-base font-semibold text-slate-900 tracking-tight whitespace-nowrap">
-                  Quản trị Quy chế & Pháp lý Thuế
+                  Quy chế thuế
                 </DialogTitle>
                 <Badge variant="secondary" className="bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-medium shrink-0">
                   {policyMetadata.version} · Hiệu lực
@@ -532,7 +532,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                     Trình Soạn Thảo Quy Chế Văn Bản:
                   </p>
                   <p className="mt-0.5 text-amber-800">
-                    Bổ sung điều khoản nội bộ. Sau khi lưu, hệ thống tạo bản nháp cần kiểm tra và duyệt để có hiệu lực.
+                    Văn bản là mô tả quy chế. Sửa nội dung không tự thay đổi quy tắc TypeScript. Các tham số thực thi chỉ có hiệu lực sau khi bộ kiểm tra nghiệp vụ đạt và policy được ban hành.
                   </p>
                 </div>
               </div>

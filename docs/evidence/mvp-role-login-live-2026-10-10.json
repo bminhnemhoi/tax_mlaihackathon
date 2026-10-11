@@ -1,0 +1,21 @@
+{
+  "release": "codex-20261010-r6",
+  "url": "https://limegreen-salamander-517622.hostingersite.com/?release=mvp-role-r6",
+  "checks": {
+    "typecheck": "PASS",
+    "build": "PASS",
+    "reviewRegressionsDevelopment": "PASS",
+    "reviewRegressionsProduction": "PASS",
+    "workflowSafety": 20,
+    "liveRoles": [
+      "ACCOUNTANT",
+      "CHIEF_ACCOUNTANT",
+      "CFO"
+    ],
+    "internalDatabase": true,
+    "internalRoleSwitch": "PASS",
+    "invalidRole": "400",
+    "uiLoginAccountantAndSwitchCFO": "PASS"
+  },
+  "browserRootCache": "Old frontend observed on root URL; versioned query URL verified."
+}
