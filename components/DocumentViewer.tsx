@@ -1,228 +1,36 @@
 'use client';
-
-import React, { useState } from 'react';
-import {
-  Printer,
-  Download,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Minimize2,
-  CheckCircle2,
-  X
-} from 'lucide-react';
-import { InvoiceInput } from '@/lib/schemas';
-import { formatVND, formatDate } from '@/lib/utils';
+import { useEffect, useState, type ReactElement } from 'react';
+import { Download, Printer, X } from 'lucide-react';
+import type { InvoiceInput } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
-
-interface DocumentViewerProps {
-  invoice: InvoiceInput;
-  className?: string;
-  onClose?: () => void;
+import { InvoiceImageViewer } from '@/components/InvoiceImageViewer';
+import { InvoiceDataSummary } from '@/components/InvoiceDataSummary';
+import { ScreenState, WorkspaceSkeleton } from '@/components/workspace/ScreenState';
+interface DocumentViewerProps {invoice:InvoiceInput;className?:string;onClose?:()=>void}
+interface SourcePreview {url:string;mime:string;text:string}
+export function DocumentViewer({invoice,className='',onClose}:DocumentViewerProps):ReactElement {
+  const [source,setSource]=useState<SourcePreview|null>(null);const [loading,setLoading]=useState(false);const [error,setError]=useState(false);const [attempt,setAttempt]=useState(0);
+  const [showData,setShowData]=useState(!invoice.sourceArtifactId);
+  useEffect(()=>{
+    setSource(null);setError(false);setShowData(!invoice.sourceArtifactId);
+    if(!invoice.sourceArtifactId){setLoading(false);return;}
+    const controller=new AbortController();let objectUrl='';setLoading(true);
+    fetch('/api/documents/artifacts/'+encodeURIComponent(invoice.sourceArtifactId),{signal:controller.signal,cache:'no-store'}).then(async response=>{
+      if(!response.ok)throw new Error('Source unavailable');
+      const blob=await response.blob();if(controller.signal.aborted)return;
+      if(blob.type.startsWith('image/')||blob.type==='application/pdf'){objectUrl=URL.createObjectURL(blob);setSource({url:objectUrl,mime:blob.type,text:''});}
+      else {const text=await blob.text();if(!controller.signal.aborted)setSource({url:'',mime:blob.type,text});}
+    }).catch(()=>{if(!controller.signal.aborted)setError(true);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    return ()=>{controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl);};
+  },[invoice.sourceArtifactId,attempt]);
+  return <section className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border bg-card ${className}`}>
+    <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3"><div><h2 className="text-sm font-semibold">{showData?'Bản trình bày dữ liệu':'Chứng từ nguồn'}</h2>{!invoice.sourceArtifactId&&<p className="mt-1 text-xs text-muted-foreground">Hồ sơ nhập trực tiếp, chưa có tệp nguồn.</p>}</div><div className="flex items-center gap-1">
+      {invoice.sourceArtifactId&&<Button variant="ghost" size="sm" onClick={()=>setShowData(v=>!v)}>{showData?'Xem nguồn':'Xem dữ liệu'}</Button>}
+      <a href={invoice.sourceArtifactId?'/api/documents/artifacts/'+encodeURIComponent(invoice.sourceArtifactId):undefined} download aria-disabled={!invoice.sourceArtifactId} className={`inline-flex h-10 items-center gap-1.5 rounded-[10px] px-3 text-xs hover:bg-muted ${!invoice.sourceArtifactId?'pointer-events-none opacity-40':''}`}><Download className="h-4 w-4"/>Tải</a>
+      <Button size="icon" variant="ghost" aria-label="In chứng từ" onClick={()=>window.print()}><Printer className="h-4 w-4"/></Button>{onClose&&<Button size="icon" variant="ghost" aria-label="Đóng chứng từ" onClick={onClose}><X className="h-4 w-4"/></Button>}
+    </div></header>
+    {showData?<InvoiceDataSummary invoice={invoice}/>:<div className="h-[min(680px,75dvh)] min-h-[320px]">
+      {loading?<WorkspaceSkeleton/>:error?<ScreenState error title="Không thể tải chứng từ" onRetry={()=>setAttempt(v=>v+1)}/>:source?.mime.startsWith('image/')?<InvoiceImageViewer src={source.url}/>:source?.mime==='application/pdf'?<iframe title="Chứng từ PDF gốc" src={source.url} className="h-full w-full border-0"/>:source?<pre className="h-full overflow-auto whitespace-pre-wrap break-words p-5 font-mono text-xs">{source.text}</pre>:null}
+    </div>}
+  </section>;
 }
-
-export const DocumentViewer: React.FC<DocumentViewerProps> = ({ invoice, className = '', onClose }) => {
-  const [zoom, setZoom] = useState<number>(100);
-  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleDownloadSource = () => {
-    if (!invoice.sourceArtifactId) return;
-    const a = document.createElement('a');
-    a.href = `/api/documents/artifacts/${encodeURIComponent(invoice.sourceArtifactId)}`;
-    a.download = '';
-    a.click();
-  };
-
-  return (
-    <div
-      className={`flex flex-col bg-white border border-slate-200 rounded-2xl shadow-card overflow-hidden ${
-        isFullscreen ? 'fixed inset-4 z-50 bg-white shadow-2xl border-slate-300' : 'h-full min-h-[480px]'
-      } ${className}`}
-    >
-      {/* Viewer Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs text-slate-700 gap-2">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 border border-emerald-200 px-2 py-0.5 text-xs font-bold text-emerald-800">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Chứng từ {invoice.sourceArtifactId ? 'gốc' : 'số'}</span>
-          </span>
-          <span className="font-numeric text-xs font-bold text-slate-500">
-            HĐ: {invoice.invoiceNumber}
-          </span>
-        </div>
-
-        {/* Toolbar Controls */}
-        <div className="flex items-center gap-1.5">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-10 w-10 text-slate-600 hover:text-slate-950 cursor-pointer"
-            onClick={() => setZoom((z) => Math.max(z - 15, 70))}
-            title="Thu nhỏ"
-            aria-label="Thu nhỏ tài liệu"
-          >
-            <ZoomOut className="w-3.5 h-3.5" />
-          </Button>
-
-          <span className="text-xs font-numeric font-bold text-slate-700 w-10 text-center">{zoom}%</span>
-
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-10 w-10 text-slate-600 hover:text-slate-950 cursor-pointer"
-            onClick={() => setZoom((z) => Math.min(z + 15, 145))}
-            title="Phóng to"
-            aria-label="Phóng to tài liệu"
-          >
-            <ZoomIn className="w-3.5 h-3.5" />
-          </Button>
-
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-10 w-10 text-slate-600 hover:text-slate-950 cursor-pointer"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            title={isFullscreen ? 'Thu nhỏ cửa sổ' : 'Toàn màn hình'}
-            aria-label={isFullscreen ? 'Thu nhỏ cửa sổ tài liệu' : 'Mở tài liệu toàn màn hình'}
-          >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-          </Button>
-
-          <button
-            type="button"
-            className="min-h-10 px-3 text-xs font-bold border border-slate-200 bg-white hover:bg-slate-100 text-slate-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-            onClick={handleDownloadSource}
-            disabled={!invoice.sourceArtifactId}
-            title={invoice.sourceArtifactId ? 'Tải tệp gốc' : 'Chưa có tệp'}
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Tải</span>
-          </button>
-
-          <button
-            type="button"
-            className="min-h-10 px-3 text-xs font-bold border border-slate-200 bg-white hover:bg-slate-100 text-slate-800 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-            onClick={handlePrint}
-            title="In hóa đơn"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>In</span>
-          </button>
-
-          {onClose && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 text-slate-500 hover:text-rose-600 cursor-pointer"
-              onClick={onClose}
-              title="Đóng"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Invoice Canvas / Viewer Body */}
-      <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-100/60 flex justify-center items-start">
-        <div
-          style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
-          className="w-full max-w-[620px] bg-white text-slate-900 rounded-xl shadow-card p-6 border border-slate-200 font-sans transition-transform duration-150"
-        >
-          {/* Header */}
-          <div className="text-center border-b border-slate-200 pb-4 mb-4">
-            <h2 className="text-xl font-bold text-slate-950 uppercase tracking-tight">
-              HÓA ĐƠN ĐIỆN TỬ
-            </h2>
-            <div className="text-xs font-numeric font-medium text-slate-500 mt-1">
-              Số: <strong className="text-slate-950 text-sm font-bold">{invoice.invoiceNumber}</strong> · Ngày: {formatDate(invoice.invoiceDate)}
-            </div>
-          </div>
-
-          {/* Supplier Info - Rõ ràng, Chữ to */}
-          <div className="space-y-2 text-sm border-b border-slate-200 pb-4 mb-4">
-            <div className="flex justify-between">
-              <span className="font-semibold text-slate-500">Đơn vị bán:</span>
-              <span className="font-bold text-slate-950 uppercase text-right">{invoice.supplierName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="font-semibold text-slate-500">Mã số thuế:</span>
-              <span className="font-numeric font-bold text-slate-950">{invoice.supplierTaxCode}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="font-semibold text-slate-500">Thanh toán:</span>
-              <span className="font-bold text-slate-800">
-                {invoice.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản (CK)' : 'Tiền mặt (TM)'}
-              </span>
-            </div>
-          </div>
-
-          {/* Item details table */}
-          <div className="mb-4 overflow-hidden rounded-lg border border-slate-200">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700 uppercase">
-                  <th className="p-2 w-8 text-center">#</th>
-                  <th className="p-2">Hàng hóa / Dịch vụ</th>
-                  <th className="p-2 w-12 text-center">SL</th>
-                  <th className="p-2 w-24 text-right">Đơn giá</th>
-                  <th className="p-2 w-28 text-right">Thành tiền</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-800">
-                {invoice.items && invoice.items.length > 0 ? (
-                  invoice.items.map((item, idx) => (
-                    <tr key={idx} className={item.flaggedReason ? 'bg-amber-50/70 font-semibold' : ''}>
-                      <td className="p-2 text-center font-numeric text-slate-500">{item.lineNumber || idx + 1}</td>
-                      <td className="p-2 font-bold text-slate-900">
-                        <div>{item.itemName}</div>
-                        {item.flaggedReason && (
-                          <span className="inline-block mt-0.5 text-[10px] text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded font-bold">
-                            {item.flaggedReason}
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-2 text-center font-numeric font-semibold">{item.quantity}</td>
-                      <td className="p-2 text-right font-numeric font-semibold">{formatVND(item.unitPrice)}</td>
-                      <td className="p-2 text-right font-numeric font-bold text-slate-950">{formatVND(item.amount)}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="p-2 text-center font-numeric text-slate-500">1</td>
-                    <td className="p-2 font-bold text-slate-900">{invoice.itemName || 'Hàng hóa / Dịch vụ chung'}</td>
-                    <td className="p-2 text-center font-numeric font-semibold">1</td>
-                    <td className="p-2 text-right font-numeric font-semibold">{formatVND(invoice.totalAmount - (invoice.taxAmount || 0))}</td>
-                    <td className="p-2 text-right font-numeric font-bold text-slate-950">{formatVND(invoice.totalAmount - (invoice.taxAmount || 0))}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Totals Section - To, Rõ, Đậm số tiền */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1.5 text-sm">
-            <div className="flex justify-between text-slate-600 font-semibold">
-              <span>Tiền chưa thuế:</span>
-              <span className="font-numeric font-bold text-slate-900">
-                {formatVND(invoice.totalAmount - (invoice.taxAmount || 0))}
-              </span>
-            </div>
-            <div className="flex justify-between text-slate-600 font-semibold">
-              <span>Thuế GTGT ({invoice.taxRate ?? 10}%):</span>
-              <span className="font-numeric font-bold text-slate-900">{formatVND(invoice.taxAmount || 0)}</span>
-            </div>
-            <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-950">
-              <span>TỔNG THANH TOÁN:</span>
-              <span className="font-numeric text-lg text-slate-950 font-extrabold">{formatVND(invoice.totalAmount)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};

@@ -1,6 +1,6 @@
 import { withRequestDatabase } from '@/lib/server/db';
+import { lookupOfficialSupplierIdentity } from '@/services/officialSupplierLookupService';
 import { NextRequest, NextResponse } from 'next/server';
-import { lookupByTaxCode, lookupByName, validateTaxCode } from '@/services/taxLookupService';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -8,59 +8,44 @@ export const runtime = 'nodejs';
 async function handleGET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const taxCode = searchParams.get('taxCode');
-    const name = searchParams.get('name');
-    const address = searchParams.get('address') || undefined;
-
-    // Chiều 1: Tra theo Mã số thuế -> Lấy Tên NCC & Địa chỉ
-    if (taxCode) {
-      const val = validateTaxCode(taxCode);
-      const result = await lookupByTaxCode(taxCode);
-
-      if (!result) {
-        return NextResponse.json({
-          found: false,
-          taxCode,
-          validation: val,
-          message: 'Không tìm thấy thông tin đăng ký thuế cho MST này'
-        });
-      }
-
-      return NextResponse.json({
-        found: true,
-        data: result,
-        validation: val
-      });
+    const taxCode = (searchParams.get('taxCode') || '').trim();
+    const name = (searchParams.get('name') || '').trim();
+    const address = (searchParams.get('address') || '').trim();
+    if (!taxCode && !name) {
+      return NextResponse.json({ error: 'Vui lòng cung cấp tên nhà cung cấp hoặc MST.' }, { status: 400 });
     }
 
-    // Chiều 2: Tra theo Tên NCC -> Lấy Mã số thuế & Xác thực chéo
-    if (name) {
-      const result = await lookupByName(name, { address });
-
-      if (!result) {
-        return NextResponse.json({
-          found: false,
-          name,
-          message: 'Chưa đủ cơ sở xác thực chính xác mã số thuế cho tên đơn vị này'
-        });
-      }
-
+    const identity = await lookupOfficialSupplierIdentity({ supplierName: name, supplierTaxCode: taxCode, address });
+    if (identity.status === 'VERIFIED') {
       return NextResponse.json({
         found: true,
-        data: result
-      });
+        lookupStatus: identity.status,
+        supplierIdentity: identity,
+        data: {
+          taxCode: identity.supplierTaxCode,
+          legalName: identity.legalName,
+          supplierName: identity.legalName,
+          isVerified: true,
+          sources: identity.sources
+        }
+      }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
-    return NextResponse.json(
-      { error: 'Vui lòng cung cấp tham số "taxCode" hoặc "name" để tra cứu' },
-      { status: 400 }
-    );
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || 'Lỗi hệ thống khi tra cứu dữ liệu thuế' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      found: false,
+      lookupStatus: identity.status,
+      supplierIdentity: identity,
+      message: identity.message || 'Chưa xác minh được nhà cung cấp từ nguồn chính thống.'
+    }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    return NextResponse.json({
+      found: false,
+      lookupStatus: 'SOURCE_UNAVAILABLE',
+      message: error instanceof Error ? error.message : 'Không thể tra cứu nhà cung cấp.'
+    }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
-export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }
+export async function GET(...args: Parameters<typeof handleGET>) {
+  return withRequestDatabase(args[0], () => handleGET(...args));
+}

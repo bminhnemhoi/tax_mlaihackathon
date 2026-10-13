@@ -11,6 +11,16 @@ export const GEMINI_API_CONFIG = {
   MODEL: process.env.SHOPAIKEY_MODEL || process.env.AI_MODEL || process.env.OPENROUTER_MODEL || 'gemini-2.5-flash'
 };
 
+// Gemini Vision and Google Search grounding are routed through ShopAIKey. Keep
+// this config strict so a key for another provider is never sent to ShopAIKey.
+export const SHOPAIKEY_GEMINI_API_CONFIG = {
+  BASE_URL: (process.env.SHOPAIKEY_BASE_URL || 'https://api.shopaikey.com')
+    .replace(/\/+$/, '')
+    .replace(/\/v1(?:beta)?$/i, ''),
+  API_KEY: process.env.SHOPAIKEY_API_KEY || '',
+  MODEL: process.env.SHOPAIKEY_MODEL || 'gemini-2.5-flash'
+};
+
 export const OPENROUTER_API_CONFIG = {
   ENDPOINT: (process.env.OPENROUTER_BASE_URL || GEMINI_API_CONFIG.BASE_URL) + '/chat/completions',
   BASE_URL: process.env.OPENROUTER_BASE_URL || GEMINI_API_CONFIG.BASE_URL,
@@ -58,6 +68,7 @@ export const LEGAL_CONSTANTS_2026 = {
 
 export const DEFAULT_POLICY_CONFIG = {
   nonCashThreshold: 5_000_000,
+  nonCashThresholdEffectiveFrom: '2025-07-01',
   kttApprovalLimit: 200_000_000,
   kFactorSafeMin: 1.05,
   kFactorSafeMax: 1.25,

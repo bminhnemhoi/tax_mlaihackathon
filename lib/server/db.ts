@@ -291,6 +291,74 @@ function applyMigrations(db: Database.Database): void {
     record.run(15, now());
   }
 
+  if (!applied.has(16)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS supplier_name_aliases (
+        id TEXT PRIMARY KEY,
+        alias_name TEXT NOT NULL,
+        normalized_alias TEXT NOT NULL,
+        supplier_tax_code TEXT NOT NULL,
+        evidence_invoice_id TEXT,
+        evidence TEXT NOT NULL,
+        verified_by TEXT NOT NULL,
+        confirmed_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(normalized_alias, supplier_tax_code)
+      );
+      CREATE INDEX IF NOT EXISTS idx_supplier_alias_name ON supplier_name_aliases(normalized_alias);
+      CREATE INDEX IF NOT EXISTS idx_supplier_alias_tax_code ON supplier_name_aliases(supplier_tax_code);
+
+      -- Older lookup rows did not retain upstream freshness metadata. Require
+      -- a new current lookup unless an explicit verification snapshot exists.
+      UPDATE supplier_master SET verification_source='MANUAL',
+        notes=COALESCE(notes, 'Dữ liệu tra cứu cũ; cần xác minh lại với nguồn thuế')
+      WHERE verification_source IN ('TCT_PORTAL','NATIONAL_BIZ_REGISTRY')
+        AND evidence_snapshot_path IS NULL;
+    `);
+    record.run(16, now());
+  }
+
+  if (!applied.has(17)) {
+    if (!hasColumn(db, 'supplier_master', 'international_name')) {
+      db.exec('ALTER TABLE supplier_master ADD COLUMN international_name TEXT');
+    }
+    record.run(17, now());
+  }
+
+  if (!applied.has(18)) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS supplier_identity_records (
+        tax_code TEXT PRIMARY KEY,
+        normalized_name TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        verified_at TEXT NOT NULL,
+        expires_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_identity_name ON supplier_identity_records(normalized_name);
+      CREATE TABLE IF NOT EXISTS supplier_identity_aliases (
+        normalized_alias TEXT NOT NULL,
+        tax_code TEXT NOT NULL REFERENCES supplier_identity_records(tax_code) ON DELETE CASCADE,
+        address_key TEXT NOT NULL DEFAULT '',
+        expires_at INTEGER NOT NULL,
+        PRIMARY KEY(normalized_alias, tax_code, address_key)
+      );
+      CREATE INDEX IF NOT EXISTS idx_identity_alias ON supplier_identity_aliases(normalized_alias);
+    `);
+    record.run(18, now());
+  }
+
+  if (!applied.has(19)) {
+    db.exec(`CREATE TABLE IF NOT EXISTS supplier_identity_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tax_code TEXT NOT NULL REFERENCES supplier_identity_records(tax_code),
+      original_name TEXT,
+      payload_json TEXT NOT NULL,
+      verified_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_identity_history ON supplier_identity_history(tax_code, verified_at);`);
+    record.run(19, now());
+  }
+
 }
 
 function initializeDatabase(db: Database.Database): void {
@@ -559,6 +627,7 @@ function initializeDatabase(db: Database.Database): void {
     const config = SystemPolicyConfigSchema.parse(DEFAULT_POLICY_CONFIG);
     const defaultBundle: PolicyBundle = {
       version: 'TAX-SOP-2026-v2.5',
+      policyNotes:'',
       status: 'PUBLISHED',
       createdAt: now(),
       effectiveFrom: '2025-07-01',

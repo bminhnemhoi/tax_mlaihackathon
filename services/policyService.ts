@@ -3,7 +3,7 @@ import { InvoiceInputSchema, PolicyBundle, PolicyBundleSchema, RefereeDecisionSc
 import { getActivePolicy, getDatabase, jsonNow } from '@/lib/server/db';
 import { appendAuditEvent } from '@/lib/server/audit';
 import { evaluateInvoiceLocally } from './policyEngine';
-import { executablePolicySummary, implementedPolicyRules } from '@/data/policyContract';
+import { executablePolicySummary, implementedPolicyRules,POLICY_CONTRACT_VERSION } from '@/data/policyContract';
 import { validatePolicySafety } from './policySafety';
 
 function contentHash(payload: unknown): string {
@@ -16,6 +16,8 @@ export function readActivePolicy(): PolicyBundle {
 
 export function createPolicyDraft(input: Partial<PolicyBundle> & { config: SystemPolicyConfig }, actorId?: string): PolicyBundle {
   const config = SystemPolicyConfigSchema.parse(input.config);
+  const policyText=executablePolicySummary(config);
+  const policyNotes=input.policyNotes ?? (input.policyText && input.policyText!==policyText?input.policyText:'');
   const version = input.version || `policy-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}`;
   const bundle = PolicyBundleSchema.parse({
     version,
@@ -24,10 +26,10 @@ export function createPolicyDraft(input: Partial<PolicyBundle> & { config: Syste
     effectiveFrom: input.effectiveFrom || new Date().toISOString().slice(0, 10),
     effectiveTo: input.effectiveTo,
     sourceDocumentVersions: input.sourceDocumentVersions || [],
-    policyText: input.policyText || executablePolicySummary(config),
+    policyText,policyNotes,contractVersion:POLICY_CONTRACT_VERSION,
     rules: implementedPolicyRules(config),
     config,
-    contentHash: contentHash({ version, config, policyText:input.policyText || executablePolicySummary(config), rules:implementedPolicyRules(config) })
+    contentHash: contentHash({ version, config, policyText,policyNotes,contractVersion:POLICY_CONTRACT_VERSION,rules:implementedPolicyRules(config) })
   });
 
   getDatabase().prepare(`
@@ -65,10 +67,15 @@ export function publishPolicy(version: string, actorId?: string, reason = 'Đã 
   return bundle;
 }
 
-export function validatePolicyBundle(bundle: PolicyBundle): { valid: boolean; errors: string[]; safetyCases:number; operationalCases:number } {
+export interface PolicyValidationResult {valid:boolean;errors:string[];safetyCases:number;operationalCases:number;changes:Array<{invoiceId:string;before:string;after:string;beforeRole:string;afterRole:string;beforeRules:string[];afterRules:string[]}>;baselinePolicyVersion:string;candidatePolicyVersion:string;parameterChanges:string[];contractVersion:string;legacyNotes:boolean}
+export function validatePolicyBundle(bundle: PolicyBundle):PolicyValidationResult {
   const rows = getDatabase().prepare('SELECT id, payload_json FROM invoices ORDER BY datetime(updated_at) DESC LIMIT 200').all() as Array<{ id: string; payload_json: string }>;
   const safety=validatePolicySafety(bundle.config,bundle.version);
   const errors: string[] = [...safety.errors];
+  const baseline=getActivePolicy();
+  const changes:Array<{invoiceId:string;before:string;after:string;beforeRole:string;afterRole:string;beforeRules:string[];afterRules:string[]}>=[];
+  if(bundle.contractVersion===POLICY_CONTRACT_VERSION && (bundle.policyText!==executablePolicySummary(bundle.config)
+    || JSON.stringify(bundle.rules)!==JSON.stringify(PolicyBundleSchema.shape.rules.parse(implementedPolicyRules(bundle.config)))))errors.push('SOP/registry không khớp cấu hình thực thi.');
   for (const row of rows) {
     const parsedInvoice = InvoiceInputSchema.safeParse(JSON.parse(row.payload_json));
     if (!parsedInvoice.success) {
@@ -77,8 +84,15 @@ export function validatePolicyBundle(bundle: PolicyBundle): { valid: boolean; er
     }
     const decision = evaluateInvoiceLocally(parsedInvoice.data, bundle.config, bundle.version);
     if (!RefereeDecisionSchema.safeParse(decision).success) errors.push(`${row.id}: phán quyết không hợp lệ theo schema`);
+    const before=evaluateInvoiceLocally(parsedInvoice.data,baseline.config,baseline.version);
+    const key=(d:typeof decision):string=>`${d.status}:${d.status==='ESCALATED'?d.riskGroup:''}`;
+    const role=(d:typeof decision):string=>d.status==='ROUTINE'?'SYSTEM':d.requiresCFO?'CFO':'CHIEF_ACCOUNTANT';
+    const ruleIds=(d:typeof decision):string[]=>(d.findings||[]).map(f=>f.ruleId).sort();
+    if(key(before)!==key(decision)||role(before)!==role(decision)||JSON.stringify(ruleIds(before))!==JSON.stringify(ruleIds(decision)))changes.push({invoiceId:row.id,before:key(before),after:key(decision),beforeRole:role(before),afterRole:role(decision),beforeRules:ruleIds(before),afterRules:ruleIds(decision)});
   }
-  return { valid: errors.length === 0, errors, safetyCases:safety.tested, operationalCases:rows.length };
+  return { valid: errors.length === 0, errors, safetyCases:safety.tested, operationalCases:rows.length,changes,
+    baselinePolicyVersion:baseline.version,candidatePolicyVersion:bundle.version,parameterChanges:Object.entries(bundle.config).filter(([k,v])=>JSON.stringify(v)!==JSON.stringify(new Map(Object.entries(baseline.config)).get(k))).map(([k])=>k),
+    contractVersion:POLICY_CONTRACT_VERSION,legacyNotes:bundle.contractVersion!==POLICY_CONTRACT_VERSION };
 }
 
 export function rollbackPolicy(version: string, actorId?: string, reason = 'Rollback theo yêu cầu vận hành'): PolicyBundle {

@@ -1,5 +1,6 @@
 'use client';
 
+import { toast } from 'sonner';
 import { useRef, useState } from 'react';
 import { InvoiceInputSchema, SourceConfirmation } from '@/lib/schemas';
 import { displayFieldValue, fieldLabels, reviewFields } from '@/lib/workflowPresentation';
@@ -26,7 +27,7 @@ export default function SourceReviewForm({ invoice, review, disabled, reason, on
   const visible = reviewFields.filter(field => field.required || ['paymentMethod','hasBankSlip','hasItemManifest','sellerStatus'].includes(field.key) || unresolved.includes(field.key) || original[field.key] !== undefined);
   const prefix = `review-${String(original.id).replace(/[^a-z0-9-]/gi,'')}`;
 
-  async function submit(useAdvanced=false) {
+  async function submit(useAdvanced=false):Promise<void> {
     const next:Record<string,unknown> = {...original};
     const issues:Record<string,string> = {};
     if(useAdvanced){
@@ -47,13 +48,12 @@ export default function SourceReviewForm({ invoice, review, disabled, reason, on
     }
     if(reason.trim().length<8)issues.reason='Ghi lý do đánh giá lại ít nhất 8 ký tự ở ô phía trên.';
     setErrors(issues);
-    if(Object.keys(issues).length){requestAnimationFrame(()=>errorRef.current?.focus());return;}
+    if(Object.keys(issues).length){const field=Object.keys(issues)[0];toast.error(issues[field].length<100?issues[field]:'Kiểm tra trường được đánh dấu.');requestAnimationFrame(()=>document.getElementById(field==='reason'?'workflow-reason':`${prefix}-${field}`)?.focus());return;}
     if(parsed.success)await onSubmit(parsed.data,confirmations);
   }
 
   return <form onSubmit={e=>{e.preventDefault();void submit();}} className="space-y-4" noValidate>
-    <p className="text-sm text-slate-600">Sửa dữ liệu từ chứng từ gốc, rồi xác nhận riêng các trường đã đối chiếu. Trường chưa xác nhận vẫn được giữ lại để xử lý tiếp.</p>
-    {Object.keys(errors).length>0 && <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 outline-none focus:ring-2 focus:ring-red-600"><p className="font-semibold">Cần bổ sung trước khi đánh giá lại</p><ul className="mt-2 list-disc pl-5">{Object.entries(errors).map(([field,message])=><li key={field}><a className="underline" href={`#${field==='reason' ? 'workflow-reason' : `${prefix}-${field}`}`}>{fieldLabels[field] || field}: {message}</a></li>)}</ul></div>}
+    <p className="text-sm text-muted-foreground">Sửa dữ liệu và ghi nguồn cho từng trường đã đối chiếu.</p>
     <div className="grid gap-4 sm:grid-cols-2">{visible.map(field=>{
       const pending=unresolved.includes(field.key);
       const changed=String(original[field.key] ?? '') !== values[field.key];
@@ -70,7 +70,7 @@ export default function SourceReviewForm({ invoice, review, disabled, reason, on
           <label className="flex items-start gap-2 text-sm"><input type="checkbox" disabled={disabled} className="mt-1" checked={selected.has(field.key)} onChange={e=>setSelected(current=>{const next=new Set(current);e.target.checked?next.add(field.key):next.delete(field.key);return next;})}/>Tôi đã đối chiếu trường này với nguồn</label>
           {selected.has(field.key) && <label className="block text-xs" htmlFor={`${inputId}-evidence`}>Nguồn bằng chứng<input id={`${inputId}-evidence`} disabled={disabled} value={evidence[field.key] || ''} onChange={e=>setEvidence(v=>({...v,[field.key]:e.target.value}))} placeholder="Ví dụ: dòng Tổng cộng, trang 1 chứng từ gốc" className="mt-1 w-full rounded border bg-white p-2 text-sm"/></label>}
         </div>}
-        {errors[field.key] && <p id={`${inputId}-error`} className="mt-2 text-sm text-red-700">{errors[field.key]}</p>}
+        {errors[field.key] && <p id={`${inputId}-error`} className="sr-only">{errors[field.key]}</p>}
       </div>;
     })}</div>
     {unresolved.filter(key=>!reviewFields.some(f=>f.key===key)).map(key=><p key={key} className="text-sm text-amber-800">Cần đối chiếu thêm {fieldLabels[key] || key}; dữ liệu chi tiết có trong mục nâng cao.</p>)}

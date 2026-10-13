@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TAX_CODE_FORMAT_REGEX } from './taxCode';
 
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày phải có định dạng YYYY-MM-DD').refine(
   (value) => {
@@ -36,7 +37,13 @@ export const RuleFindingSchema = z.object({
   flaggedReason: z.string(),
   plainExplanation: z.string(),
   legalBasis: z.string(),
-  evidence: z.string().optional()
+  evidence: z.string().optional(),
+  sopClause: z.string().optional(),
+  actionableQuestion: z.string().optional(),
+  options: z.array(z.object({id:z.enum(['A','B']),label:z.string(),actionDescription:z.string(),resultingAction:z.string()})).optional(),
+  requiresCFO: z.boolean().optional(),
+  legalVerification: z.enum(['INTERNAL_POLICY','DOCUMENT_CONFIRMED_RULE_PENDING','UNVERIFIED']).optional(),
+  sourceUrl: z.string().url().optional()
 });
 export type RuleFinding = z.infer<typeof RuleFindingSchema>;
 
@@ -61,6 +68,7 @@ export type ActionOption = z.infer<typeof ActionOptionSchema>;
 // 2.1 Schema Cấu hình Quy chế Thuế Động (Dynamic Policy Configuration)
 export const SystemPolicyConfigSchema = z.object({
   nonCashThreshold: z.number().finite().nonnegative().default(5_000_000), // Mặc định 5 triệu theo Luật Thuế GTGT 48/2024/QH15
+  nonCashThresholdEffectiveFrom: IsoDateSchema.default('2025-07-01'),
   kttApprovalLimit: z.number().finite().nonnegative().default(200_000_000), // Hạn mức tự duyệt của KTT 200 triệu
   kFactorSafeMin: z.number().finite().default(1.05),
   kFactorSafeMax: z.number().finite().default(1.25),
@@ -104,9 +112,10 @@ export const InvoiceInputSchema = z.object({
   id: z.string().trim().min(1),
   invoiceNumber: z.string().trim().min(1),
   invoiceDate: IsoDateSchema,         // Định dạng: YYYY-MM-DD
-  supplierTaxCode: z.string().trim().regex(/^\d{10}(?:-\d{3})?$/, 'MST phải có 10 hoặc 13 chữ số'),
+  supplierTaxCode: z.string().trim().regex(TAX_CODE_FORMAT_REGEX, 'MST phải có 10, 12 hoặc 13 chữ số'),
   supplierName: z.string().trim().min(2),
-  buyerTaxCode: z.string().trim().regex(/^\d{10}(?:-\d{3})?$/, 'MST người mua phải có 10 hoặc 13 chữ số').optional(),
+  supplierAddress: z.string().trim().optional(),
+  buyerTaxCode: z.string().trim().regex(TAX_CODE_FORMAT_REGEX, 'MST người mua phải có 10, 12 hoặc 13 chữ số').optional(),
   buyerName: z.string().trim().optional(),
   invoiceSeries: z.string().trim().optional(),         // Ký hiệu HĐ theo TT 78 (VD: 1C26TBB)
   invoiceTemplate: z.string().trim().optional(),       // Mẫu số HĐ (VD: 1/001)
@@ -160,6 +169,8 @@ export const PolicyBundleSchema = z.object({
   effectiveTo: IsoDateSchema.optional(),
   sourceDocumentVersions: z.array(z.string()).default([]),
   policyText: z.string().default(''),
+  policyNotes: z.string().default(''),
+  contractVersion: z.string().optional(),
   rules: z.array(PolicyRuleSchema),
   config: SystemPolicyConfigSchema,
   contentHash: z.string().regex(/^[a-f0-9]{64}$/).optional()
@@ -206,7 +217,7 @@ export const OcrHighlightSchema = z.object({
 export type OcrHighlight = z.infer<typeof OcrHighlightSchema>;
 
 export const FieldEvidenceSchema = z.object({
-  source: z.enum(['XML', 'PDF_TEXT', 'OCR', 'VLM', 'USER', 'INFERRED']),
+  source: z.enum(['XML', 'PDF_TEXT', 'OCR', 'VLM', 'USER', 'INFERRED', 'OFFICIAL_REGISTRY']),
   status: z.enum(['VERIFIED', 'UNCERTAIN', 'ABSENT', 'CONFLICT']),
   confidence: z.number().min(0).max(1),
   text: z.string().optional(),
@@ -219,6 +230,27 @@ export const FieldEvidenceSchema = z.object({
   }).optional()
 });
 export type FieldEvidence = z.infer<typeof FieldEvidenceSchema>;
+
+export const SupplierIdentitySourceSchema = z.object({
+  title: z.string().trim().min(1),
+  url: z.string().url()
+});
+export type SupplierIdentitySource = z.infer<typeof SupplierIdentitySourceSchema>;
+
+export const SupplierIdentitySchema = z.object({
+  status: z.enum(['VERIFIED', 'AMBIGUOUS', 'NOT_FOUND', 'SOURCE_UNAVAILABLE', 'CONFLICT']),
+  legalName: z.string().trim().min(1).optional(),
+  supplierTaxCode: z.string().trim().min(1).optional(),
+  originalSupplierName: z.string().optional(),
+  originalSupplierTaxCode: z.string().optional(),
+  address: z.string().optional(),
+  verifiedAt: z.string().datetime().optional(),
+  sourceUpdatedAt: z.string().datetime().optional(),
+  lookupMethod: z.enum(['LOCAL_VERIFIED', 'TAX_REGISTRY', 'SEARCH_GROUNDING']).optional(),
+  sources: z.array(SupplierIdentitySourceSchema).default([]),
+  message: z.string().trim().optional()
+});
+export type SupplierIdentity = z.infer<typeof SupplierIdentitySchema>;
 
 export const DocumentExtractionSchema = z.object({
   invoice: InvoiceInputSchema.partial(),
@@ -233,7 +265,9 @@ export const DocumentExtractionSchema = z.object({
   conflicts: z.array(z.string()).default([]),
   fieldWarnings: z.record(z.string(), z.string()).optional(),
   fieldEvidence: z.record(z.string(), FieldEvidenceSchema).default({}),
-  ocrHighlights: z.array(OcrHighlightSchema).default([])
+  ocrHighlights: z.array(OcrHighlightSchema).default([]),
+  documentType: z.enum(['INVOICE', 'NOT_INVOICE', 'UNCERTAIN']).optional(),
+  supplierIdentity: SupplierIdentitySchema.optional()
 });
 export type DocumentExtraction = z.infer<typeof DocumentExtractionSchema>;
 
@@ -278,6 +312,19 @@ export const RoutineDecisionSchema = z.object({
 });
 export type RoutineDecision = z.infer<typeof RoutineDecisionSchema>;
 
+export const HandoffSchema = z.object({
+  requiredRole: z.enum(['CHIEF_ACCOUNTANT','CFO']),
+  invoiceNumber:z.string(), primaryRuleId:z.string(), question:z.string(),
+  facts:z.array(z.object({field:z.string(),label:z.string(),value:z.string(),source:z.string()})),
+  options:z.tuple([ActionOptionSchema,ActionOptionSchema]),
+  openIssues:z.array(RuleFindingSchema),
+  evidenceRefs:z.array(z.object({kind:z.enum(['ARTIFACT','CONFIRMATION','POLICY']),ref:z.string(),description:z.string()})),
+  policyRef:z.object({version:z.string(),hash:z.string().optional(),clause:z.string()}),
+  questionSource:z.enum(['POLICY_TEMPLATE','AI_GROUNDED']),
+  automatedCheck:z.object({valid:z.boolean(),errors:z.array(z.string())}),
+});
+export type RefereeHandoff = z.infer<typeof HandoffSchema>;
+
 // 5. Schema Thông tin Trùng lặp Hóa đơn (IMP-13)
 export const DuplicateInfoSchema = z.object({
   isDuplicate: z.boolean(),
@@ -301,6 +348,7 @@ export const EscalatedDecisionSchema = z.object({
   sopClause: z.string(),              // Căn cứ điều khoản Tax-SOP-2026
   actionableQuestion: z.string(),     // Câu hỏi đóng cụ thể
   options: z.tuple([ActionOptionSchema, ActionOptionSchema]), // Bắt buộc đúng 2 phương án A và B
+  handoff:HandoffSchema.optional(),
   requiresCFO: z.boolean().default(false),
   applicableRegulations: z.array(z.string()).optional(), // Căn cứ pháp luật áp dụng theo ngày hóa đơn
   sopVersion: z.string().optional(),  // Phiên bản SOP áp dụng
@@ -394,8 +442,9 @@ export type SystemNotification = z.infer<typeof SystemNotificationSchema>;
 
 // 12. Schema Danh bạ Nhà cung cấp & Bằng chứng tra cứu CQT (Giai đoạn 1 - Module 2)
 export const SupplierMasterSchema = z.object({
-  taxCode: z.string().trim().regex(/^\d{10}(?:-\d{3})?$/, 'MST phải có 10 hoặc 13 chữ số'),
+  taxCode: z.string().trim().regex(TAX_CODE_FORMAT_REGEX, 'MST phải có 10, 12 hoặc 13 chữ số'),
   legalName: z.string().trim().min(1, 'Tên pháp lý không được để trống'),
+  internationalName: z.string().optional(),
   tradeName: z.string().optional(),
   address: z.string().optional(),
   status: z.enum(['ACTIVE', 'SUSPENDED', 'CLOSED', 'RELOCATED']).default('ACTIVE'),
@@ -403,7 +452,7 @@ export const SupplierMasterSchema = z.object({
   riskLevel: z.enum(['LOW', 'MEDIUM', 'HIGH_RISK_INVOICE']).default('LOW'),
   defaultExpenseAccount: z.string().optional(),
   lastVerifiedAt: z.string(),
-  verificationSource: z.enum(['TCT_PORTAL', 'NATIONAL_BIZ_REGISTRY', 'MANUAL']).default('MANUAL'),
+  verificationSource: z.enum(['TCT_PORTAL', 'NATIONAL_BIZ_REGISTRY', 'XINVOICE_TAX_API', 'MANUAL']).default('MANUAL'),
   evidenceSnapshotPath: z.string().optional(),
   notes: z.string().optional(),
   createdAt: z.string(),
@@ -435,7 +484,7 @@ export const TctInvoiceSchema = z.object({
   invoiceTemplate: z.string().trim().optional(),
   invoiceNumber: z.string().trim().min(1),
   invoiceDate: IsoDateSchema,
-  supplierTaxCode: z.string().trim().regex(/^\d{10}(?:-\d{3})?$/, 'MST phải có 10 hoặc 13 chữ số'),
+  supplierTaxCode: z.string().trim().regex(TAX_CODE_FORMAT_REGEX, 'MST phải có 10, 12 hoặc 13 chữ số'),
   supplierName: z.string().trim().min(1),
   buyerTaxCode: z.string().trim().optional(),
   preTaxAmount: AmountSchema,

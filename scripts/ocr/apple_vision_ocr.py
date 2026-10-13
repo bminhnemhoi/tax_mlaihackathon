@@ -3,28 +3,30 @@
 Apple Vision Framework Local Neural OCR Engine với Blur Detection & Confidence Scoring
 Tối ưu hóa chạy trên Apple Silicon Neural Engine (NPU) và GPU của macOS.
 """
-import sys
+
 import json
-import time
 import os
+import sys
+import time
 
 try:
-    import Vision
-    import Quartz
     import Cocoa
+    import Quartz
+    import Vision
     from PIL import Image, ImageFilter, ImageStat
 except ImportError as e:
-    print(json.dumps({"error": f"Required library not available: {str(e)}"}))
+    print(json.dumps({"error": f"Required library not available: {e!s}"}))
     sys.exit(1)
 
-def calculate_image_blur(image_path):
+
+def calculate_image_blur(image_path: str) -> tuple[float, bool]:
     """
     Đo độ sắc nét / độ mờ của ảnh bằng phương sai cạnh vi sai (Laplacian/Edge Variance) qua Pillow.
     - Ảnh rõ nét, chữ sắc sảo: edge_variance >= 120.0
     - Ảnh mờ nét, chụp rung tay, out-focus: edge_variance < 80.0
     """
-    try:
-        img = Image.open(image_path).convert("L")
+    with Image.open(image_path) as source:
+        img = source.convert("L")
         # Resize nhẹ nếu ảnh quá lớn để đo blur < 10ms
         img.thumbnail((1000, 1000))
         edges = img.filter(ImageFilter.FIND_EDGES)
@@ -32,15 +34,19 @@ def calculate_image_blur(image_path):
         variance = stat.var[0]
         is_blurry = variance < 70.0
         return round(float(variance), 2), bool(is_blurry)
-    except Exception as e:
-        return 100.0, False
 
-def run_apple_vision_ocr(image_path, recognition_level="accurate"):
+
+def run_apple_vision_ocr(
+    image_path: str, recognition_level: str = "accurate"
+) -> dict[str, object]:
     t0 = time.time()
     if not os.path.exists(image_path):
         return {"error": f"File not found: {image_path}"}
 
-    blur_score, is_blurry = calculate_image_blur(image_path)
+    try:
+        blur_score, is_blurry = calculate_image_blur(image_path)
+    except (OSError, ValueError) as error:
+        return {"error": f"Cannot decode image file: {error!s}"}
 
     url = Cocoa.NSURL.fileURLWithPath_(image_path)
     image = Quartz.CIImage.imageWithContentsOfURL_(url)
@@ -49,7 +55,7 @@ def run_apple_vision_ocr(image_path, recognition_level="accurate"):
 
     handler = Vision.VNImageRequestHandler.alloc().initWithCIImage_options_(image, None)
     request = Vision.VNRecognizeTextRequest.alloc().init()
-    
+
     if recognition_level == "fast":
         request.setRecognitionLevel_(Vision.VNRequestTextRecognitionLevelFast)
     else:
@@ -71,7 +77,7 @@ def run_apple_vision_ocr(image_path, recognition_level="accurate"):
         top_candidates = obs.topCandidates_(2)
         if not top_candidates:
             continue
-            
+
         primary = top_candidates[0]
         text = primary.string()
         conf = float(primary.confidence())
@@ -79,22 +85,23 @@ def run_apple_vision_ocr(image_path, recognition_level="accurate"):
 
         # Lấy tọa độ bounding box (tỉ lệ 0.0 - 1.0)
         box = obs.boundingBox()
+        # Vision uses a bottom-left origin while the receipt parser and UI use
+        # the standard top-left image origin. Convert here so all OCR engines
+        # share one coordinate convention.
         bbox_dict = {
             "x": round(float(box.origin.x), 3),
-            "y": round(float(box.origin.y), 3),
+            "y": round(1.0 - float(box.origin.y) - float(box.size.height), 3),
             "w": round(float(box.size.width), 3),
-            "h": round(float(box.size.height), 3)
+            "h": round(float(box.size.height), 3),
         }
 
         # Nếu có ứng viên thay thế sát nút (nguy cơ đọc nhầm chữ số/ký tự)
         alt_text = top_candidates[1].string() if len(top_candidates) > 1 else None
-        alt_conf = float(top_candidates[1].confidence()) if len(top_candidates) > 1 else None
+        alt_conf = (
+            float(top_candidates[1].confidence()) if len(top_candidates) > 1 else None
+        )
 
-        line_item = {
-            "text": text,
-            "confidence": round(conf, 3),
-            "bbox": bbox_dict
-        }
+        line_item = {"text": text, "confidence": round(conf, 3), "bbox": bbox_dict}
 
         if alt_text and alt_conf and (conf - alt_conf < 0.15):
             line_item["alternative"] = alt_text
@@ -103,13 +110,15 @@ def run_apple_vision_ocr(image_path, recognition_level="accurate"):
 
         # Ngưỡng cảnh báo chữ mờ / độ tin cậy thấp: < 0.75
         if conf < 0.75:
-            low_confidence_lines.append({
-                "text": text,
-                "confidence": round(conf, 3),
-                "bbox": bbox_dict,
-                "alternative": alt_text,
-                "reason": "Chữ in bị mờ nét, đứt đoạn hoặc nhòe quang học"
-            })
+            low_confidence_lines.append(
+                {
+                    "text": text,
+                    "confidence": round(conf, 3),
+                    "bbox": bbox_dict,
+                    "alternative": alt_text,
+                    "reason": "Chữ in bị mờ nét, đứt đoạn hoặc nhòe quang học",
+                }
+            )
 
     t1 = time.time()
     elapsed_ms = round((t1 - t0) * 1000, 1)
@@ -127,12 +136,17 @@ def run_apple_vision_ocr(image_path, recognition_level="accurate"):
         "totalLines": len(lines),
         "lines": lines,
         "lowConfidenceLines": low_confidence_lines,
-        "fullText": "\n".join([line["text"] for line in lines])
+        "fullText": "\n".join([line["text"] for line in lines]),
     }
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print(json.dumps({"error": "Usage: apple_vision_ocr.py <image_path> [accurate|fast]"}))
+        print(
+            json.dumps(
+                {"error": "Usage: apple_vision_ocr.py <image_path> [accurate|fast]"}
+            )
+        )
         sys.exit(1)
 
     img_path = sys.argv[1]

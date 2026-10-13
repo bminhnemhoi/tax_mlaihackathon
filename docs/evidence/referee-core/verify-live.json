@@ -1,0 +1,124 @@
+{
+  "timestamp": "2026-10-12T16:25:26.133Z",
+  "origin": "http://localhost:3000",
+  "pages": [
+    {
+      "route": "/",
+      "status": 200
+    },
+    {
+      "route": "/sop",
+      "status": 200
+    },
+    {
+      "route": "/verify",
+      "status": 200
+    },
+    {
+      "route": "/api/health",
+      "status": 200
+    }
+  ],
+  "summary": {
+    "runId": "7a35c193-777e-4b93-959e-e11b977f6951",
+    "policyHash": "dec264eacbba4467ca7fce5899bfa089285b71aa022da5f982a69e27bdf91545",
+    "executionMode": "DETERMINISTIC_LOCAL_PER_CASE",
+    "errorCases": 0,
+    "mode": "challenge_a",
+    "totalCases": 5,
+    "passedCases": 5,
+    "routineCases": 3,
+    "escalatedCases": 2,
+    "schemaValidCases": 5,
+    "allSchemaValid": true,
+    "isMatchExpected": true,
+    "totalTimeMs": 75,
+    "timestamp": "2026-10-12T16:25:26.130Z",
+    "policyVersion": "TAX-SOP-2026-v2.5",
+    "fixtureHash": "cbdf70a6334f73c92bc14bc46f83b54adf7c9bdfa2556db09fd7c3cc2d6b6130",
+    "metrics": {
+      "falseNegativeRate": 0,
+      "falseNegativeCases": 0,
+      "falsePositiveRate": 0,
+      "falsePositiveCases": 0,
+      "straightThroughProcessingRate": 60,
+      "routineCompletionRate": 100,
+      "autoApprovedRoutineCases": 3,
+      "denominators": {
+        "expectedEscalated": 2,
+        "expectedRoutine": 3,
+        "total": 5
+      },
+      "thresholdAdaptationStatus": "Hồi quy/phát triển tổng hợp; không phải đánh giá độc lập"
+    }
+  },
+  "results": [
+    {
+      "id": "A-01",
+      "actual": "ROUTINE",
+      "requiresCFO": false,
+      "workflow": "APPROVED",
+      "voucher": true,
+      "audit": true,
+      "questionCheck": {
+        "valid": true,
+        "errors": []
+      },
+      "pass": true
+    },
+    {
+      "id": "A-02",
+      "actual": "ROUTINE",
+      "requiresCFO": false,
+      "workflow": "APPROVED",
+      "voucher": true,
+      "audit": true,
+      "questionCheck": {
+        "valid": true,
+        "errors": []
+      },
+      "pass": true
+    },
+    {
+      "id": "A-03",
+      "actual": "ROUTINE",
+      "requiresCFO": false,
+      "workflow": "APPROVED",
+      "voucher": true,
+      "audit": true,
+      "questionCheck": {
+        "valid": true,
+        "errors": []
+      },
+      "pass": true
+    },
+    {
+      "id": "A-04",
+      "actual": "ESCALATED",
+      "group": "OUT_OF_POLICY",
+      "requiresCFO": false,
+      "workflow": "WAITING_CHIEF_ACCOUNTANT",
+      "voucher": false,
+      "audit": true,
+      "questionCheck": {
+        "valid": true,
+        "errors": []
+      },
+      "pass": true
+    },
+    {
+      "id": "A-05",
+      "actual": "ESCALATED",
+      "group": "EXCEED_AUTHORITY",
+      "requiresCFO": true,
+      "workflow": "WAITING_CFO",
+      "voucher": false,
+      "audit": true,
+      "questionCheck": {
+        "valid": true,
+        "errors": []
+      },
+      "pass": true
+    }
+  ]
+}

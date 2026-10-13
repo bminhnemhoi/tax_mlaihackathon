@@ -29,9 +29,9 @@ export function listSuppliers(filters?: {
     params.push(filters.riskLevel);
   }
   if (filters?.query) {
-    sql += ' AND (tax_code LIKE ? OR legal_name LIKE ? OR trade_name LIKE ?)';
+    sql += ' AND (tax_code LIKE ? OR legal_name LIKE ? OR international_name LIKE ? OR trade_name LIKE ?)';
     const q = `%${filters.query.trim()}%`;
-    params.push(q, q, q);
+    params.push(q, q, q, q);
   }
 
   sql += ' ORDER BY legal_name ASC';
@@ -39,6 +39,7 @@ export function listSuppliers(filters?: {
   const rows = db.prepare(sql).all(...params) as Array<{
     tax_code: string;
     legal_name: string;
+    international_name: string | null;
     trade_name: string | null;
     address: string | null;
     status: string;
@@ -57,6 +58,7 @@ export function listSuppliers(filters?: {
     SupplierMasterSchema.parse({
       taxCode: r.tax_code,
       legalName: r.legal_name,
+      internationalName: r.international_name || undefined,
       tradeName: r.trade_name || undefined,
       address: r.address || undefined,
       status: r.status,
@@ -79,6 +81,7 @@ export function getSupplier(taxCode: string): SupplierMaster | null {
   const r = db.prepare('SELECT * FROM supplier_master WHERE tax_code = ?').get(cleanMst) as {
     tax_code: string;
     legal_name: string;
+    international_name: string | null;
     trade_name: string | null;
     address: string | null;
     status: string;
@@ -98,6 +101,7 @@ export function getSupplier(taxCode: string): SupplierMaster | null {
   return SupplierMasterSchema.parse({
     taxCode: r.tax_code,
     legalName: r.legal_name,
+    internationalName: r.international_name || undefined,
     tradeName: r.trade_name || undefined,
     address: r.address || undefined,
     status: r.status,
@@ -116,13 +120,14 @@ export function getSupplier(taxCode: string): SupplierMaster | null {
 export function upsertSupplier(data: {
   taxCode: string;
   legalName: string;
+  internationalName?: string;
   tradeName?: string;
   address?: string;
   status?: 'ACTIVE' | 'SUSPENDED' | 'CLOSED' | 'RELOCATED';
   establishedDate?: string;
   riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH_RISK_INVOICE';
   defaultExpenseAccount?: string;
-  verificationSource?: 'TCT_PORTAL' | 'NATIONAL_BIZ_REGISTRY' | 'MANUAL';
+  verificationSource?: 'TCT_PORTAL' | 'NATIONAL_BIZ_REGISTRY' | 'XINVOICE_TAX_API' | 'MANUAL';
   evidenceSnapshotPath?: string;
   notes?: string;
 }): SupplierMaster {
@@ -139,18 +144,19 @@ export function upsertSupplier(data: {
 
   db.prepare(`
     INSERT INTO supplier_master (
-      tax_code, legal_name, trade_name, address, status,
+      tax_code, legal_name, international_name, trade_name, address, status,
       established_date, risk_level, default_expense_account,
       last_verified_at, verification_source, evidence_snapshot_path,
       notes, created_at, updated_at
     ) VALUES (
-      @taxCode, @legalName, @tradeName, @address, @status,
+      @taxCode, @legalName, @internationalName, @tradeName, @address, @status,
       @establishedDate, @riskLevel, @defaultExpenseAccount,
       @lastVerifiedAt, @verificationSource, @evidenceSnapshotPath,
       @notes, @createdAt, @updatedAt
     )
     ON CONFLICT(tax_code) DO UPDATE SET
       legal_name = excluded.legal_name,
+      international_name = COALESCE(excluded.international_name, supplier_master.international_name),
       trade_name = COALESCE(excluded.trade_name, supplier_master.trade_name),
       address = COALESCE(excluded.address, supplier_master.address),
       status = excluded.status,
@@ -165,6 +171,7 @@ export function upsertSupplier(data: {
   `).run({
     taxCode: cleanMst,
     legalName: data.legalName.trim(),
+    internationalName: data.internationalName?.trim() || null,
     tradeName: data.tradeName?.trim() || null,
     address: data.address?.trim() || null,
     status,
@@ -235,7 +242,7 @@ export function seedDefaultSuppliers(): void {
       status: 'ACTIVE' as const,
       riskLevel: 'LOW' as const,
       defaultExpenseAccount: '6422',
-      verificationSource: 'TCT_PORTAL' as const,
+      verificationSource: 'MANUAL' as const,
       notes: 'Nhà cung cấp viễn thông chuẩn quốc gia'
     },
     {
@@ -246,7 +253,7 @@ export function seedDefaultSuppliers(): void {
       status: 'ACTIVE' as const,
       riskLevel: 'LOW' as const,
       defaultExpenseAccount: '6422',
-      verificationSource: 'TCT_PORTAL' as const,
+      verificationSource: 'MANUAL' as const,
       notes: 'Nhà cung cấp phần mềm kế toán và hóa đơn điện tử'
     },
     {
@@ -257,7 +264,7 @@ export function seedDefaultSuppliers(): void {
       status: 'ACTIVE' as const,
       riskLevel: 'LOW' as const,
       defaultExpenseAccount: '6422',
-      verificationSource: 'TCT_PORTAL' as const,
+      verificationSource: 'MANUAL' as const,
       notes: 'Nhà cung cấp dịch vụ Internet và chữ ký số'
     },
     {
@@ -268,7 +275,7 @@ export function seedDefaultSuppliers(): void {
       status: 'ACTIVE' as const,
       riskLevel: 'LOW' as const,
       defaultExpenseAccount: '6422',
-      verificationSource: 'TCT_PORTAL' as const,
+      verificationSource: 'MANUAL' as const,
       notes: 'Đường truyền Internet văn phòng'
     },
     {
@@ -279,7 +286,7 @@ export function seedDefaultSuppliers(): void {
       status: 'ACTIVE' as const,
       riskLevel: 'LOW' as const,
       defaultExpenseAccount: '6428',
-      verificationSource: 'TCT_PORTAL' as const,
+      verificationSource: 'MANUAL' as const,
       notes: 'Chuỗi cửa hàng tiện lợi phục vụ văn phòng phẩm và đồ uống tiếp khách'
     },
     {
@@ -290,12 +297,12 @@ export function seedDefaultSuppliers(): void {
       status: 'ACTIVE' as const,
       riskLevel: 'LOW' as const,
       defaultExpenseAccount: '6428',
-      verificationSource: 'TCT_PORTAL' as const,
+      verificationSource: 'MANUAL' as const,
       notes: 'Cung cấp nhu yếu phẩm và văn phòng phẩm'
     }
   ];
 
   for (const s of defaultSuppliers) {
-    upsertSupplier(s);
+    if (!getSupplier(s.taxCode)) upsertSupplier(s);
   }
 }

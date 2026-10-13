@@ -33,11 +33,11 @@ export const TaxDefenseModal: React.FC<TaxDefenseModalProps> = ({ entry, onClose
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
-              <DialogTitle className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+              <DialogTitle className="text-xl font-semibold text-slate-900 flex items-center gap-2">
                 Hồ sơ Giải trình Thuế 1-Click (Tax Defense Dossier)
               </DialogTitle>
               <DialogDescription className="text-xs text-slate-500 font-numeric mt-0.5">
-                Mã tham chiếu kiểm toán: <span className="text-emerald-700 font-bold">{entry.id}</span>
+                Mã tham chiếu kiểm toán: <span className="text-emerald-700 font-medium">{entry.id}</span>
               </DialogDescription>
             </div>
           </div>
@@ -51,7 +51,7 @@ export const TaxDefenseModal: React.FC<TaxDefenseModalProps> = ({ entry, onClose
               <Award className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-emerald-900 flex items-center gap-2">
+              <h4 className="text-sm font-medium text-emerald-900 flex items-center gap-2">
                 Hồ sơ giải trình đã ghi nhận hợp lệ
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               </h4>
@@ -65,23 +65,23 @@ export const TaxDefenseModal: React.FC<TaxDefenseModalProps> = ({ entry, onClose
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90">
               <span className="text-xs text-slate-500 font-medium">Hóa đơn kiểm toán:</span>
-              <p className="text-sm font-bold text-slate-900 mt-1 flex items-center gap-2 font-numeric">
+              <p className="text-sm font-medium text-slate-900 mt-1 flex items-center gap-2 font-numeric">
                 <FileText className="w-4 h-4 text-blue-600" />
                 Mã HĐ: {entry.invoiceId}
               </p>
               <p className="text-xs text-slate-700 mt-1.5 flex items-center gap-2 font-medium">
-                <Building2 className="w-4 h-4 text-slate-400" />
+                <Building2 className="w-4 h-4 text-slate-500" />
                 Đơn vị bán: {entry.supplierName}
               </p>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90">
               <span className="text-xs text-slate-500 font-medium">Giá trị thanh toán:</span>
-              <p className="text-xl font-numeric font-extrabold text-emerald-700 mt-1">
+              <p className="text-xl font-numeric font-semibold text-emerald-700 mt-1">
                 {formatVND(entry.totalAmount)}
               </p>
               <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-2 font-numeric font-medium">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <Calendar className="w-3.5 h-3.5 text-slate-500" />
                 Thời điểm ghi nhận: {formatDateTime(entry.timestamp)}
               </p>
             </div>
@@ -91,32 +91,32 @@ export const TaxDefenseModal: React.FC<TaxDefenseModalProps> = ({ entry, onClose
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-2">
             <span className="text-xs text-slate-500 font-medium">Quyết định xử lý của người có thẩm quyền:</span>
             <div className="flex items-center gap-3">
-              <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200 font-bold">
+              <Badge variant="secondary" className="bg-slate-100 text-slate-800 border-slate-200 font-medium">
                 Người duyệt: {entry.actor === 'CHIEF_ACCOUNTANT' ? 'Kế toán trưởng (KTT)' : entry.actor === 'CFO' ? 'Giám đốc Tài chính (CFO)' : 'Hệ thống AI Referee'}
               </Badge>
-              <span className="text-xs font-bold text-slate-800">
+              <span className="text-xs font-medium text-slate-800">
                 Hành động: {entry.actionTaken}
               </span>
             </div>
             <p className="text-xs text-slate-700 bg-white p-3 rounded-lg border border-slate-200 leading-relaxed italic">
-              "{entry.plainExplanation}"
+              {entry.plainExplanation}
             </p>
           </div>
 
           {/* Legal Basis & Digital Signature */}
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-2.5">
-            <h5 className="text-[11px] uppercase tracking-wider font-bold text-slate-500">
+            <h5 className="text-[11px] uppercase tracking-wider font-medium text-slate-500">
               Căn cứ pháp lý và trạng thái chứng thực
             </h5>
             <div className="space-y-1.5 text-xs text-slate-700 font-medium">
-              <p>• Căn cứ quy chế nội bộ: <span className="text-purple-700 font-bold font-numeric">{entry.sopVersion || 'Tax-SOP-2026 v2.1'}</span></p>
+              <p>• Căn cứ quy chế nội bộ: <span className="text-purple-700 font-medium font-numeric">{entry.sopVersion || 'Tax-SOP-2026 v2.1'}</span></p>
               {entry.applicableRegulations && entry.applicableRegulations.length > 0 ? (
-                <p>• Văn bản pháp quy Nhà nước có hiệu lực: <span className="text-blue-700 font-bold font-numeric">{entry.applicableRegulations.join(' · ')}</span></p>
+                <p>• Văn bản pháp quy Nhà nước có hiệu lực: <span className="text-blue-700 font-medium font-numeric">{entry.applicableRegulations.join(' · ')}</span></p>
               ) : (
                 <p>• Căn cứ pháp quy Nhà nước: Nghị định 123/2020/NĐ-CP, Nghị định 72/2024/NĐ-CP & Thông tư 219/2013/TT-BTC</p>
               )}
               <p>• Audit hash: <span className="font-numeric text-slate-600">Được lưu vết bảo mật trong chuỗi kiểm toán hệ thống</span></p>
-              <p>• Trạng thái ký số: <span className="text-amber-700 font-bold">Lưu vết xác thực điện tử nội bộ</span></p>
+              <p>• Trạng thái ký số: <span className="text-amber-700 font-medium">Lưu vết xác thực điện tử nội bộ</span></p>
             </div>
           </div>
         </div>
@@ -127,7 +127,7 @@ export const TaxDefenseModal: React.FC<TaxDefenseModalProps> = ({ entry, onClose
             type="button"
             variant="outline"
             onClick={() => window.print()}
-            className="flex items-center gap-2 border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-bold text-xs"
+            className="flex items-center gap-2 border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-medium text-xs"
           >
             <Printer className="w-4 h-4 text-slate-500" />
             <span>In / Xuất PDF Giải trình</span>
@@ -136,7 +136,7 @@ export const TaxDefenseModal: React.FC<TaxDefenseModalProps> = ({ entry, onClose
           <Button
             type="button"
             onClick={onClose}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs"
           >
             Đóng cửa sổ
           </Button>

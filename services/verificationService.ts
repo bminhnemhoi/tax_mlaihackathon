@@ -1,27 +1,29 @@
-import {runIsolated,getDatabase, getActivePolicy, hashPayload} from '@/lib/server/db';
-import {RefereeDecisionSchema} from '@/lib/schemas';
-import {evaluateWorkflow,readRecord} from './workflowService';
-import {challengeCases,commonCases,regressionCases,demoCompanyTaxCode,VerificationCase} from '@/data/verification/challengeCases';
+import {runIsolated,getActivePolicy,hashPayload} from '@/lib/server/db';
+import {challengeCases,commonCases,regressionCases,demoCompanyTaxCode} from '@/data/verification/challengeCases';
+import {developmentCases,RefereeCase} from '@/data/verification/developmentCases';
+import {evaluateRefereeCases} from './refereeEvaluationService';
 import crypto from 'node:crypto';
-export async function runVerification(mode='challenge_a') {
- if(!['common_4','challenge_a','regression_15'].includes(mode))throw new Error('Bộ kiểm thử không hợp lệ.');
- const cases=mode==='common_4'?commonCases:mode==='regression_15'?regressionCases:challengeCases;
- return runIsolated(async()=>{
- const db=getDatabase();const policy=getActivePolicy();policy.config.companyTaxCode=demoCompanyTaxCode;
- db.prepare('UPDATE policy_versions SET payload_json=? WHERE version=?').run(JSON.stringify(policy),policy.version);
- const start=Date.now();const results=[];
- for(const c of cases){const t=Date.now();try{
- const r=await evaluateWorkflow(c.invoice,null,{forceLocalOnly:true});const d=r.decision;const row=readRecord(c.invoice.id);
- const voucher=db.prepare('SELECT id FROM internal_vouchers WHERE invoice_id=?').get(c.invoice.id);
- const audit=db.prepare('SELECT id FROM audit_events WHERE entity_id=?').get(c.invoice.id);
- const schemaValid=RefereeDecisionSchema.safeParse(d).success;
- const classified=d.status===c.expectedStatus && (d.status!=='ESCALATED' || d.riskGroup===c.expectedRiskGroup && d.requiresCFO===c.expectedRequiresCFO);
- const effects=d.status==='ROUTINE'?row.status==='APPROVED' && Boolean(voucher) && Boolean(audit) && row.approved_deductible_tax===c.invoice.taxAmount:row.approved_deductible_tax===0 && !voucher && Boolean(audit);
- results.push({testId:c.id,sourceFile:c.name,invoiceNumber:c.invoice.invoiceNumber,supplierName:c.invoice.supplierName,totalAmount:c.invoice.totalAmount,expectedStatus:c.expectedStatus,actualStatus:d.status,riskGroup:d.status==='ESCALATED'?d.riskGroup:undefined,requiresCFO:d.status==='ESCALATED'?d.requiresCFO:false,schemaValid,isMatchExpected:classified && effects,workflowValid:effects,actualWorkflowStatus:row.status,internalVoucherCreated:Boolean(voucher),auditRecorded:Boolean(audit),approvedTax:row.approved_deductible_tax,actionableQuestion:d.status==='ESCALATED'?d.actionableQuestion:undefined,options:d.status==='ESCALATED'?d.options:undefined,plainExplanation:d.plainExplanation,provenance:c.provenance,executionTimeMs:Date.now()-t});
- }catch(e){results.push({testId:c.id,sourceFile:c.name,expectedStatus:c.expectedStatus,actualStatus:'ERROR',schemaValid:false,isMatchExpected:false,workflowValid:false,plainExplanation:e instanceof Error?e.message:'Lỗi kiểm thử'});}}
- const expectedE=cases.filter(c=>c.expectedStatus==='ESCALATED').length;const expectedR=cases.length-expectedE;
- const fn=results.filter(r=>r.expectedStatus==='ESCALATED' && r.actualStatus==='ROUTINE').length;const fp=results.filter(r=>r.expectedStatus==='ROUTINE' && r.actualStatus==='ESCALATED').length;
- const auto=results.filter(r=>r.actualStatus==='ROUTINE' && r.workflowValid).length;
- return {summary:{runId:crypto.randomUUID(),policyHash:hashPayload(policy.config),executionMode:'DETERMINISTIC_LOCAL',errorCases:results.filter(r=>r.actualStatus==='ERROR').length,mode,totalCases:cases.length,passedCases:results.filter(r=>r.isMatchExpected).length,routineCases:results.filter(r=>r.actualStatus==='ROUTINE').length,escalatedCases:results.filter(r=>r.actualStatus==='ESCALATED').length,schemaValidCases:results.filter(r=>r.schemaValid).length,allSchemaValid:results.every(r=>r.schemaValid),isMatchExpected:results.every(r=>r.isMatchExpected),totalTimeMs:Date.now()-start,timestamp:new Date().toISOString(),policyVersion:policy.version,fixtureHash:hashPayload(cases),metrics:{falseNegativeRate:expectedE?fn/expectedE*100:0,falseNegativeCases:fn,falsePositiveRate:expectedR?fp/expectedR*100:0,falsePositiveCases:fp,straightThroughProcessingRate:auto/cases.length*100,routineCompletionRate:expectedR?results.filter(r=>r.expectedStatus==='ROUTINE' && r.actualStatus==='ROUTINE' && r.workflowValid).length/expectedR*100:0,autoApprovedRoutineCases:auto,denominators:{expectedEscalated:expectedE,expectedRoutine:expectedR,total:cases.length},thresholdAdaptationStatus:'Bộ hồi quy tổng hợp; không phải đánh giá độc lập'}},results};
- });
+import type {ActionOption,RefereeHandoff,RiskGroup} from '@/lib/schemas';
+export interface VerificationResult {testId:string;sourceFile:string;expectedStatus:string;actualStatus:string;schemaValid:boolean;isMatchExpected:boolean;workflowValid:boolean;plainExplanation:string;invoiceNumber?:string;supplierName?:string;totalAmount?:number;riskGroup?:RiskGroup;requiresCFO?:boolean;actualWorkflowStatus?:string;internalVoucherCreated?:boolean;auditRecorded?:boolean;approvedTax?:number;actionableQuestion?:string;questionCheck?:{valid:boolean;errors:string[]};handoff?:RefereeHandoff;options?:ActionOption[];provenance?:string;executionTimeMs?:number}
+export interface VerificationSummary {runId:string;policyHash:string;executionMode:string;errorCases:number;mode:string;totalCases:number;passedCases:number;routineCases:number;escalatedCases:number;schemaValidCases:number;allSchemaValid:boolean;isMatchExpected:boolean;totalTimeMs:number;timestamp:string;policyVersion:string;fixtureHash:string;metrics:{falseNegativeRate:number;falseNegativeCases:number;falsePositiveRate:number;falsePositiveCases:number;straightThroughProcessingRate:number;routineCompletionRate:number;autoApprovedRoutineCases:number;denominators:{expectedEscalated:number;expectedRoutine:number;total:number};thresholdAdaptationStatus:string}}
+export async function runVerification(mode='challenge_a'):Promise<{summary:VerificationSummary;results:VerificationResult[]}> {
+ if(!['common_4','challenge_a','regression_15','development_60'].includes(mode))throw new Error('Bộ kiểm thử không hợp lệ.');
+ const fixtures=mode==='common_4'?commonCases:mode==='regression_15'?regressionCases:mode==='development_60'?developmentCases:challengeCases;
+ const cases:RefereeCase[]=fixtures.map(c=>({...c,rationale:'rationale' in c?c.rationale:'Kết quả kỳ vọng của bộ hồi quy theo SOP.'}));
+ const policy=await runIsolated(async()=>{const p=getActivePolicy();p.config.companyTaxCode=demoCompanyTaxCode;return p;});
+ const start=performance.now();const report=await evaluateRefereeCases(cases,policy);
+ const results=report.results.map((r,index):VerificationResult=>r.actual==='ERROR'?{testId:r.id,sourceFile:r.name,expectedStatus:r.expected,actualStatus:'ERROR',schemaValid:false,isMatchExpected:false,workflowValid:false,plainExplanation:r.error}:({
+  testId:r.id,sourceFile:r.name,invoiceNumber:cases[index].invoice.invoiceNumber || r.decision.invoiceId,supplierName:r.decision.supplierName,totalAmount:r.decision.totalAmount,expectedStatus:r.expected,actualStatus:r.actual,
+  riskGroup:r.actualRiskGroup||undefined,requiresCFO:r.requiresCFO,schemaValid:true,isMatchExpected:r.match&&r.questionCheck.valid,workflowValid:r.workflowValid,
+  actualWorkflowStatus:r.workflow,internalVoucherCreated:r.voucher,auditRecorded:r.auditCount>0,approvedTax:r.approvedTax,
+  actionableQuestion:r.question||undefined,questionCheck:r.questionCheck,handoff:r.decision.status==='ESCALATED'?r.decision.handoff:undefined,
+  options:r.decision.status==='ESCALATED'?r.decision.options:undefined,plainExplanation:r.decision.plainExplanation,provenance:r.provenance,executionTimeMs:r.durationMs}));
+ const expectedE=cases.filter(c=>c.expectedStatus==='ESCALATED').length,expectedR=cases.length-expectedE;
+ return {summary:{runId:crypto.randomUUID(),policyHash:report.policyHash,executionMode:'DETERMINISTIC_LOCAL_PER_CASE',errorCases:report.errors,mode,totalCases:cases.length,
+  passedCases:results.filter(r=>r.isMatchExpected).length,routineCases:results.filter(r=>r.actualStatus==='ROUTINE').length,escalatedCases:results.filter(r=>r.actualStatus==='ESCALATED').length,
+  schemaValidCases:results.filter(r=>r.schemaValid).length,allSchemaValid:results.every(r=>r.schemaValid),isMatchExpected:results.every(r=>r.isMatchExpected),
+  totalTimeMs:Math.round(performance.now()-start),timestamp:new Date().toISOString(),policyVersion:policy.version,fixtureHash:hashPayload(cases),
+  metrics:{falseNegativeRate:(report.falseNegative.rate||0)*100,falseNegativeCases:report.falseNegative.count,falsePositiveRate:(report.falsePositive.rate||0)*100,falsePositiveCases:report.falsePositive.count,
+   straightThroughProcessingRate:(report.stp.rate||0)*100,routineCompletionRate:(report.routineCompletion.rate||0)*100,autoApprovedRoutineCases:report.stp.count,
+   denominators:{expectedEscalated:expectedE,expectedRoutine:expectedR,total:cases.length},thresholdAdaptationStatus:'Hồi quy/phát triển tổng hợp; không phải đánh giá độc lập'}},results};
 }

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, ChildProcess } from 'node:child_process';
 import Database from 'better-sqlite3';
-import { isAppleVisionAvailable } from '../../services/localOcrService';
+import { createInvoiceImageFixture } from './invoice-image-fixture';
 
 async function main() {
   const build = path.resolve(process.env.NEXT_BUILD_DIR || '.next');
@@ -19,16 +19,15 @@ async function main() {
     await new Promise<void>((resolve) => { running.once('exit', () => resolve()); running.kill('SIGTERM'); });
     child = undefined;
   };
-  const start = async (enableLocalPreflight = false) => {
+  const start = async () => {
     child = spawn(process.execPath, [path.join(build, 'standalone/server.js')], {
       env: {
         ...process.env,
         PORT: port,
         HOSTNAME: '127.0.0.1',
         NODE_ENV: 'production',
-        DOCUMENT_IMAGE_ENGINE: 'local-ocr',
-        LOCAL_IMAGE_PREFLIGHT: enableLocalPreflight ? 'true' : 'false',
-        LOCAL_OCR_URL: '',
+        SHOPAIKEY_API_KEY: '',
+        LOCAL_OCR_URL: 'http://127.0.0.1:9',
         TAX_REFEREE_DATA_DIR: runtime,
         TAX_REFEREE_DB_PATH: path.join(runtime, 'internal.sqlite')
       },
@@ -64,7 +63,7 @@ async function main() {
     assert.ok(token && Date.parse(expiresAt) > Date.now());
     assert.match(qr.pathname, new RegExp(`/capture/${id}$`));
 
-    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j0ioAAAAASUVORK5CYII=', 'base64');
+    const png = await createInvoiceImageFixture();
     const upload = async (activeToken: string, image: Buffer = png, type = 'image/png', filename = 'camera.png') => {
       const form = new FormData();
       form.append('token', activeToken);
@@ -78,6 +77,10 @@ async function main() {
     wrongType.append('token', token!);
     wrongType.append('file', new Blob(['plain text'], { type: 'text/plain' }), 'invoice.txt');
     assert.equal((await request('/api/capture-sessions/upload', { method: 'POST', body: wrongType })).response.status, 415);
+
+    const tiny = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j0ioAAAAASUVORK5CYII=', 'base64');
+    assert.equal((await upload(token!, tiny)).response.status, 422);
+    assert.equal((await request(`/api/capture-sessions/${id}`, { headers: { cookie } })).body.status, 'WAITING', 'rejected image must leave the QR reusable');
 
     const uploaded = await upload(token!);
     assert.equal(uploaded.response.status, 201);
@@ -97,23 +100,29 @@ async function main() {
     const parsed = await request('/api/documents/parse', {
       method: 'POST', headers: authHeaders, body: JSON.stringify({ artifactId })
     });
-    assert.equal(parsed.response.status, 200);
-    assert.equal((parsed.body as { artifactId: string }).artifactId, artifactId);
-    assert.ok((parsed.body as { invoice: unknown }).invoice);
-    const ready = await request(`/api/capture-sessions/${id}`, {
-      method: 'PATCH', headers: authHeaders, body: JSON.stringify({ status: 'READY' })
+    assert.equal(parsed.response.status, 502);
+    assert.match((parsed.body as { error: string }).error, /SHOPAIKEY_API_KEY/);
+    const failed = await request(`/api/capture-sessions/${id}`, {
+      method: 'PATCH', headers: authHeaders, body: JSON.stringify({ status: 'FAILED', error: 'Chưa cấu hình SHOPAIKEY_API_KEY' })
     });
-    assert.equal(ready.response.status, 200);
-    assert.equal(((await request(`/api/capture-sessions/${id}`, { headers: { cookie } })).body as { status: string }).status, 'READY');
+    assert.equal(failed.response.status, 200);
 
-    const nextPhoto = await upload(token!);
+    // Exercise the ready-session follow-up lifecycle independently of any external AI key.
+    const readySession = await request('/api/capture-sessions', { method: 'POST', headers: { cookie } });
+    const readyId = (readySession.body as { id: string }).id;
+    const readyToken = new URL((readySession.body as { captureUrl: string }).captureUrl).searchParams.get('token')!;
+    assert.equal((await upload(readyToken)).response.status, 201);
+    assert.equal((await request(`/api/capture-sessions/${readyId}`, { method: 'PATCH', headers: authHeaders, body: JSON.stringify({ status: 'PROCESSING' }) })).response.status, 200);
+    assert.equal((await request(`/api/capture-sessions/${readyId}`, { method: 'PATCH', headers: authHeaders, body: JSON.stringify({ status: 'READY' }) })).response.status, 200);
+
+    const nextPhoto = await upload(readyToken);
     assert.equal(nextPhoto.response.status, 201, 'the active QR should accept a follow-up photo after the first one is ready');
-    assert.equal(((await request(`/api/capture-sessions/${id}`, { headers: { cookie } })).body as { status: string }).status, 'UPLOADED');
-    const nextProcessing = await request(`/api/capture-sessions/${id}`, {
+    assert.equal(((await request(`/api/capture-sessions/${readyId}`, { headers: { cookie } })).body as { status: string }).status, 'UPLOADED');
+    const nextProcessing = await request(`/api/capture-sessions/${readyId}`, {
       method: 'PATCH', headers: authHeaders, body: JSON.stringify({ status: 'PROCESSING' })
     });
     assert.equal(nextProcessing.response.status, 200);
-    const nextReady = await request(`/api/capture-sessions/${id}`, {
+    const nextReady = await request(`/api/capture-sessions/${readyId}`, {
       method: 'PATCH', headers: authHeaders, body: JSON.stringify({ status: 'READY' })
     });
     assert.equal(nextReady.response.status, 200);
@@ -130,40 +139,15 @@ async function main() {
     const cancelled = await request(`/api/capture-sessions/${failedId}`, { method: 'DELETE', headers: { cookie } });
     assert.equal(cancelled.response.status, 200);
 
-    const audit = await request(`/api/audit?entityId=${id}`, { headers: { cookie } });
+    const audit = await request(`/api/audit?entityId=${readyId}`, { headers: { cookie } });
     const events = (audit.body as { events: Array<{ eventType: string }> }).events;
     assert.ok(events.some((event) => event.eventType === 'CAPTURE_SESSION_CREATED'));
     assert.ok(events.some((event) => event.eventType === 'CAPTURE_SESSION_UPLOADED'));
     assert.ok(events.some((event) => event.eventType === 'CAPTURE_SESSION_PROCESSING'));
     assert.ok(events.some((event) => event.eventType === 'CAPTURE_SESSION_READY'));
 
-    console.log('PASS QR capture API: scoped token, image validation, private artifact, OCR handoff, lifecycle, expiry, audit.');
-
-    if (process.platform === 'darwin' && isAppleVisionAvailable()) {
-      await stop();
-      await start(true);
-      const localLogin = await fetch(`${origin}/api/auth/login`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'ACCOUNTANT' })
-      });
-      const localCookie = localLogin.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
-      const candidate = await request('/api/capture-sessions', { method: 'POST', headers: { cookie: localCookie } });
-      const candidateId = (candidate.body as { id: string }).id;
-      const candidateUrl = new URL((candidate.body as { captureUrl: string }).captureUrl);
-      const candidateToken = candidateUrl.searchParams.get('token')!;
-      const beforePreflightDb = new Database(path.join(runtime, 'internal.sqlite'));
-      const existingArtifactCount = (beforePreflightDb.prepare('SELECT COUNT(*) AS count FROM document_artifacts').get() as { count: number }).count;
-      beforePreflightDb.close();
-      const nonInvoice = await upload(candidateToken, png);
-      assert.equal(nonInvoice.response.status, 422, 'blank image should be rejected by local OCR');
-      const preflightDb = new Database(path.join(runtime, 'internal.sqlite'));
-      assert.equal((preflightDb.prepare('SELECT status FROM capture_sessions WHERE id=?').get(candidateId) as { status: string }).status, 'WAITING');
-      assert.equal((preflightDb.prepare('SELECT COUNT(*) AS count FROM document_artifacts').get() as { count: number }).count, existingArtifactCount);
-      preflightDb.close();
-      const invoice = await fs.readFile(path.resolve('input-sample/11_real_invoice_photo.jpg'));
-      const acceptedInvoice = await upload(candidateToken, invoice, 'image/jpeg', 'invoice.jpg');
-      assert.equal(acceptedInvoice.response.status, 201, 'real invoice image should pass local OCR preflight');
-      console.log('PASS local Apple Vision preflight: blank photo rejected before artifact/provider processing; real invoice accepted.');
-    }
+    assert.ok(events.some((event) => event.eventType === 'CAPTURE_SESSION_READY'));
+  console.log('PASS QR capture API: scoped token, image validation, private artifact, ShopAIKey gate, follow-up lifecycle, expiry and audit.');
   } finally {
     await stop();
     await fs.rm(root, { recursive: true, force: true });

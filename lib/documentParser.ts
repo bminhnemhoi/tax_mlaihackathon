@@ -1,5 +1,6 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { parseNumberValue as numberValue, parseTaxRateString } from './utils';
+import { normalizeTaxCodeFormat } from './taxCode';
 
 type XmlTree = Record<string, unknown>;
 
@@ -91,6 +92,7 @@ function structuredXmlFallback(xml: string): Record<string, unknown> {
   const raw: Record<string, unknown> = {
     supplierTaxCode: first(seller, ['MST', 'TaxID', 'SellerTaxCode'], ['SellerTaxCode', 'TaxCode', 'MST']),
     supplierName: first(seller, ['Ten', 'TenNBan', 'CompanyName', 'Name'], ['SellerLegalName', 'SellerName', 'CompanyName', 'Ten']),
+    supplierAddress: first(seller, ['DChi', 'DiaChi', 'Address', 'SellerAddress'], ['SellerAddress', 'SupplierAddress']),
     buyerTaxCode: first(buyer, ['MST', 'TaxID', 'BuyerTaxCode'], ['BuyerTaxCode', 'NMuaMST']),
     buyerName: first(buyer, ['Ten', 'TenNMua', 'CompanyName', 'Name'], ['BuyerLegalName', 'BuyerName']),
     invoiceNumber: findXmlValues(root, ['SHDon', 'SHD', 'InvNum', 'InvoiceNumber', 'InvoiceNo', 'SoHoaDon'])[0],
@@ -144,6 +146,7 @@ export function parseXml(xml: string) {
     tag(xml, 'SellerName') ||
     tag(xml, 'CompanyName') ||
     tag(xml, 'Ten');
+  const supplierAddress = tag(nbanMatch, 'DChi') || tag(nbanMatch, 'DiaChi') || tag(nbanMatch, 'Address') || tag(xml, 'SellerAddress') || tag(xml, 'SupplierAddress');
 
   // 1b. Trích xuất khối Người mua <NMua> hoặc <BuyerInfo> hoặc <Buyer>
   const nmuaMatch =
@@ -352,6 +355,7 @@ export function parseXml(xml: string) {
       invoiceDate: rawDate ?? structured.invoiceDate,
       supplierTaxCode: supplierTaxCode ?? structured.supplierTaxCode,
       supplierName: supplierName ?? structured.supplierName,
+      supplierAddress: supplierAddress ?? structured.supplierAddress,
       buyerTaxCode: buyerTaxCode ?? structured.buyerTaxCode,
       buyerName: buyerName ?? structured.buyerName,
       invoiceSeries: invoiceSeries ?? structured.invoiceSeries,
@@ -401,19 +405,11 @@ export function sanitizeInvoice(raw: Record<string, unknown>): { invoice: Record
     }
   }
 
-  // buyerTaxCode -> chuẩn hóa MST người mua 10 hoặc 13 số
+  // buyerTaxCode -> chuẩn hóa MST người mua 10/13 số hoặc định danh HKD 12 số
   if (raw.buyerTaxCode) {
     const cleanedBuyerMst = String(raw.buyerTaxCode).replace(/[^0-9-]/g, '').trim();
-    if (/^\d{10}(?:-\d{3})?$/.test(cleanedBuyerMst)) {
-      invoice.buyerTaxCode = cleanedBuyerMst;
-    } else {
-      const digitsOnly = cleanedBuyerMst.replace(/-/g, '');
-      if (digitsOnly.length === 10) {
-        invoice.buyerTaxCode = digitsOnly;
-      } else if (digitsOnly.length === 13) {
-        invoice.buyerTaxCode = `${digitsOnly.slice(0, 10)}-${digitsOnly.slice(10)}`;
-      }
-    }
+    const normalized = normalizeTaxCodeFormat(cleanedBuyerMst);
+    if (normalized) invoice.buyerTaxCode = normalized;
   }
 
   // buyerName
@@ -452,11 +448,12 @@ export function sanitizeInvoice(raw: Record<string, unknown>): { invoice: Record
     }
   }
 
-  // supplierTaxCode -> 10 hoặc 13 ký tự số
+  // supplierTaxCode -> MST doanh nghiệp hoặc định danh hộ kinh doanh
   if (raw.supplierTaxCode) {
     let cleanedMst = String(raw.supplierTaxCode).replace(/[^0-9-]/g, '').trim();
     // Bỏ qua nếu là số điện thoại bàn (024..., 028...) hoặc số có đuôi máy lẻ dài như -27971
-    const isLandlinePhone = /^(024|028|020|021|022|023|025|026|027|029)\d+/.test(cleanedMst);
+    const isHouseholdId = /^\d{12}$/.test(cleanedMst.replace(/-/g, ''));
+    const isLandlinePhone = !isHouseholdId && /^(024|028|020|021|022|023|025|026|027|029)\d+/.test(cleanedMst);
     if (cleanedMst.includes('-')) {
       const parts = cleanedMst.split('-');
       if (parts[1] && parts[1].length !== 3) {
@@ -467,17 +464,11 @@ export function sanitizeInvoice(raw: Record<string, unknown>): { invoice: Record
       cleanedMst = '';
     }
 
-    if (/^\d{10}(?:-\d{3})?$/.test(cleanedMst)) {
-      invoice.supplierTaxCode = cleanedMst;
-    } else {
-      const digitsOnly = cleanedMst.replace(/-/g, '');
-      if (digitsOnly.length === 10) {
-        invoice.supplierTaxCode = digitsOnly;
-      } else if (digitsOnly.length === 13) {
-        invoice.supplierTaxCode = `${digitsOnly.slice(0, 10)}-${digitsOnly.slice(10)}`;
-      } else if (digitsOnly.length > 0 && digitsOnly.length !== 8) {
-        warnings.push(`Mã số thuế bên bán [${cleanedMst}] chưa chuẩn 10 hoặc 13 số.`);
-      }
+    const normalized = normalizeTaxCodeFormat(cleanedMst);
+    if (normalized) {
+      invoice.supplierTaxCode = normalized;
+    } else if (cleanedMst.length > 0 && cleanedMst.length !== 8) {
+      warnings.push(`Mã số thuế bên bán [${cleanedMst}] chưa chuẩn 10, 12 hoặc 13 số.`);
     }
   }
 
@@ -485,6 +476,11 @@ export function sanitizeInvoice(raw: Record<string, unknown>): { invoice: Record
   if (raw.supplierName && typeof raw.supplierName === 'string') {
     const name = raw.supplierName.trim();
     if (name.length >= 2) invoice.supplierName = name;
+  }
+
+  if (raw.supplierAddress && typeof raw.supplierAddress === 'string') {
+    const address = raw.supplierAddress.trim();
+    if (address.length >= 5) invoice.supplierAddress = address;
   }
 
   // itemName & items

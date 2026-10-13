@@ -4,13 +4,14 @@ import { isSandbox, withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { listSuppliers, getSupplier, upsertSupplier, recordVerificationEvidence, seedDefaultSuppliers } from '@/services/supplierService';
 import { SupplierMasterSchema } from '@/lib/schemas';
+import { TAX_CODE_FORMAT_REGEX } from '@/lib/taxCode';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const UpsertSupplierBodySchema = z.object({
-  taxCode: z.string().trim().regex(/^\d{10}(?:-\d{3})?$/, 'MST phải có 10 hoặc 13 chữ số'),
+  taxCode: z.string().trim().regex(TAX_CODE_FORMAT_REGEX, 'MST phải có 10, 12 hoặc 13 chữ số'),
   legalName: z.string().trim().min(1, 'Tên pháp lý không được để trống'),
   tradeName: z.string().optional(),
   address: z.string().optional(),

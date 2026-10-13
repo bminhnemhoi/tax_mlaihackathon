@@ -12,6 +12,7 @@ import {runVerification} from '../../services/verificationService';
 import {listAuditEventsForEntity} from '../../lib/server/audit';
 import {assertArtifactCapacity} from '../../lib/server/artifactQuota';
 import {extractInvoiceWithHybridPipeline} from '../../services/aiCoordinator';
+import {SHOPAIKEY_GEMINI_API_CONFIG} from '../../lib/constants';
 
 const cfo={id:'cfo-test',role:'CFO' as const,email:'cfo@test',displayName:'CFO kiểm thử'};
 const importer={...cfo,id:'importer-test',role:'ACCOUNTANT' as const};
@@ -23,7 +24,7 @@ async function main(){await runIsolated(async()=>{
  const base=challengeCases[0].invoice;
  const unknown={...base,id:'UNKNOWN-BUSINESS',invoiceNumber:'UNKNOWN-BUSINESS',paymentMethod:undefined,hasBankSlip:undefined,hasItemManifest:undefined,sellerStatus:'UNKNOWN' as const};
  await evaluateWorkflow(unknown,importer,{forceLocalOnly:true});
- check('Các trường nghiệp vụ chưa biết có trong form xác minh',()=>{const fields=JSON.parse(readRecord(unknown.id).source_review_json).unresolvedFields;for(const key of ['paymentMethod','hasBankSlip','hasItemManifest','sellerStatus'])assert.ok(fields.includes(key));});
+ check('Chỉ dữ kiện áp dụng mới chặn luồng; trạng thái và phương thức vẫn phải xác minh',()=>{const fields=JSON.parse(readRecord(unknown.id).source_review_json).unresolvedFields;for(const key of ['paymentMethod','sellerStatus'])assert.ok(fields.includes(key));for(const key of ['hasBankSlip','hasItemManifest'])assert.ok(!fields.includes(key));});
  check('Quota chặn chứng từ quá 15MB trước khi lưu',()=>assert.throws(()=>assertArtifactCapacity(16*1024*1024),/giới hạn/));
  const uncertain={...base,id:'PARTIAL',invoiceNumber:'PARTIAL',sourceUncertainFields:['supplierTaxCode','totalAmount']};
  await evaluateWorkflow(uncertain,importer,{forceLocalOnly:true});
@@ -45,7 +46,9 @@ async function main(){await runIsolated(async()=>{
  check('Hoàn tác tự xử lý mô tả đúng trạng thái chờ đánh giá lại',()=>assert.equal(allowedActions(readRecord(inflight.id),cfo).undoTarget?.targetStatus,'ON_HOLD'));
  const draft=createPolicyDraft({config:policy.config,version:'SAFETY-VALID'});
  check('Policy có SOP, rules và gate khi chưa có dữ liệu vận hành',()=>{assert.ok(draft.policyText.length>100);assert.ok(draft.rules.length>10);assert.equal(validatePolicyBundle(draft).valid,true);});
- const unsafe=createPolicyDraft({config:{...policy.config,kttApprovalLimit:500_000_000},version:'SAFETY-UNSAFE'});
+ const changedLimit=createPolicyDraft({config:{...policy.config,kttApprovalLimit:500_000_000},version:'SAFETY-CHANGED-LIMIT'});
+ check('Trần quyền mới được kiểm tra theo biên tương ứng',()=>assert.equal(validatePolicyBundle(changedLimit).valid,true));
+ const unsafe=createPolicyDraft({config:{...policy.config,nonCashThreshold:20_000_000},version:'SAFETY-UNSAFE'});
  check('Schema đúng nhưng sai phân luồng phải bị chặn publish',()=>{assert.equal(validatePolicyBundle(unsafe).valid,false);assert.throws(()=>publishPolicy(unsafe.version),/chưa đạt/);assert.equal(getActivePolicy().version,policy.version);});
  const inv=challengeCases[3].invoice,d=evaluateInvoiceLocally(inv,policy.config);
  if(d.status!=='ESCALATED')throw new Error('Fixture không chuyển tiếp');
@@ -60,12 +63,38 @@ async function main(){await runIsolated(async()=>{
  await assert.rejects(runVerification('invalid-mode'),/không hợp lệ/);
  check('Verify trả run ID và policy hash',()=>assert.equal(typeof draft.contentHash,'string'));
  });const report=await runVerification();assert.ok(report.summary.runId);assert.ok(report.summary.policyHash);
- const savedFetch=globalThis.fetch,savedEngine=process.env.DOCUMENT_IMAGE_ENGINE,savedFallback=process.env.LOCAL_OCR_QWEN_FALLBACK,savedUrl=process.env.LOCAL_OCR_URL;
+ const savedFetch=globalThis.fetch,savedKey=SHOPAIKEY_GEMINI_API_CONFIG.API_KEY;
+ const savedEngine=process.env.DOCUMENT_IMAGE_ENGINE,savedUrl=process.env.LOCAL_OCR_URL;
  try{
-  process.env.DOCUMENT_IMAGE_ENGINE='local-ocr';process.env.LOCAL_OCR_QWEN_FALLBACK='false';process.env.LOCAL_OCR_URL='http://worker.test';
-  let calls=0;globalThis.fetch=async()=>{calls++;throw new Error('Mock worker offline');};
+  SHOPAIKEY_GEMINI_API_CONFIG.API_KEY='qa-mocked-only';
+  process.env.DOCUMENT_IMAGE_ENGINE='local-ocr';process.env.LOCAL_OCR_URL='http://worker.test';
+  let calls=0;
+  globalThis.fetch=async(input,init)=>{
+   calls++;
+   const url=new URL(String(input));
+   assert.equal(url.hostname,'api.shopaikey.com');
+   assert.match(url.pathname,/^\/v1beta\/models\//);
+   assert.equal(url.searchParams.get('key'),'qa-mocked-only');
+   assert.equal(new Headers(init?.headers).get('authorization'),'Bearer qa-mocked-only');
+   const body=JSON.parse(String(init?.body));
+   assert.ok(body.contents?.[0]?.parts?.some((part:any)=>part.inlineData?.data==='AA=='));
+   return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({documentType:'INVOICE',invoice:{invoiceNumber:'HD12345',supplierTaxCode:'0100109106',totalAmount:11500}})}]}}]}),{status:200});
+  };
   const extraction=await extractInvoiceWithHybridPipeline({fileBase64:'AA==',mimeType:'image/png'});
-  check('Worker offline và fallback tắt giữ review, không gọi provider',()=>{assert.equal(calls,1);assert.equal(extraction.engineUsed,'LOCAL_FALLBACK');assert.equal(extraction.data.isImageBlurry,true);assert.ok(extraction.uncertainFields?.includes('totalAmount'));});
- }finally{globalThis.fetch=savedFetch;for(const [key,value] of [['DOCUMENT_IMAGE_ENGINE',savedEngine],['LOCAL_OCR_QWEN_FALLBACK',savedFallback],['LOCAL_OCR_URL',savedUrl]]){if(value===undefined)delete process.env[key!];else process.env[key!]=value;}}
+  check('Ảnh được gửi trực tiếp tới Gemini Vision mà không gọi worker OCR',()=>{assert.equal(calls,1);assert.equal(extraction.engineUsed,'GEMINI_AI');assert.equal(extraction.documentType,'INVOICE');assert.equal(extraction.data.invoiceNumber,'HD12345');});
+  globalThis.fetch=async()=>new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({documentType:'NOT_INVOICE',invoice:{}})}]}}]}),{status:200});
+  const notInvoice=await extractInvoiceWithHybridPipeline({fileBase64:'AA==',mimeType:'image/png'});
+  check('Gemini trả trạng thái ảnh không phải hóa đơn để UI báo bằng toaster',()=>{assert.equal(notInvoice.documentType,'NOT_INVOICE');assert.deepEqual(notInvoice.data,{});});
+  globalThis.fetch=async(input,init)=>{
+   const body=JSON.parse(String(init?.body));
+   assert.ok(body.contents?.[0]?.parts?.some((part:any)=>part.inlineData?.mimeType==='application/pdf'));
+   return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({documentType:'INVOICE',invoice:{invoiceNumber:'PDF-001'}})}]}}]}),{status:200});
+  };
+  const scannedPdf=await extractInvoiceWithHybridPipeline({fileBase64:'JVBERi0=',mimeType:'application/pdf',fileName:'scan.pdf'});
+  check('PDF scan được gửi trực tiếp cho Gemini Vision, không chuyển qua OCR',()=>{assert.equal(scannedPdf.documentType,'INVOICE');assert.equal(scannedPdf.data.invoiceNumber,'PDF-001');});
+ }finally{
+  globalThis.fetch=savedFetch;SHOPAIKEY_GEMINI_API_CONFIG.API_KEY=savedKey;
+  for(const [key,value] of [['DOCUMENT_IMAGE_ENGINE',savedEngine],['LOCAL_OCR_URL',savedUrl]]){if(value===undefined)delete process.env[key!];else process.env[key!]=value;}
+ }
  console.log(`${passed} kiểm tra cải tiến đạt.`);}
 main().catch(e=>{console.error(e);process.exitCode=1;});

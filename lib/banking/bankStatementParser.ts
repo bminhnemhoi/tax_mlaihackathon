@@ -112,7 +112,7 @@ export function parseBankStatement(content: string, defaultBankCode: string = 'V
 
     // Thử trích xuất MST người thụ hưởng từ nội dung nếu có
     let benTax: string | undefined = colIdx.beneficiaryTax !== -1 ? rawCols[colIdx.beneficiaryTax] || undefined : undefined;
-    const mstMatch = desc.match(/(?:MST|mst|Mã số thuế)[:\s]*(\d{10}(?:-\d{3})?)/i);
+    const mstMatch = desc.match(/(?:MST|mst|Mã số thuế)[:\s]*(\d{12}|\d{10}(?:-\d{3})?)/i);
     if (!benTax && mstMatch) benTax = mstMatch[1];
 
     const id = `BANK-${defaultBankCode}-${refNo.replace(/[^a-zA-Z0-9_-]/g, '')}`;

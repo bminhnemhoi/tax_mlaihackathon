@@ -50,7 +50,8 @@ export async function queryJevReferee(
       invoice,
       localDecision.riskGroup as RiskGroup,
       localDecision.flaggedReason,
-      localDecision.sopClause
+      localDecision.sopClause,
+      localDecision
     );
     if (!isGroundedQuestion(invoice,localDecision,generated)) throw new Error('Câu hỏi AI chưa khớp bằng chứng, thẩm quyền và phương án; sử dụng câu hỏi quy chế.');
     const enrichedDecision: RefereeDecision = {
@@ -61,6 +62,7 @@ export async function queryJevReferee(
       flaggedReason: localDecision.flaggedReason,
       options: localDecision.options,
       requiresCFO: localDecision.requiresCFO,
+      handoff:localDecision.handoff?{...localDecision.handoff,question:generated.actionableQuestion,questionSource:'AI_GROUNDED'}:undefined,
       engineUsed: engineUsed as DualEngineType,
       confidence: 0.95,
       riskScore: localRiskScore

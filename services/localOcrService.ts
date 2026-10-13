@@ -5,6 +5,7 @@ import fs from 'node:fs';
 export interface LocalNeuralOcrResult {
   success: boolean;
   fullText: string;
+  lines?: Array<{ text: string; confidence: number; bbox?: { x: number; y: number; w: number; h: number }; alternative?: string }>;
   isImageBlurry: boolean;
   blurScore: number;
   averageConfidence: number;
@@ -75,6 +76,7 @@ export async function runAppleVisionOcr(
     return {
       success: true,
       fullText: parsed.fullText || '',
+      lines: Array.isArray(parsed.lines) ? parsed.lines : [],
       isImageBlurry: Boolean(parsed.isImageBlurry),
       blurScore: Number(parsed.blurScore) || 0,
       averageConfidence: Number(parsed.averageConfidence) || 0,

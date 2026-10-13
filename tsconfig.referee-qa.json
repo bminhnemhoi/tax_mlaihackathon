@@ -1,0 +1,6 @@
+{
+  "extends":"./tsconfig.json",
+  "compilerOptions":{"incremental":false},
+  "include":["scripts/qa/evaluate-independent.ts","scripts/qa/evaluate-referee-development.ts","scripts/qa/referee-report-utils.ts","scripts/qa/score-referee-questions.ts","scripts/qa/lock-referee-labels.ts","scripts/qa/test-referee-core.ts","scripts/qa/test-referee-labeling.ts"],
+  "exclude":["node_modules"]
+}

@@ -6,6 +6,8 @@ import { findPrecedentForInvoice } from '@/services/precedentService';
 import { getSupplier } from '@/services/supplierService';
 import { checkSameDayMultipleInvoicesRule } from '@/services/bankMatcherService';
 import { getDatabase } from '@/lib/server/db';
+import {missingBusinessFacts,needsItemManifest,paymentThreshold} from '@/lib/refereeRequirements';
+import {buildHandoff,describeRuleEvidence} from './handoffService';
 
 // 0. IMP-08: Hàm Đối soát Chi tiết Dòng hàng & Đa Thuế suất (Line-item Validation Engine)
 export interface LineItemValidationResult {
@@ -16,6 +18,7 @@ export interface LineItemValidationResult {
   totalItemAmount: number;
   totalItemTax: number;
   mismatchHeader: boolean;
+  lineArithmeticMismatch: boolean;
   hasExcludedVat8Item: boolean;
   hasSensitiveItem: boolean;
 }
@@ -34,6 +37,7 @@ export function validateLineItems(
       totalItemAmount: inv.preTaxAmount,
       totalItemTax: inv.taxAmount,
       mismatchHeader: false,
+      lineArithmeticMismatch: false,
       hasExcludedVat8Item: false,
       hasSensitiveItem: false
     };
@@ -52,6 +56,7 @@ export function validateLineItems(
   let sumTax = 0;
   let hasExcludedVat8Item = false;
   let hasSensitiveItem = false;
+  let lineArithmeticMismatch = false;
 
   for (const item of items) {
     sumAmount += item.amount;
@@ -61,9 +66,15 @@ export function validateLineItems(
     // 1. Kiểm tra tính toán số học từng dòng (dung sai làm tròn 1.000đ)
     const expectedAmount = item.quantity * item.unitPrice - (item.discountAmount || 0);
     if (Math.abs(item.amount - expectedAmount) > 1000) {
+      lineArithmeticMismatch = true;
       warnings.push(`Dòng ${item.lineNumber} [${item.itemName}]: Thành tiền (${item.amount.toLocaleString('vi-VN')}₫) lệch so với số lượng x đơn giá (${expectedAmount.toLocaleString('vi-VN')}₫).`);
       flaggedCount++;
       item.flaggedReason = 'Lệch số học thành tiền';
+    }
+    const expectedItemTax=Math.round(item.amount*item.taxRate/100);
+    if(Math.abs(item.taxAmount-expectedItemTax)>1){
+      lineArithmeticMismatch=true;flaggedCount++;
+      warnings.push(`Dòng ${item.lineNumber} [${item.itemName}]: Tiền thuế ${item.taxAmount.toLocaleString('vi-VN')}₫ lệch so với thành tiền × thuế suất (${expectedItemTax.toLocaleString('vi-VN')}₫).`);
     }
 
     // 2. Rà soát danh mục loại trừ thuế suất 8% (Nghị quyết 204/2025/QH15)
@@ -106,6 +117,7 @@ export function validateLineItems(
     totalItemAmount: sumAmount,
     totalItemTax: sumTax,
     mismatchHeader,
+    lineArithmeticMismatch,
     hasExcludedVat8Item,
     hasSensitiveItem
   };
@@ -155,12 +167,14 @@ function evaluateInvoiceLocallyInternal(
   const evaluatedFindings: EvaluatedFinding[] = [];
 
   // Thiết lập các ngưỡng theo cấu hình động hoặc mặc định pháp luật 2026
-  const nonCashThreshold = config?.nonCashThreshold ?? regInfo.nonCashThreshold;
+  const nonCashThreshold = paymentThreshold(inv,config);
   const kttApprovalLimit = config?.kttApprovalLimit ?? 200_000_000;
   const kSafeMin = config?.kFactorSafeMin ?? 1.05;
   const kSafeMax = config?.kFactorSafeMax ?? 1.25;
   const allowStaffReimbursement = config?.allowStaffReimbursement ?? true;
   const isExceedKtt = Math.abs(inv.totalAmount) >= kttApprovalLimit;
+  const registeredSupplier=getSupplier(inv.supplierTaxCode);
+  if(registeredSupplier && ['CLOSED','SUSPENDED'].includes(registeredSupplier.status))inv.sellerStatus=registeredSupplier.status as 'CLOSED'|'SUSPENDED';
 
   // 1. STATUTORY: Kiểm tra hóa đơn trùng lặp tiền hạch toán (IMP-13)
   const duplicate = checkDuplicateInvoice(inv);
@@ -205,14 +219,14 @@ function evaluateInvoiceLocallyInternal(
     mismatchHeader: lineItemResult.mismatchHeader
   } : undefined;
 
-  if (lineItemResult.mismatchHeader) {
+  if (lineItemResult.mismatchHeader || lineItemResult.lineArithmeticMismatch) {
     evaluatedFindings.push({
       ruleId: 'RULE_LINE_ITEM_MISMATCH',
       kind: 'DATA_QUALITY',
       severity: 'HIGH',
       riskGroup: 'UNCERTAIN_INFO',
-      flaggedReason: `Tổng cộng các dòng hàng (${lineItemResult.totalItemAmount.toLocaleString('vi-VN')}₫) không khớp với số tiền trước thuế trên hóa đơn (${inv.preTaxAmount.toLocaleString('vi-VN')}₫)`,
-      plainExplanation: 'Tổng tiền các dòng chi tiết không bằng tiền trước thuế trên tiêu đề hóa đơn (chênh lệch vượt dung sai làm tròn 2.000₫). Cần KTT xác nhận lại chứng từ gốc để tránh rủi ro giải trình cơ quan thuế.',
+      flaggedReason: lineItemResult.mismatchHeader?`Tổng cộng các dòng hàng (${lineItemResult.totalItemAmount.toLocaleString('vi-VN')}₫) không khớp với số tiền trước thuế trên hóa đơn (${inv.preTaxAmount.toLocaleString('vi-VN')}₫)`:lineItemResult.warnings.filter(w=>w.startsWith('Dòng')).join('; '),
+      plainExplanation: 'Số liệu dòng hàng hoặc tổng hợp chưa nhất quán; cần đối chiếu chứng từ gốc trước khi tự xử lý.',
       legalBasis: 'Điều 1.1 Quy chế Tax-SOP-2026 (Tính toàn vẹn số liệu dòng hàng)',
       sopClause: 'Điều 1.1 Quy chế Tax-SOP-2026 (Tính toàn vẹn số liệu dòng hàng)',
       actionableQuestion: `Hóa đơn ${inv.invoiceNumber} có tổng dòng hàng (${lineItemResult.totalItemAmount.toLocaleString('vi-VN')}₫) lệch so với Header (${inv.preTaxAmount.toLocaleString('vi-VN')}₫). KTT xử lý thế nào?`,
@@ -235,7 +249,7 @@ function evaluateInvoiceLocallyInternal(
   }
 
   // 3. DATA_QUALITY: Kiểm tra chất lượng dữ liệu nguồn
-  const issue = getDataQualityIssue(inv);
+  const issue = getDataQualityIssue(inv,config,sameDayPurchaseTotal(inv,contextInvoices));
   if (issue) {
     evaluatedFindings.push({
       ruleId: 'RULE_DATA_QUALITY',
@@ -296,12 +310,6 @@ function evaluateInvoiceLocallyInternal(
   }
 
   // 5. STATUTORY: Kiểm tra Danh bạ nhà cung cấp rủi ro cao (CV 2392/TCT-QLRR)
-  let registeredSupplier = null;
-  try {
-    registeredSupplier = getSupplier(inv.supplierTaxCode);
-  } catch {
-    // Bỏ qua nếu môi trường test không có SQLite
-  }
   if (registeredSupplier) {
     if (registeredSupplier.status === 'CLOSED' || registeredSupplier.status === 'SUSPENDED') {
       inv.sellerStatus = registeredSupplier.status;
@@ -496,7 +504,7 @@ function evaluateInvoiceLocallyInternal(
       severity: 'CRITICAL',
       riskGroup: 'OUT_OF_POLICY',
       flaggedReason: 'Hóa đơn lập ngày ' + inv.invoiceDate + ', SAU ngày người bán bị đóng MST (' + inv.sellerSuspensionDate + ')',
-      plainExplanation: 'Nhà cung cấp đã chấm dứt hiệu lực mã số thuế trước khi phát hành hóa đơn này. Hóa đơn bất hợp pháp 100% theo quy định hóa đơn điện tử.',
+      plainExplanation: 'Ngày lập hóa đơn sau ngày đóng MST đã ghi nhận; cần đối chiếu chứng từ và nguồn xác minh trước khi xử lý.',
       legalBasis: 'Điều 2.2 Quy chế Tax-SOP-2026 & Nghị định 254/2026/NĐ-CP',
       sopClause: 'Điều 2.2 Quy chế Tax-SOP-2026 & Nghị định 254/2026/NĐ-CP',
       actionableQuestion: 'Hóa đơn ' + inv.invoiceNumber + ' phát hành sau ngày bên bán đóng MST (' + inv.sellerSuspensionDate + '). Hệ thống khuyến nghị loại bỏ ngay. ' + (isExceedKtt ? 'CFO' : 'KTT') + ' xác nhận?',
@@ -504,7 +512,7 @@ function evaluateInvoiceLocallyInternal(
         {
           id: 'A',
           label: 'Loại bỏ ngay lập tức (Khuyến nghị)',
-          actionDescription: 'Tuyệt đối cấm kê khai để tránh rủi ro vi phạm tội trốn thuế',
+          actionDescription: 'Loại hồ sơ này khỏi đề xuất thuế nội bộ và lưu lý do đối chiếu.',
           resultingAction: 'REJECT_TAX_DEDUCTION'
         },
         {
@@ -519,16 +527,16 @@ function evaluateInvoiceLocallyInternal(
   }
 
   // 10. STATUTORY: Hóa đơn từ 5 triệu thanh toán tiền mặt (Luật Thuế GTGT 48/2024/QH15)
-  const isCashPayment = inv.paymentMethod === 'CASH' || !inv.hasBankSlip;
+  const isCashPayment = inv.paymentMethod === 'CASH';
   if (inv.totalAmount >= nonCashThreshold && isCashPayment) {
-    const isStaffException = allowStaffReimbursement && inv.isStaffReimbursed;
+    const isStaffException = allowStaffReimbursement && inv.isStaffReimbursed && inv.hasBankSlip===true;
     if (!isStaffException) {
       evaluatedFindings.push({
         ruleId: 'STATUTORY_LAW_48_CASH_PAYMENT',
         kind: 'STATUTORY',
         severity: 'CRITICAL',
         riskGroup: 'OUT_OF_POLICY',
-        flaggedReason: 'Hóa đơn từ ' + (nonCashThreshold / 1_000_000) + ' triệu đồng thanh toán TIỀN MẶT' + (isExceedKtt ? ' (vượt hạn mức KTT)' : '') + ' (vi phạm điều kiện khấu trừ thuế GTGT theo Luật 48/2024/QH15)',
+        flaggedReason: 'Hóa đơn từ ' + (nonCashThreshold / 1_000_000) + ' triệu đồng thanh toán TIỀN MẶT' + (isExceedKtt ? ' (vượt hạn mức KTT)' : '') + ' cần đối chiếu điều kiện thanh toán theo SOP',
         plainExplanation: 'Luật thuế quy định hóa đơn từng lần từ ' + (nonCashThreshold / 1_000_000) + ' triệu VNĐ trở lên bắt buộc phải có chứng từ thanh toán không dùng tiền mặt (Ủy nhiệm chi ngân hàng) để được khấu trừ. Tuyệt đối không áp dụng tiền lệ tự duyệt cho vi phạm luật định.',
         legalBasis: 'Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 1.2 Tax-SOP-2026',
         sopClause: 'Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 1.2 Tax-SOP-2026',
@@ -542,8 +550,8 @@ function evaluateInvoiceLocallyInternal(
           },
           {
             id: 'B',
-            label: 'Loại trừ thuế GTGT & Chuyển sang Chỉ tiêu B4',
-            actionDescription: 'Chỉ ghi nhận chi phí nội bộ, loại toàn bộ tiền thuế và chi phí khỏi quyết toán thuế',
+            label: 'Loại khỏi đề xuất thuế nội bộ',
+            actionDescription: 'Chưa ghi nhận thuế được duyệt; lưu lý do và chuyển đối chiếu khi kê khai thực tế.',
             resultingAction: 'REJECT_TAX_DEDUCTION'
           }
         ],
@@ -555,7 +563,7 @@ function evaluateInvoiceLocallyInternal(
   // 11. STATUTORY: Cụm nhiều hóa đơn trong ngày >= 5M thanh toán tiền mặt (Luật 48/2024/QH15)
   if (inv.totalAmount < nonCashThreshold && isCashPayment) {
     let sameDayInvoices: InvoiceInput[] = [];
-    if (contextInvoices && contextInvoices.length > 0) {
+    if (contextInvoices) {
       sameDayInvoices = contextInvoices.filter(
         other => other.id !== inv.id &&
                  other.supplierTaxCode === inv.supplierTaxCode &&
@@ -566,7 +574,7 @@ function evaluateInvoiceLocallyInternal(
         const db = getDatabase();
         const rows = db.prepare(`
           SELECT payload_json FROM invoices
-          WHERE supplier_tax_code = ? AND invoice_date = ? AND id != ?
+          WHERE supplier_tax_code = ? AND invoice_date = ? AND id != ? AND status!='REJECTED'
         `).all(inv.supplierTaxCode, inv.invoiceDate, inv.id) as Array<{ payload_json: string }>;
         sameDayInvoices = rows.map(r => JSON.parse(r.payload_json));
       } catch {
@@ -575,7 +583,7 @@ function evaluateInvoiceLocallyInternal(
     }
 
     if (sameDayInvoices.length > 0) {
-      const allSameDay = [inv, ...sameDayInvoices];
+      const allSameDay = [inv, ...sameDayInvoices].filter(i=>i.totalAmount>0 && !i.isAdjustment);
       const sameDayCheck = checkSameDayMultipleInvoicesRule(inv, allSameDay, nonCashThreshold);
       if (sameDayCheck.isViolation) {
         evaluatedFindings.push({
@@ -617,8 +625,8 @@ function evaluateInvoiceLocallyInternal(
   const isExcludedItem = excludedCategories.some((category) => normalizedItemName.includes(category)) || /CƯỚC INTERNET/.test(normalizedItemName);
   if ((isExcludedItem && inv.taxRate === 8) || lineItemResult.hasExcludedVat8Item) {
     const flagMsg = lineItemResult.hasExcludedVat8Item
-      ? 'Phát hiện mặt hàng trong chi tiết dòng hàng thuộc danh mục loại trừ áp sai thuế suất 8% (NQ 204/2025/QH15)'
-      : 'Hàng hóa/dịch vụ thuộc danh mục loại trừ áp sai thuế suất 8% (thuộc danh mục loại trừ bắt buộc 10% theo NQ 204/2025/QH15)';
+      ? 'Dòng hàng có thuế suất 8% trong danh mục loại trừ đang cấu hình; cần đối chiếu ngành hàng và nguồn quy định'
+      : 'Hàng hóa/dịch vụ có thuế suất 8% trong danh mục loại trừ đang cấu hình; cần đối chiếu ngành hàng và nguồn quy định';
 
     evaluatedFindings.push({
       ruleId: 'STATUTORY_RES_204_VAT_8_EXCLUDED',
@@ -629,12 +637,12 @@ function evaluateInvoiceLocallyInternal(
       plainExplanation: 'Bên bán xuất hóa đơn thuế suất ưu đãi 8% cho mặt hàng thuộc danh mục loại trừ không được giảm thuế theo Nghị quyết 204/2025/QH15 (phải áp dụng 10%). Kê khai 8% sẽ bị phạt 20% khi thanh tra thuế. Không áp dụng tiền lệ cho sai sót thuế suất.',
       legalBasis: 'Điều 1.3 Quy chế Tax-SOP-2026 & Nghị quyết 204/2025/QH15',
       sopClause: 'Điều 1.3 Quy chế Tax-SOP-2026 & Nghị quyết 204/2025/QH15',
-      actionableQuestion: 'Hóa đơn ' + inv.invoiceNumber + ' từ ' + inv.supplierName + ' áp sai thuế 8% (phải là 10%)' + (isExceedKtt ? ' (vượt trần KTT)' : '') + '. ' + (isExceedKtt ? 'CFO' : 'KTT') + ' xử lý thế nào?',
+      actionableQuestion: 'Hóa đơn ' + inv.invoiceNumber + ' từ ' + inv.supplierName + ' áp thuế 8% cho ngành hàng thuộc danh mục cần đối chiếu' + (isExceedKtt ? ' (vượt trần KTT)' : '') + '. ' + (isExceedKtt ? 'CFO' : 'KTT') + ' xử lý thế nào?',
       options: [
         {
           id: 'A',
-          label: 'Yêu cầu nhà cung cấp xuất lại HĐ 10%',
-          actionDescription: 'Trả lại hóa đơn, yêu cầu bên bán lập hóa đơn thay thế hoặc điều chỉnh thuế 10%',
+          label: 'Xác minh ngành hàng và thuế suất',
+          actionDescription: 'Tạm giữ hồ sơ, đối chiếu nguồn quy định và yêu cầu bên bán điều chỉnh nếu xác nhận sai thuế suất.',
           resultingAction: 'REQUEST_INFORMATION'
         },
         {
@@ -671,8 +679,8 @@ function evaluateInvoiceLocallyInternal(
         },
         {
           id: 'B',
-          label: 'Loại bỏ khỏi thuế khấu trừ & Chuyển Chỉ tiêu B4',
-          actionDescription: 'Chỉ ghi nhận chi phí nội bộ không được trừ, loại toàn bộ tiền thuế khỏi khấu trừ',
+          label: 'Loại khỏi đề xuất thuế nội bộ',
+          actionDescription: 'Lưu chi phí nội bộ và lý do không duyệt thuế trong hồ sơ này.',
           resultingAction: 'REJECT_TAX_DEDUCTION'
         }
       ],
@@ -755,7 +763,7 @@ function evaluateInvoiceLocallyInternal(
           {
             id: 'A',
             label: 'CFO Phê duyệt chi',
-            actionDescription: 'Chấp thuận chi phí và đưa vào khấu trừ thuế hợp lệ',
+            actionDescription: 'Phê duyệt trong thẩm quyền CFO; chỉ hoàn tất khi mọi phát hiện khác đã được giải quyết.',
             resultingAction: 'ACCEPT_WITH_DOCS'
           },
           {
@@ -777,23 +785,23 @@ function evaluateInvoiceLocallyInternal(
       kind: 'DATA_QUALITY',
       severity: 'MEDIUM',
       riskGroup: 'UNCERTAIN_INFO',
-      flaggedReason: 'Hình ảnh hóa đơn bị mờ/lóa dòng tổng tiền, OCR không nhận diện chắc chắn',
+      flaggedReason: 'Hình ảnh hóa đơn bị mờ/lóa dòng tổng tiền, AI chưa đọc được dữ liệu chắc chắn',
       plainExplanation: 'Chứng từ ảnh chụp/scan bị mờ nét số tiền thanh toán. Cần Kế toán trưởng nhìn mắt thường để xác nhận con số chuẩn.',
       legalBasis: 'Điều 1.1 Quy chế Tax-SOP-2026',
       sopClause: 'Điều 1.1 Quy chế Tax-SOP-2026',
-      actionableQuestion: 'Hóa đơn taxi ' + inv.invoiceNumber + ' bị mờ số tiền, hệ thống nhận diện hai khả năng là 140.000₫ hoặc 190.000₫. KTT chọn con số nào?',
+      actionableQuestion: 'Hóa đơn ' + inv.invoiceNumber + ' chưa đọc rõ. Kế toán trưởng bổ sung ảnh rõ hơn hoặc xác minh từng trường trên chứng từ gốc?',
       options: [
         {
           id: 'A',
-          label: 'Xác nhận số tiền là 140.000₫',
-          actionDescription: 'Ghi nhận số tiền nhỏ hơn để an toàn chi phí',
-          resultingAction: 'ACCEPT_WITH_DOCS'
+          label: 'Bổ sung ảnh rõ hơn',
+          actionDescription: 'Nhận lại ảnh hoặc XML gốc và chạy lại việc trích xuất.',
+          resultingAction: 'REQUEST_INFORMATION'
         },
         {
           id: 'B',
-          label: 'Xác nhận số tiền là 190.000₫',
-          actionDescription: 'Ghi nhận số tiền đúng theo thực tế cuốc xe sau khi xem lại bản gốc',
-          resultingAction: 'ACCEPT_WITH_DOCS'
+          label: 'Xác minh dữ liệu từ chứng từ gốc',
+          actionDescription: 'Ghi giá trị và nguồn bằng chứng cho từng trường rồi đánh giá lại.',
+          resultingAction: 'CONFIRM_CORRECTED_DATA'
         }
       ],
       requiresCFO: false
@@ -801,14 +809,14 @@ function evaluateInvoiceLocallyInternal(
   }
 
   // 17. DATA_QUALITY: Thiếu bảng kê
-  if (inv.hasItemManifest === false) {
+  if (needsItemManifest(inv) && inv.hasItemManifest === false) {
     evaluatedFindings.push({
       ruleId: 'RULE_MISSING_MANIFEST',
       kind: 'DATA_QUALITY',
       severity: 'MEDIUM',
       riskGroup: 'UNCERTAIN_INFO',
       flaggedReason: 'Hóa đơn tổng hợp thiếu tệp bảng kê chi tiết quy cách hàng hóa đính kèm',
-      plainExplanation: 'Hóa đơn ghi tên dịch vụ/hàng hóa chung chung và thiếu bảng kê chi tiết từng món. Cơ quan thuế sẽ loại chi phí khi kiểm tra nếu không có bảng kê.',
+      plainExplanation: 'Nội dung tổng hợp chưa có bảng kê/chi tiết theo SOP; cần bổ sung để xác định giao dịch.',
       legalBasis: 'Điều 1.1 Quy chế Tax-SOP-2026',
       sopClause: 'Điều 1.1 Quy chế Tax-SOP-2026',
       actionableQuestion: 'Hóa đơn ' + inv.invoiceNumber + ' (' + inv.totalAmount.toLocaleString('vi-VN') + '₫) thiếu bảng kê chi tiết. KTT xử lý thế nào?',
@@ -928,7 +936,7 @@ function evaluateInvoiceLocallyInternal(
       approvedTaxAmount: approvedTax,
       plainExplanation: precedentAppliedInfo
         ? 'Duyệt theo Tiền lệ Quy chế Tiếp khách của CFO (#' + precedentAppliedInfo.precedentId + '): ' + precedentAppliedInfo.rationale
-        : 'Hóa đơn đáp ứng đầy đủ điều kiện 3H (Hợp pháp - Hợp lệ - Hợp lý), đúng thuế suất, thanh toán không tiền mặt hợp lệ và nằm trong hạn mức thường quy.',
+        : 'Hồ sơ đủ dữ kiện cần thiết và không còn phát hiện theo quy tắc SOP đang chạy; tự hoàn tất chứng từ nội bộ.',
       kFactorAfter: newK,
       lineItemAnalysis,
       precedentApplied: precedentAppliedInfo,
@@ -940,7 +948,7 @@ function evaluateInvoiceLocallyInternal(
         flaggedReason: f.flaggedReason,
         plainExplanation: f.plainExplanation,
         legalBasis: f.legalBasis,
-        evidence: f.evidence
+        evidence: f.evidence, sopClause:f.sopClause,actionableQuestion:f.actionableQuestion,options:f.options,requiresCFO:f.requiresCFO
       })),
       timestamp
     };
@@ -1013,7 +1021,7 @@ function evaluateInvoiceLocallyInternal(
       flaggedReason: f.flaggedReason,
       plainExplanation: f.plainExplanation,
       legalBasis: f.legalBasis,
-      evidence: f.evidence
+      evidence: f.evidence, sopClause:f.sopClause,actionableQuestion:f.actionableQuestion,options:f.options,requiresCFO:f.requiresCFO
     })),
     // No tax entitlement is established while any finding remains open.
     deductibleTax: 0,
@@ -1032,16 +1040,27 @@ export function evaluateInvoiceLocally(
 ): RefereeDecision {
   const regInfo = getApplicableRegulations(inv.invoiceDate);
   const applicableDecreeCodes = regInfo.applicableRegulations.map((d) => d.code);
-  const decision = evaluateInvoiceLocallyInternal(inv, customConfig, macroState, contextInvoices);
-
-  return {
+  const decision = evaluateInvoiceLocallyInternal(structuredClone(inv), customConfig, macroState, contextInvoices);
+  const decorated={
     ...decision,
     applicableRegulations: applicableDecreeCodes,
-    sopVersion: customSopVersion
+    sopVersion: customSopVersion,
+    findings:decision.findings?.map(f=>describeRuleEvidence(f,inv.invoiceDate))
   } as RefereeDecision;
+  if(decorated.status==='ROUTINE')return decorated;
+  decorated.sopClause=decorated.findings?.[0]?.sopClause||decorated.sopClause;
+  decorated.plainExplanation=decorated.findings?.[0]?.plainExplanation||decorated.plainExplanation;
+  return buildHandoff(inv,decorated);
 }
 
-function getDataQualityIssue(inv: InvoiceInput): string | null {
+export function sameDayPurchaseTotal(inv:Partial<InvoiceInput>,context?:InvoiceInput[]):number {
+  const rows=context || (getDatabase().prepare("SELECT payload_json FROM invoices WHERE supplier_tax_code=? AND invoice_date=? AND id!=? AND status!='REJECTED'").all(inv.supplierTaxCode || '',inv.invoiceDate || '',inv.id || '') as {payload_json:string}[]).map(r=>JSON.parse(r.payload_json) as InvoiceInput);
+  const distinct=new Map<string,Partial<InvoiceInput>>();
+  for(const invoice of [inv,...rows])if(invoice.supplierTaxCode===inv.supplierTaxCode && invoice.invoiceDate===inv.invoiceDate && !invoice.isAdjustment && (invoice.totalAmount||0)>0)
+    distinct.set(`${invoice.supplierTaxCode}:${invoice.invoiceSeries || ''}:${invoice.invoiceNumber}`,invoice);
+  return [...distinct.values()].reduce((sum,i)=>sum+(i.totalAmount||0),0);
+}
+function getDataQualityIssue(inv: InvoiceInput,config?:Partial<SystemPolicyConfig>,dailyTotal=0): string | null {
   const date = new Date(`${inv.invoiceDate}T00:00:00Z`);
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== inv.invoiceDate) return 'Ngày hóa đơn không hợp lệ hoặc không thể đối chiếu văn bản có hiệu lực.';
   const expectedTax = Math.round(inv.preTaxAmount * inv.taxRate / 100);
@@ -1050,9 +1069,9 @@ function getDataQualityIssue(inv: InvoiceInput): string | null {
     return 'Các số tiền trên hóa đơn không nhất quán với tiền trước thuế và thuế suất; cần xác nhận lại chứng từ gốc.';
   }
   if (inv.isImageBlurry) return 'Ảnh hóa đơn bị mờ, chưa thể xác nhận chính xác dữ liệu thực tế.';
-  if (!inv.paymentMethod || inv.hasBankSlip === undefined || inv.hasItemManifest === undefined || inv.sellerStatus === 'UNKNOWN') {
-    return 'Hóa đơn còn thiếu dữ liệu nguồn về thanh toán, bảng kê hoặc trạng thái mã số thuế nhà cung cấp.';
-  }
+  if(inv.totalAmount<0 && !inv.isAdjustment)return 'Giá trị âm chưa được xác định là hóa đơn điều chỉnh.';
+  const missing=missingBusinessFacts(inv,config,dailyTotal);
+  if(missing.length)return `Thiếu dữ kiện cần cho quy tắc: ${missing.join(', ')}. Cần bổ sung nguồn xác minh.`;
   return null;
 }
 

@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useState} from 'react';
+import {ScreenState,WorkspaceSkeleton} from '@/components/workspace/ScreenState';
 import {displayFieldValue,fieldLabels} from '@/lib/workflowPresentation';
 
 type AuditEvent={id:string;createdAt:string;eventHash:string;payload:{invoice?:Record<string,unknown>;review?:{unresolvedFields?:string[];confirmations?:Array<{field:string;evidence:string;confirmedAt:string}>}};presentation:{title:string;actorName:string;actorRole:string;reason:string;changes:Array<{field:string;label:string;before:unknown;after:unknown}>;artifactId?:string;policyVersion?:string;policyHash?:string;revision?:number;evaluationId?:string;reversesEventId?:string}};
@@ -9,9 +10,9 @@ export default function WorkflowAuditHistory({invoiceId}:{invoiceId:string}){
   fetch(`/api/audit?entityId=${encodeURIComponent(invoiceId)}`,{signal:controller.signal}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error);if(active)setEvents(d.events || []);}).catch(e=>{if(active)setError(e.message);}).finally(()=>{if(active)setLoading(false);});
   return()=>{active=false;controller.abort();};
  },[invoiceId,attempt]);
+ if(error)return <ScreenState error title="Không thể tải lịch sử" onRetry={()=>setAttempt(n=>n+1)}/>;
  return <section className="space-y-3 rounded-xl border bg-white p-4"><h3 className="font-semibold">Lịch sử xử lý hồ sơ</h3>
-  {loading && <p role="status" className="text-sm text-slate-600">Đang tải lịch sử…</p>}
-  {error && <p role="alert" className="text-sm text-red-700">{error}<button type="button" onClick={()=>setAttempt(n=>n+1)} className="ml-2 underline">Thử lại</button></p>}
+  {loading && <WorkspaceSkeleton/>}
   {!loading && !error && !events.length && <p className="text-sm text-slate-600">Hồ sơ chưa có sự kiện kiểm toán.</p>}
   <ol className="space-y-3">{events.map(event=>{
    const p=event.presentation;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,25 +13,21 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
+import { ScreenState } from '@/components/workspace/ScreenState';
+import { PagePanel } from '@/components/workspace/PagePanel';
 import { CanonicalLedgerVoucher, TargetAccountingSystem } from '@/lib/accounting/types';
-import {
-  Building2,
-  CheckCircle2,
-  Download,
-  FileSpreadsheet,
-  FileText,
-  RefreshCw,
-  SendHorizontal,
-  ShieldCheck,
-  Sparkles
-} from 'lucide-react';
+import { Building2, CheckCircle2, Download, FileSpreadsheet, RefreshCw, SendHorizontal, ShieldCheck } from 'lucide-react';
 
 interface LedgerSyncModalProps {
+  presentation?: 'dialog' | 'page';
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenChange }) => {
+export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenChange, presentation='dialog' }) => {
+  const Content=presentation==='page'?PagePanel:DialogContent;
+  const [loadError,setLoadError]=useState(false);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [vouchers, setVouchers] = useState<CanonicalLedgerVoucher[]>([]);
@@ -49,29 +45,31 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
-  const loadLedgerData = async (selectedRegime = regime) => {
+  const loadLedgerData = useCallback(async (selectedRegime:typeof regime):Promise<void> => {
+    setLoadError(false);
     setLoading(true);
     try {
       const res = await fetch(`/api/ledger/sync?regime=${selectedRegime}`);
       const data = await res.json();
+      if(!res.ok||!data.success)throw new Error('Ledger unavailable');
       if (data.success) {
         setVouchers(data.vouchers || []);
         setTotalDebit(data.totalDebit || 0);
         setTotalCredit(data.totalCredit || 0);
       }
     } catch {
-      // ignore
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
-  };
+  },[]);
 
   useEffect(() => {
     if (open) {
       void loadLedgerData(regime);
       setLastSyncResult(null);
     }
-  }, [open]);
+  }, [open,regime,loadLedgerData]);
 
   const handleSyncApi = async () => {
     setSyncing(true);
@@ -82,6 +80,7 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
         body: JSON.stringify({ targetSystem, regime })
       });
       const data = await res.json();
+      if(!res.ok||!data.success)throw new Error('Export unavailable');
       if (data.success) {
         setLastSyncResult({
           reference: data.batchReference,
@@ -90,7 +89,7 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
         });
       }
     } catch {
-      // ignore
+      toast.error('Không thể tạo gói nhập. Hãy thử lại.');
     } finally {
       setSyncing(false);
     }
@@ -115,24 +114,26 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
     URL.revokeObjectURL(url);
   };
 
+  if(loadError&&presentation==='page')return <ScreenState error title="Không thể tải dữ liệu xuất" onRetry={()=>void loadLedgerData(regime)}/>;
+  if(loadError&&open)return <Dialog open onOpenChange={onOpenChange}><DialogContent><DialogTitle>Xuất dữ liệu kế toán</DialogTitle><DialogDescription>Kiểm tra kết nối dữ liệu nội bộ.</DialogDescription><ScreenState error title="Không thể tải dữ liệu xuất" onRetry={()=>void loadLedgerData(regime)}/></DialogContent></Dialog>;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white border-slate-200 shadow-2xl">
+    <Dialog open={open} modal={presentation!=='page'} onOpenChange={onOpenChange}>
+      <Content className={presentation==='page'?'w-full p-0':'max-w-4xl max-h-[90dvh] flex flex-col p-0 overflow-hidden bg-card border shadow-modal'}>
         <DialogHeader className="p-6 pb-4 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-sm">
-                <Building2 className="w-5 h-5 text-[#e4f222]" />
+              <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-none">
+                <Building2 className="w-5 h-5 text-brand-lime" />
               </div>
               <div>
-                <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                  Đồng Bộ Sổ Cái Kế Toán
+                <DialogTitle className="text-xl font-medium text-slate-900 flex items-center gap-2">
+                  Xuất dữ liệu kế toán
                   <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
                     {regime === 'CIRCULAR_133' ? 'Thông tư 133/2016 (SME)' : 'Thông tư 99/2025 (DN Lớn)'}
                   </Badge>
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500 mt-0.5">
-                  Tự động chuyển đổi hóa đơn đã duyệt thành bút toán kép Nợ/Có và đẩy sang phần mềm kế toán
+                  Tạo gói nhập từ hóa đơn đã duyệt. Chỉ xuất payload, chưa kết nối trực tiếp ERP.
                 </DialogDescription>
               </div>
             </div>
@@ -143,11 +144,10 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
                 <button
                   onClick={() => {
                     setRegime('CIRCULAR_99_200');
-                    void loadLedgerData('CIRCULAR_99_200');
                   }}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition cursor-pointer ${
                     regime === 'CIRCULAR_99_200'
-                      ? 'bg-slate-950 text-white shadow-xs'
+                      ? 'bg-slate-950 text-white shadow-none'
                       : 'text-slate-600 hover:text-slate-950'
                   }`}
                   title="Thông tư 99/2025/TT-BTC & TT 200/2014 cho Doanh nghiệp Vừa và Lớn"
@@ -157,11 +157,10 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
                 <button
                   onClick={() => {
                     setRegime('CIRCULAR_133');
-                    void loadLedgerData('CIRCULAR_133');
                   }}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-md transition cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition cursor-pointer ${
                     regime === 'CIRCULAR_133'
-                      ? 'bg-slate-950 text-white shadow-xs'
+                      ? 'bg-slate-950 text-white shadow-none'
                       : 'text-slate-600 hover:text-slate-950'
                   }`}
                   title="Thông tư 133/2016/TT-BTC cho Doanh nghiệp Nhỏ (SME)"
@@ -188,19 +187,19 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
             <Card className="bg-white border-slate-200/80 shadow-none">
               <CardContent className="p-3">
                 <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Chứng Từ Ghi Sổ</div>
-                <div className="text-xl font-black font-numeric text-slate-900 mt-0.5">{vouchers.length}</div>
+                <div className="text-xl font-semibold font-numeric text-slate-900 mt-0.5">{vouchers.length}</div>
               </CardContent>
             </Card>
             <Card className="bg-white border-slate-200/80 shadow-none">
               <CardContent className="p-3">
                 <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Tổng Phát Sinh Nợ</div>
-                <div className="text-xl font-black font-numeric text-blue-700 mt-0.5">{formatVND(totalDebit)}</div>
+                <div className="text-xl font-semibold font-numeric text-slate-900 mt-0.5">{formatVND(totalDebit)}</div>
               </CardContent>
             </Card>
             <Card className="bg-white border-slate-200/80 shadow-none">
               <CardContent className="p-3">
                 <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Tổng Phát Sinh Có</div>
-                <div className="text-xl font-black font-numeric text-slate-900 mt-0.5">{formatVND(totalCredit)}</div>
+                <div className="text-xl font-semibold font-numeric text-slate-900 mt-0.5">{formatVND(totalCredit)}</div>
               </CardContent>
             </Card>
             <Card className="bg-white border-slate-200/80 shadow-none">
@@ -208,7 +207,7 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
                 <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Cân Đối Kế Toán</div>
                 <div className="mt-1 flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-emerald-700">100% Khớp Đúng</span>
+                  <span className="text-xs font-medium text-emerald-700">{vouchers.length === 0 ? 'Chưa có chứng từ' : totalDebit === totalCredit ? 'Nợ / Có cân bằng' : 'Cần đối chiếu'}</span>
                 </div>
               </CardContent>
             </Card>
@@ -219,9 +218,9 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Target System Selection */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between">
+            <label className="text-xs font-medium text-slate-700 uppercase tracking-wider flex items-center justify-between">
               <span>Hệ Thống Phần Mềm Đích</span>
-              <span className="text-slate-400 font-normal">Tương thích hơn 95% doanh nghiệp Việt Nam</span>
+              <span className="text-slate-500 font-normal">Định dạng gói xuất</span>
             </label>
             <Tabs
               value={targetSystem}
@@ -236,7 +235,7 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
                   FAST Accounting
                 </TabsTrigger>
                 <TabsTrigger value="UNIVERSAL_XML" className="text-xs font-semibold py-2">
-                  XML TT99 (Toàn năng)
+                  XML TT99
                 </TabsTrigger>
                 <TabsTrigger value="UNIVERSAL_EXCEL" className="text-xs font-semibold py-2">
                   Excel Bảng Kê
@@ -249,12 +248,12 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
           {lastSyncResult && (
             <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start justify-between gap-3 animate-in fade-in">
               <div className="space-y-1">
-                <div className="flex items-center gap-2 font-bold text-sm text-emerald-800">
+                <div className="flex items-center gap-2 font-medium text-sm text-emerald-800">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   Đã tạo gói nhập thủ công gồm {lastSyncResult.syncedCount} chứng từ cho {targetSystem}.
                 </div>
                 <div className="text-xs text-emerald-700">
-                  Mã gói: <span className="font-mono font-bold">{lastSyncResult.reference}</span> · Hãy tải gói và nhập vào phần mềm kế toán.
+                  Mã gói: <span className="font-mono font-medium">{lastSyncResult.reference}</span> · Hãy tải gói và nhập vào phần mềm kế toán.
                 </div>
               </div>
               <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-300 text-xs">
@@ -265,9 +264,9 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
           )}
 
           {/* Vouchers Table Preview */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-none">
             <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <span className="text-xs font-medium text-slate-700 uppercase tracking-wider">
                 Chi Tiết Bút Toán Kép Nợ / Có ({vouchers.length} chứng từ)
               </span>
               <span className="text-[11px] text-slate-500 flex items-center gap-1">
@@ -281,7 +280,7 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
                 <div key={v.id} className="p-3 hover:bg-slate-50/70 transition-colors">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">
+                      <span className="font-mono text-xs font-medium text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">
                         {v.voucherNumber}
                       </span>
                       <span className="text-xs text-slate-600">
@@ -292,7 +291,7 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-bold font-numeric text-slate-900">
+                      <span className="text-xs font-medium font-numeric text-slate-900">
                         {formatVND(v.totalAmount)}
                       </span>
                     </div>
@@ -304,11 +303,11 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
                       <div key={idx} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2 text-slate-600">
                           {entry.debitAmount > 0 ? (
-                            <span className="font-mono font-bold text-blue-700 bg-blue-50 px-1 rounded text-[11px]">
+                            <span className="font-mono font-medium text-blue-700 bg-blue-50 px-1 rounded text-[11px]">
                               Nợ TK {entry.accountCode}
                             </span>
                           ) : (
-                            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-1 rounded text-[11px]">
+                            <span className="font-mono font-medium text-slate-800 bg-slate-100 px-1 rounded text-[11px]">
                               Có TK {entry.accountCode}
                             </span>
                           )}
@@ -351,14 +350,14 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
 
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="text-xs">
-              Đóng
+              {presentation === 'page' ? 'Về Thẩm định' : 'Đóng'}
             </Button>
             <Button
               variant="default"
               size="sm"
               onClick={handleSyncApi}
               disabled={syncing || vouchers.length === 0}
-              className="bg-slate-900 text-white hover:bg-slate-800 gap-1.5 text-xs font-bold shadow-sm"
+              className="bg-slate-900 text-white hover:bg-slate-800 gap-1.5 text-xs font-medium shadow-none"
             >
               {syncing ? (
                 <>
@@ -367,14 +366,14 @@ export const LedgerSyncModal: React.FC<LedgerSyncModalProps> = ({ open, onOpenCh
                 </>
               ) : (
                 <>
-                  <SendHorizontal className="w-3.5 h-3.5 text-[#e4f222]" />
+                  <SendHorizontal className="w-3.5 h-3.5 text-brand-lime" />
                   Tạo Gói Nhập {targetSystem.replace('_', ' ')}
                 </>
               )}
             </Button>
           </div>
         </DialogFooter>
-      </DialogContent>
+      </Content>
     </Dialog>
   );
 };

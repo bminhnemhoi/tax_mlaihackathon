@@ -1,0 +1,11 @@
+{
+  "schemaVersion":2,
+  "status":"AWAITING_HUMAN_LABELS",
+  "targetCases":40,
+  "minimumCases":20,
+  "companyTaxCode":"",
+  "lockedAt":"",
+  "trainingInvoiceHashes":[],
+  "cases":[],
+  "instructions":"Nhân sự nghiệp vụ điền id, name, invoice (cho phép thiếu dữ kiện để kiểm tra chuyển tiếp), expectedStatus, expectedRiskGroup, expectedRequiresCFO, rationale, labeledBy, labeledAt, provenance. Context tùy chọn có history, macroBaseline, config. Khóa nhãn trước khi chạy; chỉ đổi status thành LOCKED sau khi người gán nhãn đã chốt. Không chép ca Verify/bộ phát triển, không ghi tên người tham gia thay họ."
+}

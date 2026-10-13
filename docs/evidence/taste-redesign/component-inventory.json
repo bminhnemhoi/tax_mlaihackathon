@@ -1,0 +1,630 @@
+{
+  "generatedAt": "2026-10-13T04:12:51.857Z",
+  "method": "Static import/name references, current source hashes; browser evidence is route-level, not a claim of all state combinations.",
+  "components": [
+    {
+      "file": "components/AuditTrailTable.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "cdaf5a43f6a8f4ce881070c4a959439ef0a90bee585c50bee13e1d1d6cb46e6a",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/BrandMark.tsx",
+      "status": "Giữ nguyên có lý do",
+      "callers": [
+        "components/CapturePhonePage.tsx",
+        "components/HomePage.tsx",
+        "components/workspace/WorkspaceShell.tsx",
+        "app/verify/page.tsx"
+      ],
+      "baselineChanged": false,
+      "sha256": "e12c55885649e88911134813e64893d9d14d4d3d5f7c122a0c1d13166bc4d3bf",
+      "verification": "Giữ logo TR đã được chốt."
+    },
+    {
+      "file": "components/CapturePhoneDialog.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/InteractiveInputForm.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "e183a67fa437d1a61210abe184c66c7d50d12150855cfc5208d69d09129fd8d6",
+      "verification": "Viewer/scan/nguồn thực hoặc bản dựng; fit theo hai chiều."
+    },
+    {
+      "file": "components/CapturePhonePage.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "app/capture/[id]/page.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "f3ccc76bfe246455bb40690d3b12c6dc9d606cde34b78394370dceb92f59d32c",
+      "verification": "Viewer/scan/nguồn thực hoặc bản dựng; fit theo hai chiều."
+    },
+    {
+      "file": "components/DocumentViewer.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "3c905e1000b0c2cd45aa283a5d12c7c0b5fb374edc3c9d1d134b77e24cf70a11",
+      "verification": "Viewer/scan/nguồn thực hoặc bản dựng; fit theo hai chiều."
+    },
+    {
+      "file": "components/EscalationCard.tsx",
+      "status": "Giữ tương thích, chuẩn hóa hình ảnh",
+      "callers": [],
+      "baselineChanged": true,
+      "sha256": "e1a74af060e7055d7dfb911710b76afdedc51f923d79f4e633d22df9c384350c",
+      "verification": "Chưa mount trong luồng chính; giữ interface cho caller cũ, compile/typecheck."
+    },
+    {
+      "file": "components/HandoffContext.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/EscalationCard.tsx",
+        "components/ProductionWorkspace.tsx",
+        "components/VerifyHarness.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "c30aca87866da1f1be0f44a91955848963c49e096578cf46220fe192c493a7f8",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/HeaderBanner.tsx",
+      "status": "Giữ tương thích, chuẩn hóa hình ảnh",
+      "callers": [],
+      "baselineChanged": true,
+      "sha256": "9e7f122b9a882d6f9b3bb5b9f6add7417dc7ade39434678a640f9c0e00b2dabc",
+      "verification": "Chưa mount trong luồng chính; giữ interface cho caller cũ, compile/typecheck."
+    },
+    {
+      "file": "components/HomePage.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "app/page.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "4825e7862738e4a37b051bb0021e65f375098035c2353aac90caac194cabe509",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/InboxFilterToolbar.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "380bfe162782937da42d768c07872f6b4540cf0105e4ace7a1f5b3a27d78231f",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/InteractiveInputForm.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx",
+        "app/verify/page.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "4276b6cd2de5181d8edf456dd88773a5c7402e5668eb38aa72f1eb1186425d8f",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/InvoiceDataSummary.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/DocumentViewer.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "37e552ea6fc8fe5f9cb923751c893339ef343c0b0b309133b7a86cdf1fe960f4",
+      "verification": "Viewer/scan/nguồn thực hoặc bản dựng; fit theo hai chiều."
+    },
+    {
+      "file": "components/InvoiceImageViewer.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/DocumentViewer.tsx",
+        "components/InteractiveInputForm.tsx",
+        "components/PhoneInvoicePreview.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "903aa2010cd47d9fa158d54209df6f88ad60dc933322ebf029ad872ea5343f11",
+      "verification": "Viewer/scan/nguồn thực hoặc bản dựng; fit theo hai chiều."
+    },
+    {
+      "file": "components/InvoiceScanOverlay.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/InvoiceImageViewer.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "991183b926fcd9e5f03c16961177d9a92338b3a9462826245bbf7ce3bec74b0e",
+      "verification": "Viewer/scan/nguồn thực hoặc bản dựng; fit theo hai chiều."
+    },
+    {
+      "file": "components/LedgerSyncModal.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "8137240981abab8f2f4754497315a37f038fe7dd6befc92b3801fa02ea8b3f0e",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/MacroHealthWidget.tsx",
+      "status": "Giữ tương thích, chuẩn hóa hình ảnh",
+      "callers": [],
+      "baselineChanged": true,
+      "sha256": "71190bf6cb9635acf021975837845932cbae2e74a23030b7b1c88b2795d024b8",
+      "verification": "Chưa mount trong luồng chính; giữ interface cho caller cũ, compile/typecheck."
+    },
+    {
+      "file": "components/NotificationCenterView.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "11a364f7c798a5a4bc55a2526df71ec39a70a4f3719b43d06798acda47263985",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/PhoneInvoicePreview.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/CapturePhonePage.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "a883104bb32146f6bc7ffdb9adf8f14821064c5d03357f89a362f95e13c394aa",
+      "verification": "Viewer/scan/nguồn thực hoặc bản dựng; fit theo hai chiều."
+    },
+    {
+      "file": "components/PolicyRuleReference.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "app/sop/page.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "9635e2fea7d52344ef4cd1504a1a69d204bd3385a9cc47966de52c31200bd5b6",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/PolicyViewerModal.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "d9444cc3923d0901746f4423db9832cae36e73a276ce44d3817d50c3ae91987f",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/ProductionWorkspace.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/workspace/WorkspaceSession.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "1db8b8f094c462d30e7a7408f22f19a97e5b30398d01225f9c318f06118bc99c",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/SourceReviewForm.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/WorkflowControls.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "be33fb40d0b55c9fed776672680ff51f581689a7accb0192bb19759bef1ba781",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/TaxDefenseModal.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "74f9f6d4ca99ef72faac3674d992d51b4487b9b0bc294621b003af7493fa848b",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/VerifyHarness.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "app/verify/page.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "61e4ea8d238dcef965a8dc81ffa0179aeaf9d0d35bfd73d854137563e95f5145",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/WorkflowAuditHistory.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx",
+        "components/WorkflowControls.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "da7320ee5cdad18a4f55d474f825837925a69b8703639a8b34c6617720099211",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/WorkflowControls.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "6c83f7ea64efda6378d4a76cc4459aa323831b14cfe7f36ba12c92399261c16d",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/banking/BankStatementView.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "b5791c0401b360b0aa6695d0f3795f96e65c6bd4c17cd48045f78775eabd95fe",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/reception/ReceptionLayout.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/InteractiveInputForm.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "3c71feb3d541f44c080d9d243d03f674c214de1c0740a60ba15cc586b541a1f8",
+      "verification": "Tách bố cục/nguồn/hành động, không thay engine."
+    },
+    {
+      "file": "components/reception/ReceptionSubmitBar.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/InteractiveInputForm.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "5616a12f80f645d33cdaaf240b5776e3f30597434dd913ce602afae5f1653474",
+      "verification": "Tách bố cục/nguồn/hành động, không thay engine."
+    },
+    {
+      "file": "components/reception/ReceptionUpload.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/InteractiveInputForm.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "37e790cb8037ded93f6452a371c16e54564aa45f3acf14dca48e32cd677563e3",
+      "verification": "Tách bố cục/nguồn/hành động, không thay engine."
+    },
+    {
+      "file": "components/reconciliation/TctReconciliationView.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "9db259709725a81e6efa028de5ae8704ae3b4c36264e6d8f45e64586da4a36ac",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/suppliers/SupplierMasterView.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "f35b31b6241d1dc5b6a449f53ff68e16430404339b82bd16a7420ddba44c272c",
+      "verification": "Giữ thao tác/API nghiệp vụ; giảm chữ và thông báo thao tác qua toast."
+    },
+    {
+      "file": "components/ui/badge.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/AuditTrailTable.tsx",
+        "components/EscalationCard.tsx",
+        "components/InteractiveInputForm.tsx",
+        "components/LedgerSyncModal.tsx",
+        "components/NotificationCenterView.tsx",
+        "components/PolicyViewerModal.tsx",
+        "components/ProductionWorkspace.tsx",
+        "components/TaxDefenseModal.tsx",
+        "components/banking/BankStatementView.tsx",
+        "components/reconciliation/TctReconciliationView.tsx",
+        "components/suppliers/SupplierMasterView.tsx",
+        "components/workspace/InvoiceList.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "59a76680a0927fc065492fde19728bd584927df40fc845298f3d04c3013ab765",
+      "verification": "Token light, focus, font, radius thống nhất."
+    },
+    {
+      "file": "components/ui/button.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/AuditTrailTable.tsx",
+        "components/CapturePhoneDialog.tsx",
+        "components/CapturePhonePage.tsx",
+        "components/DocumentViewer.tsx",
+        "components/EscalationCard.tsx",
+        "components/HeaderBanner.tsx",
+        "components/HomePage.tsx",
+        "components/InboxFilterToolbar.tsx",
+        "components/InteractiveInputForm.tsx",
+        "components/InvoiceImageViewer.tsx",
+        "components/LedgerSyncModal.tsx",
+        "components/NotificationCenterView.tsx",
+        "components/PolicyViewerModal.tsx",
+        "components/ProductionWorkspace.tsx",
+        "components/SourceReviewForm.tsx",
+        "components/TaxDefenseModal.tsx",
+        "components/VerifyHarness.tsx",
+        "components/WorkflowControls.tsx",
+        "components/banking/BankStatementView.tsx",
+        "components/reception/ReceptionLayout.tsx",
+        "components/reception/ReceptionSubmitBar.tsx",
+        "components/reception/ReceptionUpload.tsx",
+        "components/reconciliation/TctReconciliationView.tsx",
+        "components/suppliers/SupplierMasterView.tsx",
+        "components/workspace/InvoiceList.tsx",
+        "components/workspace/ReportsView.tsx",
+        "components/workspace/ScreenState.tsx",
+        "components/workspace/WorkspaceShell.tsx",
+        "app/verify/page.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "3aa386d1d3c7f05d79df9f53363b96f2f5b12efdf4218f8b9ff7f40f08476182",
+      "verification": "Token light, focus, font, radius thống nhất."
+    },
+    {
+      "file": "components/ui/card.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/DocumentViewer.tsx",
+        "components/HomePage.tsx",
+        "components/InteractiveInputForm.tsx",
+        "components/LedgerSyncModal.tsx",
+        "components/MacroHealthWidget.tsx",
+        "components/PolicyRuleReference.tsx",
+        "components/PolicyViewerModal.tsx",
+        "components/ProductionWorkspace.tsx",
+        "components/banking/BankStatementView.tsx",
+        "components/reception/ReceptionSubmitBar.tsx",
+        "components/reception/ReceptionUpload.tsx",
+        "components/reconciliation/TctReconciliationView.tsx",
+        "components/suppliers/SupplierMasterView.tsx",
+        "components/ui/dialog.tsx",
+        "components/ui/select.tsx",
+        "components/ui/sonner.tsx",
+        "components/workspace/InvoiceList.tsx",
+        "components/workspace/PagePanel.tsx",
+        "components/workspace/ReportsView.tsx",
+        "components/workspace/ScreenState.tsx",
+        "app/sop/page.tsx",
+        "app/verify/page.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "eaf92a3205fb21ee539057a702e1bd6994e1be3c898b65f85b076b00eee0ab71",
+      "verification": "Token light, focus, font, radius thống nhất."
+    },
+    {
+      "file": "components/ui/dialog.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/AuditTrailTable.tsx",
+        "components/CapturePhoneDialog.tsx",
+        "components/LedgerSyncModal.tsx",
+        "components/PolicyViewerModal.tsx",
+        "components/TaxDefenseModal.tsx",
+        "components/suppliers/SupplierMasterView.tsx",
+        "components/workspace/PagePanel.tsx",
+        "components/workspace/WorkspaceShell.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "97ccfaed83bbe81a7e4e17ce22958ac67bb36eb501465722b565d248976af77b",
+      "verification": "Token light, focus, font, radius thống nhất."
+    },
+    {
+      "file": "components/ui/input.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/CapturePhonePage.tsx",
+        "components/InboxFilterToolbar.tsx",
+        "components/InteractiveInputForm.tsx",
+        "components/PolicyRuleReference.tsx",
+        "components/PolicyViewerModal.tsx",
+        "components/ProductionWorkspace.tsx",
+        "components/SourceReviewForm.tsx",
+        "components/reception/ReceptionLayout.tsx",
+        "components/reception/ReceptionUpload.tsx",
+        "components/workspace/ReportsView.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "436cdea642fbe8141358eabba0254751320829f4f48cb4abc824c69b97c6d268",
+      "verification": "Token light, focus, font, radius thống nhất."
+    },
+    {
+      "file": "components/ui/select.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/AuditTrailTable.tsx",
+        "components/CapturePhonePage.tsx",
+        "components/HomePage.tsx",
+        "components/InboxFilterToolbar.tsx",
+        "components/InteractiveInputForm.tsx",
+        "components/InvoiceImageViewer.tsx",
+        "components/LedgerSyncModal.tsx",
+        "components/NotificationCenterView.tsx",
+        "components/PolicyRuleReference.tsx",
+        "components/ProductionWorkspace.tsx",
+        "components/SourceReviewForm.tsx",
+        "components/VerifyHarness.tsx",
+        "components/WorkflowControls.tsx",
+        "components/reception/ReceptionLayout.tsx",
+        "components/reconciliation/TctReconciliationView.tsx",
+        "components/suppliers/SupplierMasterView.tsx",
+        "components/ui/table.tsx",
+        "components/workspace/WorkspaceShell.tsx",
+        "app/layout.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "16a032b0c9848bcb3256518350c6d64ad1a35c4644a6cb6c8c8796f33cf45709",
+      "verification": "Token light, focus, font, radius thống nhất."
+    },
+    {
+      "file": "components/ui/sonner.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/CapturePhoneDialog.tsx",
+        "components/CapturePhonePage.tsx",
+        "components/HomePage.tsx",
+        "components/InteractiveInputForm.tsx",
+        "components/InvoiceImageViewer.tsx",
+        "components/LedgerSyncModal.tsx",
+        "components/NotificationCenterView.tsx",
+        "components/PolicyViewerModal.tsx",
+        "components/ProductionWorkspace.tsx",
+        "components/SourceReviewForm.tsx",
+        "components/VerifyHarness.tsx",
+        "components/WorkflowControls.tsx",
+        "components/banking/BankStatementView.tsx",
+        "components/reconciliation/TctReconciliationView.tsx",
+        "components/workspace/WorkspaceSession.tsx",
+        "app/layout.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "b01cd7fa7beb5cde79bca67478c4f042b85b1563161e759d7dbb78c1182e38e6",
+      "verification": "Token light, focus, font, radius thống nhất."
+    },
+    {
+      "file": "components/ui/table.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/AuditTrailTable.tsx",
+        "components/InvoiceDataSummary.tsx",
+        "components/PolicyViewerModal.tsx",
+        "components/VerifyHarness.tsx",
+        "components/banking/BankStatementView.tsx",
+        "components/reconciliation/TctReconciliationView.tsx",
+        "components/suppliers/SupplierMasterView.tsx",
+        "app/sop/page.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "205572c60686859c9422d14a45e25cffe50222c443c035d9d4cba8e966cde95a",
+      "verification": "Token light, focus, font, radius thống nhất."
+    },
+    {
+      "file": "components/ui/tabs.tsx",
+      "status": "Cải thiện / hợp nhất",
+      "callers": [
+        "components/AuditTrailTable.tsx",
+        "components/LedgerSyncModal.tsx",
+        "components/PolicyViewerModal.tsx",
+        "components/ProductionWorkspace.tsx",
+        "components/VerifyHarness.tsx",
+        "components/reception/ReceptionLayout.tsx"
+      ],
+      "baselineChanged": true,
+      "sha256": "d345c6b50a8f955c5581b51c6b8bb6c5e1e9759b74456e7a317e4dcc4edc6fad",
+      "verification": "Token light, focus, font, radius thống nhất."
+    },
+    {
+      "file": "components/ui/tooltip.tsx",
+      "status": "Giữ nguyên có lý do",
+      "callers": [],
+      "baselineChanged": false,
+      "sha256": "7bf0b0fc722c9e958662f1ee83252fa892fee4b270863da8a97028d241c5abdf",
+      "verification": "Radix tooltip hiện hành; không phải surface màn tối."
+    },
+    {
+      "file": "components/workspace/InvoiceList.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "8ff935222cc79d3a67e94813cad4bbf15cc60d04311b1468fa5d3932fbb142b5",
+      "verification": "Shell/session/read model/danh sách và trạng thái dùng chung."
+    },
+    {
+      "file": "components/workspace/PagePanel.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/LedgerSyncModal.tsx",
+        "components/PolicyViewerModal.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "2cc9c6a5649d9686f654d22c2b4a4e39e682b9098871fc57660639a8e4093093",
+      "verification": "Shell/session/read model/danh sách và trạng thái dùng chung."
+    },
+    {
+      "file": "components/workspace/ReportsView.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "54a3480a7f8b445f7c0cc902a5ba69905e48a0310d724cb43fed7f6a3163301a",
+      "verification": "Shell/session/read model/danh sách và trạng thái dùng chung."
+    },
+    {
+      "file": "components/workspace/ScreenState.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/DocumentViewer.tsx",
+        "components/LedgerSyncModal.tsx",
+        "components/NotificationCenterView.tsx",
+        "components/ProductionWorkspace.tsx",
+        "components/WorkflowAuditHistory.tsx",
+        "components/banking/BankStatementView.tsx",
+        "components/reconciliation/TctReconciliationView.tsx",
+        "components/suppliers/SupplierMasterView.tsx",
+        "components/workspace/InvoiceList.tsx",
+        "components/workspace/WorkspaceSession.tsx",
+        "app/verify/page.tsx",
+        "app/workspace/error.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "e05811219b0c03a0ff90631b73ff465dbebd7fed2ceb8a47146d794b770b0b05",
+      "verification": "Shell/session/read model/danh sách và trạng thái dùng chung."
+    },
+    {
+      "file": "components/workspace/WorkspaceSession.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "app/workspace/layout.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "a1267a0416aefe56de1b9386b5ce3f70499a4d28eb4c6e3c12c9c85dfa9b1a00",
+      "verification": "Shell/session/read model/danh sách và trạng thái dùng chung."
+    },
+    {
+      "file": "components/workspace/WorkspaceShell.tsx",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "d621efebce3aa12cccd73450c6e9703b3a2503ffe116f62447c3727cdc976ae8",
+      "verification": "Shell/session/read model/danh sách và trạng thái dùng chung."
+    },
+    {
+      "file": "components/workspace/useWorkspaceData.ts",
+      "status": "Thêm component dùng chung",
+      "callers": [
+        "components/ProductionWorkspace.tsx"
+      ],
+      "baselineChanged": null,
+      "sha256": "56430d014a6ba9b13ac42c00e7a02652ddc02e65a005d06e9fe6363dffaa0ee1",
+      "verification": "Shell/session/read model/danh sách và trạng thái dùng chung."
+    }
+  ]
+}

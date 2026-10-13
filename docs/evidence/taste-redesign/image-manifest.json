@@ -1,0 +1,264 @@
+{
+  "note": "Filename suffixes record requested viewports; PNG dimensions reflect the in-app browser capture. Some captures are cropped and are not proof of a full viewport.",
+  "images": [
+    {
+      "file": "after-approvals-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 50807,
+      "sha256": "808154c17ebf76a29827194c35b743d0cda82364d8002c965169d44b91a386ca"
+    },
+    {
+      "file": "after-audit-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 96368,
+      "sha256": "acbe94fd275c7088f574b7399de8e63a097e7baf879c52eb27803bd59ed840d1"
+    },
+    {
+      "file": "after-banking-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 60652,
+      "sha256": "e5da1d31918f4d8edc9fb03b6fbc60bb23b9f4665009b93a915c6822feb99e82"
+    },
+    {
+      "file": "after-entry-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 23654,
+      "sha256": "0744852e693d02f0a8ac6753af33bb0e516ece5d741bc4437c10beafcb4dba28"
+    },
+    {
+      "file": "after-handoff-1440.png",
+      "width": 1435,
+      "height": 897,
+      "bytes": 73861,
+      "sha256": "19bc330bd859900c5d81d36ed939d55e819f079389ad1c620594f049b0b85f88"
+    },
+    {
+      "file": "after-inbox-1280.png",
+      "width": 1275,
+      "height": 717,
+      "bytes": 59526,
+      "sha256": "b34d357764df7fff5064cd51df6face6616a3f77140129dc2986b1fe95d00463"
+    },
+    {
+      "file": "after-inbox-1440.png",
+      "width": 1275,
+      "height": 717,
+      "bytes": 59208,
+      "sha256": "2a08e7c853773fb0c3330233adb90e394e841fb82a3aa351c86194df7396d4bc"
+    },
+    {
+      "file": "after-ledger-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 106074,
+      "sha256": "e15ef750d726f5ee0759676760d13be6e159f42534b5d9c3d16dfdd18e8cd023"
+    },
+    {
+      "file": "after-notifications-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 45785,
+      "sha256": "f104429c202375c1829e4a3b29f2c0d699c9904d207fe673ce91a302432d9eb6"
+    },
+    {
+      "file": "after-policy-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 93438,
+      "sha256": "ec7073f41e0afae38694608eb41d6ddde5fb98c103c73392b16abd1aa1054e0c"
+    },
+    {
+      "file": "after-receive-1280.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 84119,
+      "sha256": "a3f68f9025008748d4f07418dfc632d426157d1a78d583c90d47ffe450bc4825"
+    },
+    {
+      "file": "after-receive-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 84119,
+      "sha256": "a3f68f9025008748d4f07418dfc632d426157d1a78d583c90d47ffe450bc4825"
+    },
+    {
+      "file": "after-reconciliation-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 108610,
+      "sha256": "8b0ee68d59e64cc84909ab03245b4e92dbf350b4be9c4a95772fdcc7b37881b7"
+    },
+    {
+      "file": "after-reports-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 56187,
+      "sha256": "04a650b487da3fc38e888384db9c74bdbcb0abf0b5e524fee1a62d4fd6d7ab3c"
+    },
+    {
+      "file": "after-sop-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 55569,
+      "sha256": "3847fafa558643aa46a5bcb998028f10d5af7f56ca3117773f232ed4559c9b0d"
+    },
+    {
+      "file": "after-source-1440.png",
+      "width": 1435,
+      "height": 897,
+      "bytes": 48319,
+      "sha256": "0c4e09cf05513d3c80f3536c48e89e24c2f27cceda93c33f71e8d7cddf6a249f"
+    },
+    {
+      "file": "after-suppliers-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 55693,
+      "sha256": "7261e5313a9ad87fb96104ca27ccc8de10b12f4762e5dc1a0c8348acac1730a4"
+    },
+    {
+      "file": "after-verify-1440.png",
+      "width": 1435,
+      "height": 897,
+      "bytes": 69956,
+      "sha256": "a79cd6e796c5c1077f0f75d8274f409bad35ad63bfa9125a1e5a608d644ef224"
+    },
+    {
+      "file": "before-inbox-1280.png",
+      "width": 447,
+      "height": 720,
+      "bytes": 17011,
+      "sha256": "44ab85093f36afc03ff6916fec2750ea2872154a6297f66e42b63aa6e761ef93"
+    },
+    {
+      "file": "before-receive-1280.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 58432,
+      "sha256": "d12cc1a24ce537169c1c9bfff5466b56c7d577eab993ffc9434bae2be48be8e0"
+    },
+    {
+      "file": "capture-received-fit-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 84733,
+      "sha256": "9193dcedc71b6415348449019ba2a6ea609b80728275b196ab1b831b5d795efc"
+    },
+    {
+      "file": "handoff-local-inbox-1280.png",
+      "width": 1280,
+      "height": 720,
+      "bytes": 40813,
+      "sha256": "53a592d967cee2d06bb879286cc0e3e4f37bfc642f68c3a2ac8e6777107e900b"
+    },
+    {
+      "file": "missing-invoice-1440.png",
+      "width": 1440,
+      "height": 900,
+      "bytes": 32946,
+      "sha256": "65e7d80aa3c88460a98fd2683744d2cbbfb95815595e43b1c29769e4f0dd17b1"
+    },
+    {
+      "file": "mobile-navigation-360.png",
+      "width": 360,
+      "height": 640,
+      "bytes": 16338,
+      "sha256": "47d8abc979a7ceaee68a7dc9d2f3a735cae36598735540c919ac48e4031504bc"
+    },
+    {
+      "file": "phone-preview-390.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 23051,
+      "sha256": "bb1c2d0aa5c7309fd32ea52f7dfd69abdbcbdb03c0f84a7e6f5ab6d8b4f8196a"
+    },
+    {
+      "file": "phone-sent-360.png",
+      "width": 360,
+      "height": 640,
+      "bytes": 20246,
+      "sha256": "86b454547a222c9f45febdcdd1292bdcffa3b04738aeb18356a2da4fa078e656"
+    },
+    {
+      "file": "phone-upload-scan-390.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 23766,
+      "sha256": "96b660d39f0cc63780f6c124a7fb436e8525325a07fe76b573a51e02aa4e63da"
+    },
+    {
+      "file": "receive-1280x720.png",
+      "width": 405,
+      "height": 720,
+      "bytes": 18345,
+      "sha256": "4028b3e517e24545f3f53f195c3b4f254b1cd7cb1504473a08573d05beec6e80"
+    },
+    {
+      "file": "receive-1440x900.png",
+      "width": 506,
+      "height": 900,
+      "bytes": 19707,
+      "sha256": "d65c3b8ca75032331f31017c4ca3d94053dcff0e2faf45bdcf9995e5887768c3"
+    },
+    {
+      "file": "receive-360x640.png",
+      "width": 360,
+      "height": 640,
+      "bytes": 27260,
+      "sha256": "9d8d32f6b76213ae7fad0c063e6e66008bc064d40181c2c52720958816b35dc4"
+    },
+    {
+      "file": "receive-390x844.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 33674,
+      "sha256": "d59d84488960134eb70a900fb0453c22b530bc882fa10e03b65b920c6706fbea"
+    },
+    {
+      "file": "receive-430x932.png",
+      "width": 430,
+      "height": 932,
+      "bytes": 37651,
+      "sha256": "f8ed65f7422d5567e483d717d55ce142ade0a0828aaef483aeeb97671e163ab8"
+    },
+    {
+      "file": "receive-768x1024.png",
+      "width": 768,
+      "height": 1024,
+      "bytes": 54931,
+      "sha256": "0d0ac2c4561b16975e2fdd399cdc4a0c98a1cee022dfa0acd5f14d44cc4a3a1f"
+    },
+    {
+      "file": "receive-844x390.png",
+      "width": 844,
+      "height": 390,
+      "bytes": 29681,
+      "sha256": "3c65345806d0e672dcabf0d7cfc04dcb2e12e6ab28c25e4ce6e586b27fd05c11"
+    },
+    {
+      "file": "receive-landscape-safe-scroll.png",
+      "width": 839,
+      "height": 388,
+      "bytes": 25703,
+      "sha256": "db2cd28b1a5993c93978fe56eaee9886315ff1867e3e03a57d065dac0e81b3f6"
+    },
+    {
+      "file": "receive-mobile-fields-360.png",
+      "width": 360,
+      "height": 640,
+      "bytes": 27251,
+      "sha256": "f88d8c69843c1b6e65fab41035f11941c40fbd32d9721fc3a624c3b8c5d85269"
+    },
+    {
+      "file": "receive-tablet-768.png",
+      "width": 768,
+      "height": 1024,
+      "bytes": 49376,
+      "sha256": "576862b4b8bfcf6b1110e5eb12cbc52d004cfe64b945206ca88f753c44cd5d5d"
+    }
+  ]
+}

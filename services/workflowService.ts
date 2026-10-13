@@ -5,8 +5,11 @@ import { appendAuditEvent, appendImmutableAudit } from '@/lib/server/audit';
 import { getActivePolicy, getDatabase, getMacroState, hashPayload, jsonNow, saveMacroState } from '@/lib/server/db';
 import { generateCanonicalVoucher } from '@/lib/accounting/ledgerMapper';
 import { queryJevReferee } from './jevService';
-import { calculateKFactor } from './policyEngine';
+import { calculateKFactor,sameDayPurchaseTotal } from './policyEngine';
+import {coreDecisionFields,missingBusinessFacts,requiredDecisionFields} from '@/lib/refereeRequirements';
+import {buildHandoff,checkHandoff,describeRuleEvidence} from './handoffService';
 import { fieldLabels } from '@/lib/workflowPresentation';
+import { recordConfirmedSupplierAlias } from './taxLookupService';
 import { z } from 'zod';
 
 export class WorkflowError extends Error { constructor(message: string, public status = 409) { super(message); } }
@@ -86,7 +89,7 @@ export function recordAction(row: WorkflowRecord, user: AppUser | null, eventTyp
   const after = readRecord(row.id);
   const policy = after.evaluation_policy_json ? JSON.parse(after.evaluation_policy_json) : getActivePolicy();
   const payload = { evaluationId: after.evaluation_id, revision: after.revision, policyVersion:policy.version, policyHash:policy.contentHash || hashPayload(policy), actorRole:user?.role || 'SYSTEM_REFEREE', actorName:user?.displayName || 'Hệ thống',
-    invoice: JSON.parse(after.payload_json), review:JSON.parse(after.source_review_json), before, after:snapshot(after),
+    invoice: JSON.parse(after.payload_json), review:JSON.parse(after.source_review_json), decision:after.decision_json?JSON.parse(after.decision_json):null, before, after:snapshot(after),
     previousStatus:before.status, targetStatus:after.status, previousApprovedDeductibleTax:before.approvedTax, approvedDeductibleTax:after.approved_deductible_tax, reason, ...extra };
   const event = appendAuditEvent({eventType,entityId:row.id,actorId:user?.id,payload});
   appendImmutableAudit({eventType,entityId:row.id,userId:user?.id || 'system',userRole:user?.role || 'SYSTEM_REFEREE',action:eventType,rationale:reason,payload:{...payload,auditEventId:event.id}});
@@ -102,9 +105,9 @@ function syncVoucher(row: WorkflowRecord) {
   db.prepare(`INSERT INTO internal_vouchers (id, invoice_id, evaluation_id, regime, voucher_json, created_at, updated_at) VALUES (?,?,?,'CIRCULAR_99_200',?,?,?) ON CONFLICT(invoice_id) DO UPDATE SET id=excluded.id,evaluation_id=excluded.evaluation_id,voucher_json=excluded.voucher_json,updated_at=excluded.updated_at`).run(voucher.id,row.id,row.evaluation_id,JSON.stringify({...voucher,status:'READY_TO_POST'}),t,t);
 }
 export async function evaluateWorkflow(raw: unknown, user: AppUser | null, options: {forceLocalOnly?:boolean; confirmedFields?:string[]; evidence?:string; expectedRevision?:number; confirmations?:SourceConfirmation[]} = {}) {
-  const partial=InvoiceInputSchema.partial().parse(raw);
+  const partial=Object.fromEntries(Object.entries(InvoiceInputSchema.partial().parse(raw)).filter(([,value])=>value!==undefined)) as Partial<InvoiceInput>;
   if((raw as any)?.sourceUncertainFields && (!Array.isArray((raw as any).sourceUncertainFields) || (raw as any).sourceUncertainFields.some((f:unknown)=>typeof f!=='string')))throw new WorkflowError('Danh sách trường nghi vấn sai cấu trúc.',400);
-  const required=['invoiceNumber','invoiceDate','supplierTaxCode','supplierName','itemName','preTaxAmount','taxRate','taxAmount','totalAmount'] as const;
+  const required=coreDecisionFields;
   const missing=required.filter(k=>partial[k] === undefined);
   const id=partial.id || crypto.randomUUID();
   const invoice=InvoiceInputSchema.parse({invoiceNumber:'Chưa xác minh',invoiceDate:'2026-01-01',supplierTaxCode:'0000000000',supplierName:'Chưa xác minh',itemName:'Chưa xác minh',preTaxAmount:0,taxRate:0,taxAmount:0,totalAmount:0,...partial,id});
@@ -121,7 +124,11 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
   if (invoice.sourceArtifactId && (!source || source.content_hash!==invoice.sourceHash || (!sharedDuplicateSource && ![id,`pending:${invoice.sourceArtifactId}`].includes(source.invoice_id)))) throw new WorkflowError('Chứng từ nguồn không thuộc hồ sơ này.');
   const extracted=source?.review ? JSON.parse(source.review) : {};
   const previousReview=existing ? JSON.parse(existing.source_review_json || '{}') : {};
-  const unknownBusinessFields=['paymentMethod','hasBankSlip','hasItemManifest','sellerStatus'].filter(field=>(invoice as any)[field]===undefined || (invoice as any)[field]==='UNKNOWN');
+  const dailyTotal=sameDayPurchaseTotal(invoice);
+  const requiredFields=requiredDecisionFields(invoice,policy.config,dailyTotal);
+  // Flagged optional identifiers remain relevant even if their extracted value is absent.
+  for(const field of ['buyerTaxCode','invoiceSeries','taxAuthorityCode','signingDate','items','isAdjustment'])if([...(extracted.uncertainFields||[]),...((raw as any)?.sourceUncertainFields||[])].includes(field))requiredFields.add(field);
+  const unknownBusinessFields=missingBusinessFacts(invoice,policy.config,dailyTotal);
   const sourceFields=[...(extracted.uncertainFields || []),...((raw as any)?.sourceUncertainFields || []),...unknownBusinessFields];
   const inferredFields=extracted.inferredFields || [];
   const oldInvoice=existing ? JSON.parse(existing.payload_json) : {};
@@ -145,8 +152,20 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
       }
     }
   }
-  const unresolved=[...new Set<string>([...missing,...sourceFields,...inferredFields,...(previousReview.unresolvedFields || [])])].filter(f=>!confirmed.includes(f) || missing.includes(f as typeof missing[number]));
-  const review={rawInput:raw,sourceValues:extracted.invoice || previousReview.sourceValues || null,inferredFields,unresolvedFields:unresolved,confirmedFields:[...new Set(confirmed)],confirmations,evidence:options.evidence || previousReview.evidence || null,confirmedBy:newConfirmations.length || legacyFields.length ? user?.id : previousReview.confirmedBy};
+  const identityVerified = extracted.supplierIdentity?.status === 'VERIFIED'
+    && extracted.supplierIdentity.supplierTaxCode === invoice.supplierTaxCode
+    && extracted.supplierIdentity.legalName === invoice.supplierName;
+  const allWarnings=[...new Set<string>([...missing,...sourceFields,...inferredFields,...(previousReview.unresolvedFields || [])])];
+  const unresolved=allWarnings.filter(field=>requiredFields.has(field))
+    .filter(f=>identityVerified && ['supplierName','supplierTaxCode'].includes(f)
+      ? missing.includes(f as typeof missing[number])
+      : !confirmed.includes(f) || missing.includes(f as typeof missing[number]));
+  const recordedIdentity = extracted.supplierIdentity || previousReview.supplierIdentity;
+  const supplierIdentity = recordedIdentity?.status === 'VERIFIED'
+    && (recordedIdentity.supplierTaxCode !== invoice.supplierTaxCode || recordedIdentity.legalName !== invoice.supplierName)
+    ? { ...recordedIdentity, status: 'CONFLICT', message: 'Thông tin nhà cung cấp đã thay đổi so với kết quả đối chiếu nguồn.' }
+    : recordedIdentity;
+  const review={rawInput:raw,sourceValues:extracted.invoice || previousReview.sourceValues || null,supplierIdentity,inferredFields,unresolvedFields:unresolved,nonBlockingFields:allWarnings.filter(field=>!requiredFields.has(field)),confirmedFields:[...new Set(confirmed)],confirmations,evidence:options.evidence || previousReview.evidence || null,confirmedBy:newConfirmations.length || legacyFields.length ? user?.id : previousReview.confirmedBy};
   const hash=hashPayload({invoice,review});
   if(existing?.content_hash===hash && existing.evaluation_id && ['APPROVED','REJECTED','WAITING_CFO','WAITING_CHIEF_ACCOUNTANT','FORWARDED'].includes(existing.status)) return {decision:JSON.parse(existing.decision_json!),workflow:{status:existing.status,revision:existing.revision,evaluationId:existing.evaluation_id,duplicate:true},policy};
   if(existing && options.expectedRevision!==existing.revision) throw new WorkflowError('Cần phiên bản hồ sơ hiện hành để bổ sung dữ liệu.');
@@ -159,6 +178,20 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
     db.prepare(`INSERT INTO invoices (id,invoice_number,supplier_tax_code,invoice_date,payload_json,content_hash,status,approved_deductible_tax,created_by_user_id,created_at,updated_at,revision,source_review_json) VALUES (?,?,?,?,?,?,'EVALUATING',0,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET invoice_number=excluded.invoice_number,supplier_tax_code=excluded.supplier_tax_code,invoice_date=excluded.invoice_date,payload_json=excluded.payload_json,content_hash=excluded.content_hash,status='EVALUATING',approved_deductible_tax=0,updated_at=excluded.updated_at,revision=excluded.revision,source_review_json=excluded.source_review_json`).run(id,invoice.invoiceNumber,invoice.supplierTaxCode,invoice.invoiceDate,JSON.stringify(invoice),hash,user?.id || null,t,t,revision,JSON.stringify(review));
     db.prepare('UPDATE invoices SET evaluation_attempt_id=?,evaluation_deadline=?,evaluation_policy_json=? WHERE id=?').run(attemptId,deadline,JSON.stringify(policy),id);
     db.prepare('INSERT INTO invoice_revisions VALUES (?,?,?,?,?,?)').run(crypto.randomUUID(),id,revision,JSON.stringify(invoice),JSON.stringify(review),t);
+    const confirmedSupplierName = confirmations.find(c => c.field === 'supplierName' && c.value === invoice.supplierName);
+    const confirmedSupplierTaxCode = confirmations.find(c => c.field === 'supplierTaxCode' && c.value === invoice.supplierTaxCode);
+    if (user && confirmedSupplierName && confirmedSupplierTaxCode) {
+      recordConfirmedSupplierAlias({
+        supplierName: invoice.supplierName,
+        supplierTaxCode: invoice.supplierTaxCode,
+        supplierAddress: invoice.supplierAddress,
+        invoiceId: id,
+        nameEvidence: confirmedSupplierName.evidence,
+        taxCodeEvidence: confirmedSupplierTaxCode.evidence,
+        verifiedBy: `${confirmedSupplierName.confirmedBy},${confirmedSupplierTaxCode.confirmedBy}`,
+        confirmedAt: [confirmedSupplierName.confirmedAt, confirmedSupplierTaxCode.confirmedAt].sort().at(-1)
+      });
+    }
     if(source) db.prepare("UPDATE document_artifacts SET invoice_id=? WHERE id=? AND invoice_id LIKE 'pending:%'").run(id,invoice.sourceArtifactId);
     syncVoucher(readRecord(id)); recomputeMacro();
     recordAction(readRecord(id),user,'EVALUATION_STARTED','Tiếp nhận revision mới; khóa tự duyệt cho đến khi đánh giá xong.',initialSnapshot);
@@ -170,7 +203,18 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
       const names:Record<string,string>={invoiceNumber:'Số hóa đơn',invoiceDate:'Ngày lập',supplierTaxCode:'MST bên bán',supplierName:'Tên bên bán',itemName:'Nội dung hàng hóa',preTaxAmount:'Tiền trước thuế',taxRate:'Thuế suất',taxAmount:'Tiền thuế',totalAmount:'Tổng thanh toán',paymentMethod:'Thanh toán',hasBankSlip:'Chứng từ ngân hàng',hasItemManifest:'Bảng kê hàng hóa',sellerStatus:'Trạng thái bên bán'};
       const details=unresolved.map(field=>`${fieldLabels[field] || names[field] || field}: ${missing.includes(field as typeof missing[number])?'chưa có dữ liệu':String((extracted.invoice || partial as any)[field] ?? 'chưa xác minh')}`).join('; ');
       const findings=decision.findings?.filter(f=>!['RULE_DATA_QUALITY','RULE_IMAGE_BLURRY'].includes(f.ruleId)) || [];
-      decision={...decision,riskGroup:unresolved.every(field=>['paymentMethod','hasBankSlip','hasItemManifest','sellerStatus'].includes(field))?decision.riskGroup:'UNCERTAIN_INFO',actionableQuestion:`Hóa đơn ${invoice.invoiceNumber}: ${decision.requiresCFO?'CFO':'Kế toán trưởng'} cần xác minh ${details}. Điền giá trị đúng và nguồn bằng chứng cho từng trường, hoặc yêu cầu người nộp bổ sung chứng từ?${findings.length ? ` Còn ${findings.length} phát hiện khác cần xử lý sau khi xác minh.` : ''}`,plainExplanation:'Dữ liệu nguồn chưa được xác minh; chưa xác định số thuế được duyệt.',findings:[{ruleId:'RULE_SOURCE_REVIEW',kind:'DATA_QUALITY',severity:'HIGH',riskGroup:'UNCERTAIN_INFO',flaggedReason:details,plainExplanation:'Yêu cầu chứng từ gốc và xác nhận dữ liệu trước khi đánh giá lại.',legalBasis:'Quy trình kiểm soát dữ liệu đầu vào'},...findings]};
+      decision={...decision,riskGroup:unresolved.every(field=>['paymentMethod','hasBankSlip','hasItemManifest','sellerStatus'].includes(field))?decision.riskGroup:'UNCERTAIN_INFO',flaggedReason:details,actionableQuestion:`Hóa đơn ${invoice.invoiceNumber}: cần xác minh ${details}.`,options:[
+        {id:'A',label:'Xác minh dữ liệu từ chứng từ gốc',actionDescription:'Ghi giá trị và nguồn cho từng trường; chạy lại mọi quy tắc.',resultingAction:'CONFIRM_CORRECTED_DATA'},
+        {id:'B',label:'Yêu cầu bổ sung chứng từ',actionDescription:'Giữ hồ sơ chờ người nộp bổ sung; chưa duyệt thuế.',resultingAction:'REQUEST_INFORMATION'}],plainExplanation:'Dữ liệu nguồn chưa được xác minh; chưa xác định số thuế được duyệt.',findings:[{ruleId:'RULE_SOURCE_REVIEW',kind:'DATA_QUALITY',severity:'HIGH',riskGroup:'UNCERTAIN_INFO',flaggedReason:details,plainExplanation:'Yêu cầu chứng từ gốc và xác nhận dữ liệu trước khi đánh giá lại.',legalBasis:'Quy trình kiểm soát dữ liệu đầu vào'},...findings]};
+    }
+    if(decision.status==='ESCALATED'){
+      const groundedQuestion=!unresolved.length && decision.handoff?.questionSource==='AI_GROUNDED'?decision.actionableQuestion:undefined;
+      decision={...decision,findings:decision.findings?.map(f=>describeRuleEvidence(f,invoice.invoiceDate))};
+      const primary=decision.findings?.[0];
+      decision=buildHandoff(invoice,{...decision,sopClause:primary?.sopClause || decision.sopClause},{policyHash:policy.contentHash || hashPayload(policy),unresolvedFields:unresolved,missingFields:[...missing],confirmations});
+      if(groundedQuestion){decision={...decision,actionableQuestion:groundedQuestion,handoff:{...decision.handoff!,question:groundedQuestion,questionSource:'AI_GROUNDED'}};}
+      decision.handoff!.automatedCheck=checkHandoff(decision);
+      if(!decision.handoff!.automatedCheck.valid)throw new WorkflowError('Cấu trúc chuyển tiếp không đủ dữ kiện; giữ hồ sơ để kiểm tra.',500);
     }
     RefereeDecisionSchema.parse(decision);
     const evaluationId=crypto.randomUUID();

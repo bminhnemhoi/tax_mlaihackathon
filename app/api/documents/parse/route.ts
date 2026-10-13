@@ -6,23 +6,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { extractInvoiceWithUnifiedAI, extractInvoiceWithHybridPipeline } from '@/services/aiCoordinator';
-import { DocumentExtractionSchema } from '@/lib/schemas';
+import { DocumentExtraction, DocumentExtractionSchema } from '@/lib/schemas';
 import { getDatabase, jsonNow } from '@/lib/server/db';
 import {assertArtifactCapacity,ArtifactQuotaError} from '@/lib/server/artifactQuota';
 
-import { parseNumberValue as numberValue, parseTaxRateString } from '@/lib/utils';
 import { parseInvoiceFromRawText } from '@/lib/rawTextParser';
-import { autoEnrichSupplierData, validateTaxCode } from '@/services/taxLookupService';
+import { validateTaxCode } from '@/lib/taxCode';
+import { lookupOfficialSupplierIdentity } from '@/services/officialSupplierLookupService';
+import { screenInvoiceImage, imageScreeningMessage } from '@/services/invoiceImagePreflight';
+import { extractInvoiceImageWithGeminiVision } from '@/services/geminiService';
 import { extractTextFromPdfBuffer, optimizeImageBuffer } from '@/lib/server/pdfToImage';
-import { GEMINI_API_CONFIG } from '@/lib/constants';
+import { SHOPAIKEY_GEMINI_API_CONFIG } from '@/lib/constants';
 import { validateInvoiceMathematics } from '@/lib/invoiceMathValidator';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Stored in the current request database: never reuse another session's artifact/review.
-const extractionVersion = `vision-compact-v3:${GEMINI_API_CONFIG.BASE_URL}:${GEMINI_API_CONFIG.MODEL}:${process.env.DOCUMENT_IMAGE_MAX_DIM || "1000"}-q${process.env.DOCUMENT_IMAGE_JPEG_QUALITY || "80"}:provenance-v1:${process.env.DOCUMENT_IMAGE_ENGINE || "gemini"}:receipt-v2:${process.env.LOCAL_OCR_PROFILE || "min960"}`;
+const extractionVersion = `shopaikey-gemini-vision-identity-resolver-v4:${SHOPAIKEY_GEMINI_API_CONFIG.MODEL}:${process.env.DOCUMENT_IMAGE_MAX_DIM || '1000'}-q${process.env.DOCUMENT_IMAGE_JPEG_QUALITY || '80'}`;
 function getCachedDocumentResult(hash: string) {
   const row = getDatabase().prepare(`SELECT r.payload_json FROM document_artifacts a
     JOIN extraction_reviews r ON r.artifact_id=a.id WHERE a.content_hash=?`).get(hash) as {payload_json:string}|undefined;
@@ -40,16 +41,104 @@ function extractionResponse(result: unknown, started: number, cacheHit=false) {
     { headers:{'Server-Timing':`extraction;dur=${totalMs}`, 'Cache-Control':'no-store'} });
 }
 
+function supplierIdentityReview(identity: Awaited<ReturnType<typeof lookupOfficialSupplierIdentity>> | undefined, source: 'XML' | 'PDF_TEXT' | 'VLM' | 'USER') {
+  const hasConflict = identity?.status === 'CONFLICT';
+  const note = identity?.message || 'MST in trên hóa đơn chưa khớp nhà cung cấp.';
+  return {
+    uncertainFields: [] as string[],
+    conflicts: hasConflict ? [note] : [],
+    fieldWarnings: {} as Record<string, string>,
+    fieldEvidence: hasConflict ? { supplierTaxCode: {
+      source,
+      status: 'CONFLICT' as const,
+      confidence: 0.6
+    } } : {}
+  };
+}
 
-function persistTextExtraction(rawText:string, rawInvoice:Record<string,unknown>, result:any, extractedFields:string[]) {
+async function verifySupplierIdentity(invoice: Record<string, unknown>) {
+  const supplierName = typeof invoice.supplierName === 'string' ? invoice.supplierName : '';
+  const supplierTaxCode = typeof invoice.supplierTaxCode === 'string' ? invoice.supplierTaxCode : '';
+  const address = typeof invoice.supplierAddress === 'string' ? invoice.supplierAddress : '';
+  if (!supplierName.trim() && !supplierTaxCode.trim()) return { identity: undefined, trustedDerivedFields: [] as string[] };
+  const identity = await lookupOfficialSupplierIdentity({ supplierName, supplierTaxCode, address });
+  const trustedDerivedFields: string[] = [];
+  if (identity.status === 'VERIFIED' && identity.legalName && identity.supplierTaxCode) {
+    invoice.supplierName = identity.legalName;
+    invoice.supplierTaxCode = identity.supplierTaxCode;
+    trustedDerivedFields.push('supplierName', 'supplierTaxCode');
+  }
+  return { identity, trustedDerivedFields };
+}
+
+// Recheck supplier freshness without calling Vision again for the same image.
+// Keep the original extracted name/MST as the query, rather than a previous
+// canonical result that could hide a mismatch on a later registry refresh.
+async function refreshCachedSupplier(result: DocumentExtraction): Promise<DocumentExtraction> {
+  const original = result.supplierIdentity;
+  const identity = await lookupOfficialSupplierIdentity({
+    supplierName: original?.originalSupplierName ?? result.invoice.supplierName,
+    supplierTaxCode: original?.originalSupplierTaxCode ?? result.invoice.supplierTaxCode,
+    address: result.invoice.supplierAddress
+  });
+  const updated: DocumentExtraction = { ...result, invoice: { ...result.invoice }, supplierIdentity: identity,
+    fieldEvidence: { ...result.fieldEvidence }, confidence: { ...result.confidence },
+    fieldWarnings: { ...result.fieldWarnings } };
+  updated.conflicts = (result.conflicts || []).filter(message => message !== original?.message);
+  if (identity.status === 'CONFLICT' && identity.message) updated.conflicts.push(identity.message);
+  if (identity.status === 'VERIFIED' && identity.legalName && identity.supplierTaxCode) {
+    updated.invoice.supplierName = identity.legalName;
+    updated.invoice.supplierTaxCode = identity.supplierTaxCode;
+    for (const field of ['supplierName', 'supplierTaxCode'] as const) {
+      updated.confidence[field] = 1;
+      updated.fieldEvidence[field] = { source: 'OFFICIAL_REGISTRY', status: 'VERIFIED', confidence: 1, text: updated.invoice[field] };
+      delete updated.fieldWarnings![field];
+    }
+    updated.uncertainFields = updated.uncertainFields.filter(field => !['supplierName', 'supplierTaxCode'].includes(field));
+    updated.absentFields = updated.absentFields.filter(field => !['supplierName', 'supplierTaxCode'].includes(field));
+  } else if (original?.status === 'VERIFIED') {
+    // Expired cached registry data must not retain its former verified badge.
+    updated.invoice.supplierName = original.originalSupplierName ?? '';
+    updated.invoice.supplierTaxCode = original.originalSupplierTaxCode ?? '';
+    updated.needsReview = true;
+    for (const field of ['supplierName', 'supplierTaxCode']) {
+      updated.fieldEvidence[field] = { source: result.sourceType === 'XML' ? 'XML' : result.sourceType === 'FORM' ? 'USER' : 'VLM', status: identity.status === 'CONFLICT' && field === 'supplierTaxCode' ? 'CONFLICT' : 'UNCERTAIN', confidence: 0.6 };
+      updated.confidence[field] = 0.6;
+      updated.uncertainFields = [...new Set([...updated.uncertainFields, field])];
+    }
+  }
+  if (result.artifactId) {
+    const db = getDatabase();
+    const row = db.prepare('SELECT payload_json FROM extraction_reviews WHERE artifact_id=?').get(result.artifactId) as { payload_json: string } | undefined;
+    if (row) {
+      const stored = JSON.parse(row.payload_json);
+      const inferredFields = identity.status === 'VERIFIED'
+        ? (stored.inferredFields || []).filter((field: string) => !['supplierName', 'supplierTaxCode'].includes(field))
+        : stored.inferredFields;
+      db.prepare('UPDATE extraction_reviews SET payload_json=? WHERE artifact_id=?')
+        .run(JSON.stringify({ ...stored, ...updated, invoice: stored.invoice, inferredFields, cachedResult: updated }), result.artifactId);
+    }
+  }
+  return updated;
+}
+
+
+function persistTextExtraction(rawText:string, rawInvoice:Record<string,unknown>, result:any, extractedFields:string[], trustedDerivedFields:string[] = []) {
  const db=getDatabase();const hash=result.sourceHash;
  const prior=db.prepare('SELECT id FROM document_artifacts WHERE content_hash=?').get(hash) as {id:string}|undefined;
  const id=prior?.id || crypto.randomUUID();const directory=artifactRoot();const storage=path.join(directory,`${id}.txt`);
  if(!prior){assertArtifactCapacity(Buffer.byteLength(rawText));fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(storage,rawText,{flag:'wx'});db.prepare('INSERT INTO document_artifacts (id,invoice_id,revision,original_file_name,source_type,mime_type,storage_path,content_hash,byte_size,signature_status,created_at) VALUES (?,?,1,?,?,?,?,?,?,?,?)').run(id,`pending:${id}`,'van-ban.txt','FORM','text/plain',storage,hash,Buffer.byteLength(rawText),'NOT_APPLICABLE',jsonNow());}
- const inferredFields=Object.keys(result.invoice).filter(k=>!extractedFields.includes(k) && !['isImageBlurry','isAdjustment'].includes(k));
- const uncertainFields=[...new Set([...(result.uncertainFields || []),...inferredFields])];
- const output={...result,artifactId:id,uncertainFields,needsReview:true};
- db.prepare('INSERT OR REPLACE INTO extraction_reviews VALUES (?,?)').run(id,JSON.stringify({...output,invoice:rawInvoice,inferredFields}));return output;
+ const trustedDerived=new Set(trustedDerivedFields);
+ const inferredFields=Object.keys(result.invoice).filter(k=>!extractedFields.includes(k) && !trustedDerived.has(k) && !['isImageBlurry','isAdjustment'].includes(k));
+ const uncertainFields=[...new Set([...(result.uncertainFields || []).filter((field:string)=>!trustedDerived.has(field)),...inferredFields])];
+ const confidence={...result.confidence};
+ const fieldEvidence={...(result.fieldEvidence || {})};
+ for(const field of trustedDerived){
+   confidence[field]=1;
+   fieldEvidence[field]={source:'OFFICIAL_REGISTRY',status:'VERIFIED',confidence:1,text:String(result.invoice[field] ?? '')};
+ }
+ const output={...result,confidence,fieldEvidence,artifactId:id,uncertainFields,needsReview:true};
+ db.prepare('INSERT OR REPLACE INTO extraction_reviews VALUES (?,?)').run(id,JSON.stringify({...output,invoice:rawInvoice,inferredFields,extractionVersion,cachedResult:output}));return output;
 }
 
 async function handlePOST(req: NextRequest) {
@@ -74,28 +163,18 @@ async function handlePOST(req: NextRequest) {
 
       const textHash = crypto.createHash('sha256').update(rawText).digest('hex');
       const cached = getCachedDocumentResult(textHash);
-      if (cached) return NextResponse.json(cached);
+      if (cached) return NextResponse.json(await refreshCachedSupplier(cached));
 
       const parsedText = parseInvoiceFromRawText(rawText);
       const { invoice, warnings } = sanitizeInvoice(parsedText.invoice);
 
-      // Tự động suy luận và điền trường MST hoặc Tên bên bán còn thiếu
-      const enriched = await autoEnrichSupplierData({
-        supplierTaxCode: typeof invoice.supplierTaxCode === 'string' ? invoice.supplierTaxCode : undefined,
-        supplierName: typeof invoice.supplierName === 'string' ? invoice.supplierName : undefined,
-        rawText,
-        skipAi: true
-      });
-      if (enriched.enrichedField) {
-        invoice.supplierTaxCode = enriched.supplierTaxCode || invoice.supplierTaxCode;
-        invoice.supplierName = enriched.supplierName || invoice.supplierName;
-      }
+      const { identity, trustedDerivedFields } = await verifySupplierIdentity(invoice as Record<string, unknown>);
 
       const combinedWarnings = [
         `Đã bóc tách tự động từ văn bản thô (${parsedText.extractedFields.length} trường nhận diện).`,
         ...warnings
       ];
-      if (enriched.notes) combinedWarnings.unshift(enriched.notes);
+      const supplierReview = supplierIdentityReview(identity, 'USER');
 
       const result = DocumentExtractionSchema.parse({
         invoice,
@@ -103,9 +182,11 @@ async function handlePOST(req: NextRequest) {
         needsReview: true,
         sourceType: 'FORM',
         sourceHash: textHash,
-        warnings: combinedWarnings
+        supplierIdentity: identity,
+        warnings: combinedWarnings,
+        ...supplierReview
       });
-      return NextResponse.json(persistTextExtraction(rawText,parsedText.invoice as Record<string,unknown>,result,parsedText.extractedFields));
+      return NextResponse.json(persistTextExtraction(rawText,parsedText.invoice as Record<string,unknown>,result,parsedText.extractedFields,trustedDerivedFields));
       }
     }
 
@@ -114,28 +195,18 @@ async function handlePOST(req: NextRequest) {
     if (typeof rawText === 'string' && rawText.trim()) {
       const textHash = crypto.createHash('sha256').update(rawText.trim()).digest('hex');
       const cached = getCachedDocumentResult(textHash);
-      if (cached) return NextResponse.json(cached);
+      if (cached) return NextResponse.json(await refreshCachedSupplier(cached));
 
       const parsedText = parseInvoiceFromRawText(rawText.trim());
       const { invoice, warnings } = sanitizeInvoice(parsedText.invoice);
 
-      // Tự động suy luận và điền trường MST hoặc Tên bên bán còn thiếu
-      const enriched = await autoEnrichSupplierData({
-        supplierTaxCode: typeof invoice.supplierTaxCode === 'string' ? invoice.supplierTaxCode : undefined,
-        supplierName: typeof invoice.supplierName === 'string' ? invoice.supplierName : undefined,
-        rawText: rawText.trim(),
-        skipAi: true
-      });
-      if (enriched.enrichedField) {
-        invoice.supplierTaxCode = enriched.supplierTaxCode || invoice.supplierTaxCode;
-        invoice.supplierName = enriched.supplierName || invoice.supplierName;
-      }
+      const { identity, trustedDerivedFields } = await verifySupplierIdentity(invoice as Record<string, unknown>);
 
       const combinedWarnings = [
         `Đã bóc tách tự động từ văn bản thô (${parsedText.extractedFields.length} trường nhận diện).`,
         ...warnings
       ];
-      if (enriched.notes) combinedWarnings.unshift(enriched.notes);
+      const supplierReview = supplierIdentityReview(identity, 'USER');
 
       const result = DocumentExtractionSchema.parse({
         invoice,
@@ -143,9 +214,11 @@ async function handlePOST(req: NextRequest) {
         needsReview: true,
         sourceType: 'FORM',
         sourceHash: textHash,
-        warnings: combinedWarnings
+        supplierIdentity: identity,
+        warnings: combinedWarnings,
+        ...supplierReview
       });
-      return NextResponse.json(persistTextExtraction(rawText,parsedText.invoice as Record<string,unknown>,result,parsedText.extractedFields));
+      return NextResponse.json(persistTextExtraction(rawText,parsedText.invoice as Record<string,unknown>,result,parsedText.extractedFields,trustedDerivedFields));
     }
 
     const file = capturedFile || form?.get('file');
@@ -167,8 +240,15 @@ async function handlePOST(req: NextRequest) {
     if (!sourceType) return NextResponse.json({ error: 'Chỉ hỗ trợ file XML, PDF và ảnh hóa đơn (PNG, JPG)' }, { status: 415 });
 
     if (sourceType === 'XML') assertValidXml(buffer.toString('utf8'));
+    if (sourceType === 'IMAGE') {
+      const screening = await screenInvoiceImage(buffer);
+      if (screening.decision === 'REJECT') return NextResponse.json({
+        error: imageScreeningMessage(screening), code: 'IMAGE_PREFLIGHT_REJECTED'
+      }, { status: 422 });
+    }
     const cachedFile = form?.get('forceRefresh') === 'true' ? null : getCachedDocumentResult(sourceHash);
-    if (cachedFile && cachedFile.sourceType === sourceType) return extractionResponse(cachedFile,started,true);
+    if (cachedFile && cachedFile.sourceType === sourceType && cachedFile.documentType !== 'NOT_INVOICE') return extractionResponse(await refreshCachedSupplier(cachedFile),started,true);
+    if (cachedFile?.documentType === 'NOT_INVOICE') return extractionResponse(cachedFile,started,true);
 
     const existingArtifact = getDatabase().prepare('SELECT id FROM document_artifacts WHERE content_hash = ?').get(sourceHash) as { id: string } | undefined;
     const artifactId = existingArtifact?.id || crypto.randomUUID();
@@ -202,9 +282,8 @@ async function handlePOST(req: NextRequest) {
     let rawData: Record<string, unknown> = {};
     let initialWarnings: string[] = [];
     let sourceReadFields: string[] | undefined;
-    let extractedOcrDetails: any = null;
-    let extractedFieldConfidences: Record<string, number> = {};
-    let localUncertainFields: string[] = [];
+    let documentType: 'INVOICE' | 'NOT_INVOICE' | 'UNCERTAIN' | undefined;
+    let usedVision = false;
 
     if (sourceType === 'XML') {
       const parsed = parseXml(buffer.toString('utf8'));
@@ -230,33 +309,24 @@ async function handlePOST(req: NextRequest) {
         }
       }
 
-      // Nếu không có text stream (PDF scan dạng ảnh), fallback sang AI Vision
+      // Scanned PDFs have no text layer; send their original PDF bytes to Gemini Vision.
       if (Object.keys(rawData).length === 0) {
         try {
-          const { data: extracted, engineUsed } = await extractInvoiceWithUnifiedAI(
-            buffer.toString('base64'),
-            'application/pdf',
-            file.name
-          );
-          rawData = (extracted || {}) as Record<string, unknown>;
-          const engineLabel =
-            engineUsed === 'GEMINI_AI'
-              ? 'Gemini 2.5 Flash'
-              : engineUsed === 'QWEN_AI'
-              ? GEMINI_API_CONFIG.MODEL
-              : engineUsed === 'HYBRID_NEURAL_OCR'
-              ? 'Hybrid Neural OCR'
-              : 'Gemini 2.5 Flash';
-          initialWarnings.push(`Dữ liệu được trích xuất trực tiếp bởi ${engineLabel}; kế toán vui lòng kiểm tra lại trước khi thẩm định.`);
+          const vision = await extractInvoiceImageWithGeminiVision(buffer.toString('base64'), 'application/pdf', file.name);
+          rawData = vision.data as Record<string, unknown>;
+          documentType = vision.documentType;
+          sourceReadFields = Object.keys(rawData);
+          usedVision = true;
+          initialWarnings.push('Dữ liệu được trích xuất trực tiếp từ PDF bằng Gemini Vision qua ShopAIKey; kế toán vui lòng kiểm tra trước khi thẩm định.');
         } catch (aiError: any) {
-          console.error('[Document Parse] Lỗi bóc tách PDF scan qua Gemini Vision:', aiError);
+          console.error('[Document Parse] Lỗi bóc tách PDF scan qua ShopAIKey Gemini Vision:', aiError);
           return NextResponse.json({
-            error: `Lỗi đọc tài liệu PDF từ Gemini Vision: ${aiError?.message || 'Không thể trích xuất dữ liệu từ API'}`
+            error: `Lỗi đọc tài liệu PDF từ ShopAIKey Vision: ${aiError?.message || 'Không thể trích xuất dữ liệu từ API'}`
           }, { status: 502 });
         }
       }
     } else {
-      // IMAGE: Sử dụng model Gemini 2.5 Flash Vision
+      // IMAGE: pass the image itself to Gemini Vision; no OCR transcript or worker is used.
       let mimeType = file.type || 'image/jpeg';
       if (!mimeType.startsWith('image/')) mimeType = 'image/jpeg';
 
@@ -266,238 +336,49 @@ async function handlePOST(req: NextRequest) {
 
       try {
         const t_ai0 = Date.now();
-        const { data: extracted, ocrDetails, uncertainFields: localFields, fieldConfidences, fallbackReason } = await extractInvoiceWithHybridPipeline({
-          imagePath: storagePath,
-          fileBase64: optimized.buffer.toString('base64'),
-          mimeType: optimized.mimeType,
-          fileName: file.name
-        });
+        const vision = await extractInvoiceImageWithGeminiVision(
+          optimized.buffer.toString('base64'), optimized.mimeType, file.name
+        );
         console.log(`[Parse Perf] Vision AI Call: ${Date.now() - t_ai0}ms`);
-        rawData = (extracted || {}) as Record<string, unknown>;
-        extractedOcrDetails = ocrDetails;
-        extractedFieldConfidences = fieldConfidences || {};
-        localUncertainFields = localFields || [];
-        if (fallbackReason) initialWarnings.push(`Luồng trích xuất: ${fallbackReason}.`);
-        if (process.env.DOCUMENT_IMAGE_ENGINE === 'local-ocr') sourceReadFields = Object.keys(rawData);
-
-        if (ocrDetails?.lowConfidenceLines && ocrDetails.lowConfidenceLines.length >= 3) {
-          initialWarnings.push(
-            `⚠️ Phát hiện ${ocrDetails.lowConfidenceLines.length} dòng chữ in bị mờ nét hoặc phai mực trên chứng từ.`
-          );
-        }
+        rawData = (vision.data || {}) as Record<string, unknown>;
+        documentType = vision.documentType;
+        sourceReadFields = Object.keys(rawData);
+        usedVision = true;
       } catch (aiError: any) {
-        console.error('[Document Parse] Lỗi bóc tách ảnh hóa đơn qua Gemini Vision:', aiError);
+        console.error('[Document Parse] Lỗi bóc tách ảnh hóa đơn qua ShopAIKey Gemini Vision:', aiError);
         return NextResponse.json({
-          error: `Lỗi đọc ảnh hóa đơn từ Gemini 2.5 Flash: ${aiError?.message || 'Không thể trích xuất dữ liệu từ API'}`
+          error: `Lỗi đọc ảnh hóa đơn từ ShopAIKey (${SHOPAIKEY_GEMINI_API_CONFIG.MODEL}): ${aiError?.message || 'Không thể trích xuất dữ liệu từ API'}`
         }, { status: 502 });
       }
+    }
+
+    if (documentType === 'NOT_INVOICE' || (documentType === 'UNCERTAIN' && Object.keys(rawData).length === 0)) {
+      const result = DocumentExtractionSchema.parse({
+        invoice: {}, confidence: {}, needsReview: true, sourceType, artifactId, sourceHash,
+        documentType, warnings: [], uncertainFields: [], absentFields: [], fieldEvidence: {}
+      });
+      getDatabase().prepare('INSERT OR REPLACE INTO extraction_reviews (artifact_id,payload_json) VALUES (?,?)')
+        .run(artifactId, JSON.stringify({ ...result, extractionVersion, cachedResult: result }));
+      return extractionResponse(result, started);
     }
 
     const t_san0 = Date.now();
     const { invoice, warnings } = sanitizeInvoice(rawData);
     console.log(`[Parse Perf] Sanitize Invoice: ${Date.now() - t_san0}ms`);
+    const { identity: supplierIdentity, trustedDerivedFields: trustedFieldsArray } = await verifySupplierIdentity(invoice as Record<string, unknown>);
+    const trustedDerivedFields = new Set(trustedFieldsArray);
 
-    // Local OCR is deliberately source-preserving: the shared sanitizer can
-    // derive a missing amount from total + VAT rate for legacy XML/VLM flows,
-    // but an image must never gain a tax value that was not printed. Keep only
-    // numeric fields actually returned by the OCR entity parser.
-    if (process.env.DOCUMENT_IMAGE_ENGINE === 'local-ocr') {
-      for (const field of ['preTaxAmount', 'taxAmount', 'totalAmount'] as const) {
-        if (!(field in rawData)) delete invoice[field];
-      }
-    }
+    const supplierReview = supplierIdentityReview(
+      supplierIdentity,
+      sourceType === 'XML' ? 'XML' : sourceType === 'PDF' && sourceReadFields ? 'PDF_TEXT' : sourceType === 'IMAGE' ? 'VLM' : 'USER'
+    );
+    const uncertainFields: string[] = [...supplierReview.uncertainFields];
+    const fieldWarnings: Record<string, string> = { ...supplierReview.fieldWarnings };
+    const ocrHighlights: Array<{ text: string; confidence: number; bbox?: { x: number; y: number; w: number; h: number }; field?: string; reason?: string }> = [];
 
-    // Tự động đối chiếu CSDL & Danh bạ chuỗi bán lẻ để điền MST hoặc Tên bên bán (bỏ qua LLM để đạt tốc độ < 1s)
-    const t_enr0 = Date.now();
-    const enriched = process.env.DOCUMENT_IMAGE_ENGINE === 'local-ocr'
-      ? { enrichedField: undefined, supplierTaxCode: undefined, supplierName: undefined }
-      : await autoEnrichSupplierData({
-          supplierTaxCode: typeof invoice.supplierTaxCode === 'string' ? invoice.supplierTaxCode : undefined,
-          supplierName: typeof invoice.supplierName === 'string' ? invoice.supplierName : undefined,
-          skipAi: true
-        });
-    console.log(`[Parse Perf] Auto Enrich Supplier: ${Date.now() - t_enr0}ms`);
-    if (enriched.enrichedField) {
-      invoice.supplierTaxCode = enriched.supplierTaxCode || invoice.supplierTaxCode;
-      invoice.supplierName = enriched.supplierName || invoice.supplierName;
-    }
-
-    // Xác định các trường bóc tách bị mờ / không chắc chắn và Bounding Boxes để highlight trực tiếp trên hóa đơn
-    const uncertainFields: string[] = [...localUncertainFields];
-    const fieldWarnings: Record<string, string> = {};
-    const ocrHighlights: Array<{
-      text: string;
-      confidence: number;
-      bbox?: { x: number; y: number; w: number; h: number };
-      field?: string;
-      reason?: string;
-    }> = [];
-
-    if (extractedOcrDetails?.lowConfidenceLines && extractedOcrDetails.lowConfidenceLines.length > 0) {
-      for (const line of extractedOcrDetails.lowConfidenceLines) {
-        let matchedField: string | undefined = undefined;
-        let matchedReason = line.reason || 'Chữ in bị mờ nét hoặc đứt đoạn quang học';
-        const lineTextClean = line.text.toLowerCase().trim();
-        const lineDigits = line.text.replace(/[^0-9]/g, '');
-
-        // 1. Khớp Số Hóa Đơn (invoiceNumber)
-        if (typeof invoice.invoiceNumber === 'string' && invoice.invoiceNumber.trim()) {
-          const invNum = invoice.invoiceNumber.toLowerCase().trim();
-          const invDigits = invNum.replace(/[^0-9]/g, '');
-          if (
-            (invNum.length >= 3 && lineTextClean.includes(invNum)) ||
-            (invDigits.length >= 4 && lineDigits.includes(invDigits))
-          ) {
-            matchedField = 'invoiceNumber';
-            matchedReason = 'Số hóa đơn nằm trong vùng chữ bị mờ nét';
-          }
-        }
-
-        // 2. Khớp Mã Số Thuế Bên Bán (supplierTaxCode)
-        if (!matchedField && typeof invoice.supplierTaxCode === 'string' && invoice.supplierTaxCode.trim()) {
-          const mstClean = invoice.supplierTaxCode.replace(/[^0-9]/g, '');
-          if (mstClean.length >= 6 && lineDigits.includes(mstClean.slice(0, 6))) {
-            matchedField = 'supplierTaxCode';
-            matchedReason = 'Mã số thuế bên bán nằm trong vùng chữ bị mờ/phai nét';
-          }
-        }
-
-        // 3. Khớp Tên Bên Bán (supplierName)
-        if (!matchedField && typeof invoice.supplierName === 'string' && invoice.supplierName.trim().length >= 4) {
-          const sName = invoice.supplierName.toLowerCase().trim();
-          const sKeywords = sName
-            .replace(/^(công ty|cty|tnhh|cổ phần|cp|doanh nghiệp|dn tư nhân|tập đoàn)\s+/i, '')
-            .split(/\s+/)
-            .filter((w) => w.length >= 3);
-
-          if (
-            lineTextClean.includes(sName.slice(0, 8)) ||
-            (sKeywords.length > 0 && sKeywords.some((kw) => lineTextClean.includes(kw)))
-          ) {
-            matchedField = 'supplierName';
-            matchedReason = 'Tên nhà cung cấp nằm trong vùng chữ bị nhòe nét';
-          }
-        }
-
-        // 4. Khớp Ngày Lập Hóa Đơn (invoiceDate)
-        if (!matchedField && typeof invoice.invoiceDate === 'string' && invoice.invoiceDate.trim()) {
-          const dateParts = invoice.invoiceDate.split('-');
-          const dmy = dateParts.length === 3 ? `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}` : '';
-          const shortDmy = dateParts.length === 3 ? `${Number(dateParts[2])}/${Number(dateParts[1])}/${dateParts[0]}` : '';
-          if (
-            lineTextClean.includes(invoice.invoiceDate) ||
-            (dmy && lineTextClean.includes(dmy)) ||
-            (shortDmy && lineTextClean.includes(shortDmy))
-          ) {
-            matchedField = 'invoiceDate';
-            matchedReason = 'Ngày lập hóa đơn nằm trong vùng chữ bị mờ nét';
-          }
-        }
-
-        // 5. Khớp Số Tiền (totalAmount, preTaxAmount, taxAmount)
-        if (!matchedField) {
-          const amountsToCheck = [
-            { field: 'totalAmount', val: invoice.totalAmount, label: 'Tổng thanh toán' },
-            { field: 'preTaxAmount', val: invoice.preTaxAmount, label: 'Tiền trước thuế' },
-            { field: 'taxAmount', val: invoice.taxAmount, label: 'Tiền thuế GTGT' }
-          ];
-
-          for (const item of amountsToCheck) {
-            if (item.val !== undefined && item.val !== null && typeof item.val === 'number' && item.val > 0) {
-              const amtDigits = String(Math.round(item.val)).replace(/[^0-9]/g, '');
-              if (amtDigits.length >= 4 && lineDigits.includes(amtDigits)) {
-                matchedField = item.field;
-                matchedReason = `${item.label} nằm trong vùng chữ bị mờ nét`;
-                break;
-              }
-            }
-          }
-        }
-
-        // 6. Khớp Nội Dung Mặt Hàng (itemName hoặc mảng items)
-        if (!matchedField) {
-          if (typeof invoice.itemName === 'string' && invoice.itemName.trim().length >= 4) {
-            const itemClean = invoice.itemName.toLowerCase().trim();
-            const itemWords = itemClean.split(/\s+/).filter((w) => w.length >= 4);
-            if (lineTextClean.includes(itemClean.slice(0, 10)) || (itemWords.length > 0 && itemWords.some((w) => lineTextClean.includes(w)))) {
-              matchedField = 'itemName';
-              matchedReason = 'Tên hàng hóa dịch vụ nằm trong vùng chữ bị mờ nét';
-            }
-          }
-
-          if (!matchedField && Array.isArray(invoice.items)) {
-            for (const it of invoice.items) {
-              if (it && typeof it.itemName === 'string' && it.itemName.trim().length >= 4) {
-                const subName = it.itemName.toLowerCase().trim();
-                if (lineTextClean.includes(subName.slice(0, 8))) {
-                  matchedField = 'itemName';
-                  matchedReason = `Tên hàng hóa [${it.itemName}] nằm trong vùng chữ bị mờ nét`;
-                  break;
-                }
-              }
-            }
-          }
-        }
-
-        // 7. Khớp Bên Mua (buyerTaxCode, buyerName)
-        if (!matchedField && typeof invoice.buyerTaxCode === 'string' && invoice.buyerTaxCode.trim()) {
-          const bMstClean = invoice.buyerTaxCode.replace(/[^0-9]/g, '');
-          if (bMstClean.length >= 6 && lineDigits.includes(bMstClean.slice(0, 6))) {
-            matchedField = 'buyerTaxCode';
-            matchedReason = 'Mã số thuế bên mua nằm trong vùng chữ bị mờ/phai nét';
-          }
-        }
-        if (!matchedField && typeof invoice.buyerName === 'string' && invoice.buyerName.trim().length >= 5) {
-          const bName = invoice.buyerName.toLowerCase().trim();
-          if (lineTextClean.includes(bName.slice(0, 8))) {
-            matchedField = 'buyerName';
-            matchedReason = 'Tên bên mua nằm trong vùng chữ bị nhòe nét';
-          }
-        }
-
-        // ĐIỀU KIỆN QUAN TRỌNG: CHỈ HIGHLIGHT KHI VỪA CÓ ĐỘ CHẮC CHẮN THẤP, VỪA LÀ THỰC THỂ ĐƯỢC LLM TRÍCH XUẤT!
-        if (matchedField) {
-          ocrHighlights.push({
-            text: line.text,
-            confidence: line.confidence,
-            bbox: line.bbox,
-            field: matchedField,
-            reason: matchedReason
-          });
-
-          if (!uncertainFields.includes(matchedField)) {
-            uncertainFields.push(matchedField);
-            fieldWarnings[matchedField] = matchedReason;
-          }
-        }
-      }
-    }
-
-    if (Boolean(invoice.isImageBlurry) || (extractedOcrDetails?.lowConfidenceLines && extractedOcrDetails.lowConfidenceLines.length >= 10)) {
-      if (!uncertainFields.includes('totalAmount') && invoice.totalAmount) {
-        uncertainFields.push('totalAmount');
-        fieldWarnings['totalAmount'] = 'Ảnh bị nhòe nét: Kế toán vui lòng kiểm tra lại số tiền';
-      }
-    }
-
-    if (uncertainFields.length > 0) {
-      const fieldNamesMap: Record<string, string> = {
-        invoiceNumber: 'Số Hóa Đơn',
-        invoiceDate: 'Ngày Lập HĐ',
-        supplierTaxCode: 'Mã Số Thuế',
-        supplierName: 'Tên Bên Bán',
-        totalAmount: 'Tổng Thanh Toán',
-        itemName: 'Nội Dung Hàng Hóa'
-      };
-      const highlightedNames = uncertainFields.map(f => fieldNamesMap[f] || f).join(', ');
-      initialWarnings.unshift(
-        `⚠️ Đã khoanh vùng highlight trực tiếp trên hóa đơn và các trường (${highlightedNames}) để kế toán dễ dàng đối chiếu.`
-      );
-    }
-
-    const inferredFields = Object.keys(invoice).filter(key => !['isImageBlurry','isAdjustment','sellerStatus'].includes(key) && (rawData[key] === undefined || rawData[key] === null || (sourceReadFields !== undefined && !sourceReadFields.includes(key))));
+    const inferredFields = Object.keys(invoice).filter(key => !trustedDerivedFields.has(key) && !['isImageBlurry','isAdjustment','sellerStatus'].includes(key) && (rawData[key] === undefined || rawData[key] === null || (sourceReadFields !== undefined && !sourceReadFields.includes(key))));
     for (const key of inferredFields) if (!uncertainFields.includes(key)) uncertainFields.push(key);
-    // Balanced zeros and absent identities are not evidence of successful OCR.
+    // Zero amounts and absent identities are not evidence of a successful extraction.
     const requiredSourceFields = ['invoiceNumber','invoiceDate','supplierTaxCode','supplierName','itemName','preTaxAmount','taxRate','taxAmount','totalAmount'];
     if (sourceType !== 'XML') requiredSourceFields.push('buyerTaxCode');
     for (const key of requiredSourceFields) {
@@ -507,10 +388,8 @@ async function handlePOST(req: NextRequest) {
       }
     }
     const absentFields = requiredSourceFields.filter((key) => invoice[key] === undefined || invoice[key] === null || invoice[key] === '');
-    // A ten/13-digit shape alone is not enough evidence for an MST. Reject
-    // OCR strings that fail the public checksum and keep them editable; a
-    // directory lookup or supplier name must never silently repair a printed
-    // tax code.
+    // A valid-looking code alone is not identity proof; retain it for review
+    // unless the source document and official grounding agree.
     for (const key of ['supplierTaxCode', 'buyerTaxCode'] as const) {
       const value = invoice[key];
       if (typeof value === 'string' && value && !validateTaxCode(value).isValid) {
@@ -521,7 +400,7 @@ async function handlePOST(req: NextRequest) {
     if (sourceType !== 'XML' && Number(invoice.preTaxAmount || 0) === 0 && Number(invoice.totalAmount || 0) === 0) {
       for (const key of ['preTaxAmount','taxAmount','totalAmount']) {
         if (!uncertainFields.includes(key)) uncertainFields.push(key);
-        fieldWarnings[key] = 'Không có số tiền đáng tin cậy từ OCR; số 0 cần xác minh.';
+        fieldWarnings[key] = 'Không có số tiền đáng tin cậy từ ảnh; số 0 cần xác minh.';
       }
     }
     // Run the arithmetic check only after source/uncertainty guards have been
@@ -532,39 +411,41 @@ async function handlePOST(req: NextRequest) {
       sourceType
     });
     const combinedWarnings = [...initialWarnings, ...warnings, ...mathCheck.notes];
-    if (enriched.notes) combinedWarnings.unshift(enriched.notes);
 
     const confidence = Object.fromEntries(
       Object.keys(invoice).map((key) => [
         key,
-        uncertainFields.includes(key)
+        trustedDerivedFields.has(key)
+          ? 1
+          : uncertainFields.includes(key)
           ? 0.6
           : sourceType === 'XML'
           ? 1
-          : Math.min(0.95, Math.max(0.05, extractedFieldConfidences[key] ?? 0.85))
+          : Math.min(0.95, Math.max(0.05, 0.85))
       ])
     );
     const evidenceSource = sourceType === 'XML'
       ? 'XML'
-      : sourceType === 'PDF' && sourceReadFields
+      : sourceType === 'PDF' && sourceReadFields && !usedVision
       ? 'PDF_TEXT'
-      : sourceType === 'IMAGE' && extractedOcrDetails
-      ? 'OCR'
-      : sourceType === 'IMAGE'
+      : sourceType === 'IMAGE' || usedVision
       ? 'VLM'
       : 'USER';
     const fieldEvidence = Object.fromEntries(
       Object.keys(invoice).map((key) => [key, {
-        source: inferredFields.includes(key) ? 'INFERRED' : evidenceSource,
-        status: !mathCheck.isBalanced && ['preTaxAmount', 'taxAmount', 'totalAmount'].includes(key)
+        source: trustedDerivedFields.has(key) ? 'OFFICIAL_REGISTRY' : inferredFields.includes(key) ? 'INFERRED' : evidenceSource,
+        status: trustedDerivedFields.has(key)
+          ? 'VERIFIED'
+          : !mathCheck.isBalanced && ['preTaxAmount', 'taxAmount', 'totalAmount'].includes(key)
           ? 'CONFLICT'
           : uncertainFields.includes(key)
           ? 'UNCERTAIN'
           : 'VERIFIED',
         confidence: confidence[key] ?? 0,
-        text: typeof rawData[key] === 'string' ? rawData[key] as string : undefined
+        text: trustedDerivedFields.has(key) ? String(invoice[key] ?? '') : typeof rawData[key] === 'string' ? rawData[key] as string : undefined
       }])
     );
+    Object.assign(fieldEvidence, supplierReview.fieldEvidence);
     for (const key of absentFields) {
       fieldEvidence[key] = {
         source: evidenceSource,
@@ -573,15 +454,20 @@ async function handlePOST(req: NextRequest) {
         text: undefined
       };
     }
-    const conflicts = mathCheck.isBalanced ? [] : combinedWarnings.filter((warning) => /không khớp|không xác nhận|mâu thuẫn/i.test(warning));
+    const conflicts = [
+      ...supplierReview.conflicts,
+      ...(mathCheck.isBalanced ? [] : combinedWarnings.filter((warning) => /không khớp|không xác nhận|mâu thuẫn/i.test(warning)))
+    ];
 
     const result = DocumentExtractionSchema.parse({
       invoice,
       confidence,
-      needsReview: !mathCheck.isBalanced || Boolean(invoice.isImageBlurry) || uncertainFields.length > 0,
+      needsReview: !mathCheck.isBalanced || Boolean(invoice.isImageBlurry) || uncertainFields.length > 0 || Boolean(supplierIdentity && supplierIdentity.status !== 'VERIFIED'),
       sourceType,
       artifactId,
       sourceHash,
+      documentType,
+      supplierIdentity,
       warnings: combinedWarnings,
       uncertainFields,
       absentFields,

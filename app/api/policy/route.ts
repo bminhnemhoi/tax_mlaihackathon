@@ -2,12 +2,15 @@ import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { createPolicyDraft, listPolicyVersions, publishPolicy, readActivePolicy, rollbackPolicy, validatePolicyBundle } from '@/services/policyService';
 import { getRequestUser } from '@/lib/server/auth';
+import {executablePolicySummary,policyRuleMatrix,POLICY_CONTRACT_VERSION} from '@/data/policyContract';
 
 export const dynamic = 'force-dynamic';
 
 async function handleGET(req: NextRequest) {
   if (!getRequestUser(req)) return NextResponse.json({ error: 'Vui lòng đăng nhập' }, { status: 401 });
-  return NextResponse.json({ active: readActivePolicy(), versions: listPolicyVersions() });
+  const active=readActivePolicy();
+  return NextResponse.json({ active, versions: listPolicyVersions(),executableText:executablePolicySummary(active.config),ruleMatrix:policyRuleMatrix(active.config),contractVersion:POLICY_CONTRACT_VERSION,
+    notes:active.policyNotes || (active.contractVersion!==POLICY_CONTRACT_VERSION?active.policyText:'') });
 }
 
 async function handlePOST(req: NextRequest) {

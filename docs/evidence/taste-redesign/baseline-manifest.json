@@ -1,0 +1,169 @@
+{
+  "createdAt": "2026-10-13T01:01:53.796Z",
+  "files": [
+    {
+      "file": "components/AuditTrailTable.tsx",
+      "sha256": "d224028005db39e82b5a95b781e226dcac7787f711b310c63b423a387ee382f3"
+    },
+    {
+      "file": "components/BrandMark.tsx",
+      "sha256": "e12c55885649e88911134813e64893d9d14d4d3d5f7c122a0c1d13166bc4d3bf"
+    },
+    {
+      "file": "components/CapturePhoneDialog.tsx",
+      "sha256": "d4319c00cd8c355f658b77831c51b4cd5103a07a7ab96d4dada849cc4bb20dc6"
+    },
+    {
+      "file": "components/CapturePhonePage.tsx",
+      "sha256": "c49e9b25fe204bc8c3140775afdcfdd6d709eadc5ba277da87fae96dab94094d"
+    },
+    {
+      "file": "components/DocumentViewer.tsx",
+      "sha256": "351e0f5aa5c09b8ee92dba997a3b0252ba4006e605a657693a48fb56eeefcc77"
+    },
+    {
+      "file": "components/EscalationCard.tsx",
+      "sha256": "fb7abfe270d79c7715144d361a537db83962c681d12e597bde0916968cf3cd05"
+    },
+    {
+      "file": "components/HandoffContext.tsx",
+      "sha256": "e4ad2cf9e445c591e977720d7e1171b101b88dde8b8fdb3a888adeba67993731"
+    },
+    {
+      "file": "components/HeaderBanner.tsx",
+      "sha256": "ca0bd340de6933376acff21e923870e2913077576f7a655661a7b890ef5c29ab"
+    },
+    {
+      "file": "components/HomePage.tsx",
+      "sha256": "9bef7a0312daa5d1ad77824c0ac1d08e0838fc5fc563e9cd77f6d1a62b860acc"
+    },
+    {
+      "file": "components/InboxFilterToolbar.tsx",
+      "sha256": "0335deaac9a3dd3914cb475ddb3bca282469a39f45ec7530c98ae79be3770d45"
+    },
+    {
+      "file": "components/InteractiveInputForm.tsx",
+      "sha256": "94035d9ae4a99f9c6b1557cb152223c70d1be1807f884ad3c5fae023262af71b"
+    },
+    {
+      "file": "components/LedgerSyncModal.tsx",
+      "sha256": "b4bf7fe1e7fccd66b5add34a0b1439b334f020afc2388afc218345d1b07a0838"
+    },
+    {
+      "file": "components/MacroHealthWidget.tsx",
+      "sha256": "b0704ac881041ed222fd12b8129903a7fcc0cd654b92d87f14e14ab3e6a76f5e"
+    },
+    {
+      "file": "components/NotificationCenterView.tsx",
+      "sha256": "168d7465aebbf78e609b995770aba85fca04b06c00dad5d05cf6ed740b61bc23"
+    },
+    {
+      "file": "components/PhoneInvoicePreview.tsx",
+      "sha256": "ec7c83cfa0faa80bb4776443bf5ca30366dd65ab4d30961657b60357fc22f6b9"
+    },
+    {
+      "file": "components/PolicyViewerModal.tsx",
+      "sha256": "6dc689b7746c1d4410884d584a0082501bbbc6b602754463eeac2c5baa644553"
+    },
+    {
+      "file": "components/ProductionWorkspace.tsx",
+      "sha256": "4623c7b5aa929a08d13c7672cd1473e6f801d3ac8860f029c7f31b7ed06955e4"
+    },
+    {
+      "file": "components/SourceReviewForm.tsx",
+      "sha256": "8ff9b8f9134b6cc7ef17d5b88327ba65c8f113a20f5bb4e5a17a60cb5cc15e1a"
+    },
+    {
+      "file": "components/TaxDefenseModal.tsx",
+      "sha256": "6ae479ca4dd1a141490c55d328d3fc1e85f72013d7f1837bc464fa54e4db691e"
+    },
+    {
+      "file": "components/VerifyHarness.tsx",
+      "sha256": "2854285a28564d14b545cbd23ecbfaf28945f295660943af2421bf13db86c637"
+    },
+    {
+      "file": "components/WorkflowAuditHistory.tsx",
+      "sha256": "e773b026dd251a44f2f668f10b931dd414f3c10dd638f3307a477c54b187e4ad"
+    },
+    {
+      "file": "components/WorkflowControls.tsx",
+      "sha256": "4e3a2bdb43b7b485d2a8be15ff067da8b7fc3f70a90b602c131b33367bc23eab"
+    },
+    {
+      "file": "components/banking/BankStatementView.tsx",
+      "sha256": "0abe81c56ea86370dc96152dd949b71f98526b73901df86ffd5db8d9efd4ff3a"
+    },
+    {
+      "file": "components/reconciliation/TctReconciliationView.tsx",
+      "sha256": "ac1651700c2635d456539f89797778f0113f0d0e43bd9a85fc49c9d722855876"
+    },
+    {
+      "file": "components/suppliers/SupplierMasterView.tsx",
+      "sha256": "209c63a6eab3f085e4054215ed74548b78bff32f4f878d323fe88854d277553e"
+    },
+    {
+      "file": "components/ui/badge.tsx",
+      "sha256": "ce626a534071b98063ab918c28b96e50c4f46937b16dd7bc8e846431c68957b8"
+    },
+    {
+      "file": "components/ui/button.tsx",
+      "sha256": "c8887ffa126e847b643cff93e7dbaf2474179e326c35f9457c5a0b359d91936b"
+    },
+    {
+      "file": "components/ui/card.tsx",
+      "sha256": "57a42ca9a945a8fecf5427f2a466e00aed833a21eaa0f8e82825b39ea1ffe8dc"
+    },
+    {
+      "file": "components/ui/dialog.tsx",
+      "sha256": "8739cf860d2335262a0783fb285679d3a97adb63f10c984360f800c9b6bbb54d"
+    },
+    {
+      "file": "components/ui/input.tsx",
+      "sha256": "26efd152d521b562255f933addd0eb57d1a0563fd173da2a163ed3f7c42e5645"
+    },
+    {
+      "file": "components/ui/select.tsx",
+      "sha256": "c249a275de44ccaf9b36213e8663d95668d5b5944b2638a911e5fdc8a7347cb1"
+    },
+    {
+      "file": "components/ui/sonner.tsx",
+      "sha256": "5e42b490ef5eda170a7e8d652821da9243546fd11d54249ef8003e912e045cf5"
+    },
+    {
+      "file": "components/ui/table.tsx",
+      "sha256": "43bf71f8b150ae63eb41d7ba2ce0238da7c2d020b5f06090b97f26c54e0acb5f"
+    },
+    {
+      "file": "components/ui/tabs.tsx",
+      "sha256": "e14e4031294e5e60e7e208ad24ac54adf2f1fcd5ecbb4c4eb2098eace71c5cf1"
+    },
+    {
+      "file": "components/ui/tooltip.tsx",
+      "sha256": "7bf0b0fc722c9e958662f1ee83252fa892fee4b270863da8a97028d241c5abdf"
+    },
+    {
+      "file": "app/capture/[id]/page.tsx",
+      "sha256": "cc14b53daa6d3b1b6b5e49dbd0da95bb278c280589570736b2c0166bd308d8b7"
+    },
+    {
+      "file": "app/globals.css",
+      "sha256": "056def113cc98fb6ad09cdfd0dc4f1d7b048a0e8452512dfcb453a15ac2d6111"
+    },
+    {
+      "file": "app/layout.tsx",
+      "sha256": "9c7b0abc7c844e1daf107722e98717b833b43276c736f50fabe03dc4a4702bcd"
+    },
+    {
+      "file": "app/page.tsx",
+      "sha256": "45f780758738912cbcb7e3697c782c50a3a687a9638c880dc970e630f0f4ffbf"
+    },
+    {
+      "file": "app/sop/page.tsx",
+      "sha256": "348df6b1747e426870b9b98614e5d83cf887de14ccfe766b6fef43aa5ed7a9de"
+    },
+    {
+      "file": "app/verify/page.tsx",
+      "sha256": "3db4b8b2231f927ecf884cc3219fc1735a3fb250f7493e6514a8f743655de119"
+    }
+  ]
+}

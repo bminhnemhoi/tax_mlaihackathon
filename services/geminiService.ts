@@ -1,5 +1,5 @@
-import { GEMINI_API_CONFIG } from '@/lib/constants';
-import { InvoiceInput, ActionOptionSchema, RiskGroup } from '@/lib/schemas';
+import { GEMINI_API_CONFIG, SHOPAIKEY_GEMINI_API_CONFIG } from '@/lib/constants';
+import { InvoiceInput, ActionOptionSchema, RiskGroup,EscalatedDecision } from '@/lib/schemas';
 import { z } from 'zod';
 
 export const GeminiQuestionResultSchema = z.object({
@@ -54,7 +54,7 @@ export async function callGeminiChat(
 ): Promise<string> {
   const url = GEMINI_API_CONFIG.ENDPOINT;
   const apiKey = GEMINI_API_CONFIG.API_KEY;
-  if (!apiKey) throw new Error('Chưa cấu hình GEMINI_API_KEY để sinh câu hỏi.');
+  if (!apiKey) throw new Error('Chưa cấu hình khóa AI trong .env.local để sinh câu hỏi.');
 
   const res = await fetch(url, {
     method: 'POST',
@@ -85,135 +85,98 @@ export async function callGeminiChat(
   return content;
 }
 
-/**
- * Trích xuất hóa đơn trực tiếp từ ảnh bằng Gemini 2.5 Flash Vision (không qua OCR cục bộ)
- */
+export type GeminiVisionDocumentType = 'INVOICE' | 'NOT_INVOICE' | 'UNCERTAIN';
+
+export interface GeminiVisionExtraction {
+  data: Partial<InvoiceInput>;
+  documentType: GeminiVisionDocumentType;
+}
+
+/** Read the image directly with Gemini Vision through ShopAIKey; no OCR stage. */
+export async function extractInvoiceImageWithGeminiVision(
+  fileBase64: string,
+  mimeType: string,
+  fileName?: string
+): Promise<GeminiVisionExtraction> {
+  const { API_KEY: apiKey, BASE_URL, MODEL } = SHOPAIKEY_GEMINI_API_CONFIG;
+  if (!apiKey) throw new Error('Chưa cấu hình SHOPAIKEY_API_KEY trong .env.local để đọc ảnh hóa đơn.');
+
+  const prompt = `Đọc trực tiếp ảnh hoặc PDF scan chứng từ Việt Nam bằng khả năng thị giác; không dựa vào OCR hoặc bản chép chữ.
+Trả về duy nhất JSON theo cấu trúc:
+{
+  "documentType": "INVOICE | NOT_INVOICE | UNCERTAIN",
+  "invoice": {
+    "invoiceNumber": "Số hóa đơn hoặc mã bill nếu thấy",
+    "invoiceDate": "YYYY-MM-DD nếu thấy",
+    "supplierTaxCode": "MST bên bán nếu thấy rõ; không lấy số điện thoại hoặc mã nhân viên",
+    "supplierName": "Tên bên bán/thương hiệu đúng như in trên ảnh",
+    "supplierAddress": "Địa chỉ bên bán nếu thấy rõ",
+    "buyerTaxCode": "MST bên mua nếu có",
+    "buyerName": "Tên bên mua nếu có",
+    "itemName": "Tên các mặt hàng chính nếu có",
+    "totalAmount": 0,
+    "preTaxAmount": 0,
+    "taxRate": 0,
+    "taxAmount": 0,
+    "paymentMethod": "CASH hoặc BANK_TRANSFER nếu nhận diện được"
+  }
+}
+Quy tắc: giữ nguyên dấu tiếng Việt; tiền là số nguyên VNĐ; chỉ trích xuất điều thực sự nhìn thấy. Nếu ảnh không phải hóa đơn, đặt documentType là NOT_INVOICE và invoice là object rỗng. Nếu không chắc ảnh là hóa đơn, đặt UNCERTAIN. ${fileName ? `Tên file: ${JSON.stringify(fileName)}.` : ''}`;
+
+  const url = new URL(`${BASE_URL}/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`);
+  url.searchParams.set('key', apiKey);
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { text: prompt },
+        { inlineData: { mimeType: mimeType || 'image/jpeg', data: fileBase64 } }
+      ] }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0, maxOutputTokens: 2048 }
+    }),
+    signal: AbortSignal.timeout(35000),
+    cache: 'no-store'
+  });
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`[ShopAIKey Vision] Lỗi HTTP ${response.status}: ${errorText.slice(0, 200)}`);
+  }
+
+  const payload = await response.json();
+  const candidate = payload?.candidates?.[0];
+  if (candidate?.finishReason === 'MAX_TOKENS' || candidate?.finishReason === 'LENGTH') {
+    throw new Error('ShopAIKey Vision trả về kết quả bị cắt; không chấp nhận dữ liệu chưa hoàn chỉnh.');
+  }
+  const rawContent = (candidate?.content?.parts || [])
+    .map((part: { text?: unknown }) => typeof part.text === 'string' ? part.text : '')
+    .join('')
+    .trim();
+  if (!rawContent) throw new Error('[ShopAIKey Vision] Không nhận được nội dung từ mô hình');
+
+  const parsed = extractCleanJson(rawContent) as Record<string, unknown>;
+  const documentType: GeminiVisionDocumentType = parsed.documentType === 'INVOICE'
+    ? 'INVOICE'
+    : parsed.documentType === 'NOT_INVOICE' ? 'NOT_INVOICE' : 'UNCERTAIN';
+  const rawInvoice = parsed.invoice && typeof parsed.invoice === 'object' && !Array.isArray(parsed.invoice)
+    ? parsed.invoice as Record<string, unknown>
+    : {};
+  return {
+    documentType,
+    data: documentType === 'NOT_INVOICE' ? {} : rawInvoice as Partial<InvoiceInput>
+  };
+}
+
+/** Compatibility wrapper for callers that only need extracted invoice fields. */
 export async function extractInvoiceWithGeminiVision(
   fileBase64: string,
   mimeType: string,
   fileName?: string
 ): Promise<Partial<InvoiceInput>> {
-  const apiKey = GEMINI_API_CONFIG.API_KEY;
-  if (!apiKey) {
-    throw new Error('Chưa cấu hình GEMINI_API_KEY trong .env.local để đọc ảnh hóa đơn.');
-  }
-
-  const dataUrl = `data:${mimeType};base64,${fileBase64}`;
-  const prompt = `Trích xuất hóa đơn Việt Nam sang JSON:
-{
-  "invoiceNumber": "Số hóa đơn hoặc mã bill",
-  "invoiceDate": "YYYY-MM-DD",
-  "supplierTaxCode": "Mã số thuế bên bán (10 hoặc 13 số, tuyệt đối không lấy SĐT bàn hoặc mã NVBH)",
-  "supplierName": "Tên bên bán/thương hiệu (giữ nguyên 100% dấu tiếng Việt)",
-  "buyerTaxCode": "Mã số thuế bên mua",
-  "buyerName": "Tên bên mua",
-  "itemName": "Tên các mặt hàng chính",
-  "totalAmount": 0,
-  "preTaxAmount": 0,
-  "taxRate": 0,
-  "taxAmount": 0,
-  "paymentMethod": "CASH hoặc BANK_TRANSFER"
-}
-QUY TẮC:
-1. Giữ nguyên 100% dấu tiếng Việt.
-2. Không nhầm lẫn số điện thoại với Mã số thuế.
-3. Số tiền là số nguyên VNĐ (ví dụ: 125000).
-4. Chỉ trả về một JSON duy nhất.`;
-
-  const model = GEMINI_API_CONFIG.MODEL;
-
-  try {
-    const t0 = Date.now();
-    console.log(`[Gemini Vision] Bắt đầu đọc ảnh: Model=${model}, size=${Math.round(dataUrl.length / 1024)}KB`);
-
-    // Thử gọi qua endpoint native v1beta với thinkingBudget: 0 để đạt tốc độ tối đa (~4s)
-    let rawContent = '';
-    try {
-      const nativeUrl = `https://api.shopaikey.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const nativeRes = await fetch(nativeUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-                { inline_data: { mime_type: mimeType || 'image/jpeg', data: fileBase64 } }
-              ]
-            }
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            thinkingConfig: { thinkingBudget: 0 }
-          }
-        }),
-        signal: AbortSignal.timeout(25000)
-      });
-
-      if (nativeRes.ok) {
-        const nativeData = await nativeRes.json();
-        const finishReason = nativeData.candidates?.[0]?.finishReason;
-        if (finishReason === 'MAX_TOKENS' || finishReason === 'LENGTH') {
-          throw new Error('Gemini Vision trả về kết quả bị cắt; không chấp nhận dữ liệu chưa hoàn chỉnh.');
-        }
-        const parts = nativeData.candidates?.[0]?.content?.parts || [];
-        rawContent = parts[parts.length - 1]?.text?.trim() || '';
-      }
-    } catch (nativeErr) {
-      console.warn('[Gemini Vision] Native endpoint không phản hồi, fallback sang OpenAI format:', nativeErr);
-    }
-
-    // Fallback sang OpenAI-compatible endpoint nếu native endpoint chưa trả dữ liệu
-    if (!rawContent) {
-      const res = await fetch(GEMINI_API_CONFIG.ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                { type: 'image_url', image_url: { url: dataUrl } }
-              ]
-            }
-          ],
-          response_format: { type: 'json_object' },
-          max_tokens: 2048,
-          temperature: 0.1
-        }),
-        signal: AbortSignal.timeout(35000)
-      });
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        throw new Error(`[Gemini Vision] Lỗi HTTP ${res.status}: ${errText.slice(0, 200)}`);
-      }
-
-      const data = await res.json();
-      const msg = data.choices?.[0]?.message;
-      if (data.choices?.[0]?.finish_reason === 'length') {
-        throw new Error('Gemini Vision trả về kết quả bị cắt; không chấp nhận dữ liệu chưa hoàn chỉnh.');
-      }
-      rawContent = msg?.content?.trim() || '';
-    }
-
-    const elapsed = Date.now() - t0;
-    console.log(`[Gemini Vision] Hoàn tất trong ${elapsed}ms (${(elapsed / 1000).toFixed(2)}s)`);
-
-    if (!rawContent) {
-      throw new Error('[Gemini Vision] Không nhận được nội dung từ mô hình');
-    }
-
-    return extractCleanJson(rawContent);
-  } catch (err: any) {
-    console.error('[Gemini Vision Service] Trích xuất ảnh thất bại:', err);
-    throw err;
-  }
+  return (await extractInvoiceImageWithGeminiVision(fileBase64, mimeType, fileName)).data;
 }
 
 /**
@@ -224,43 +187,10 @@ export async function generateActionableQuestionWithGemini(
   invoice: InvoiceInput,
   riskGroup: RiskGroup,
   detectedHint?: string,
-  sopClauseHint?: string
+  sopClauseHint?: string,
+  canonicalDecision?:EscalatedDecision
 ): Promise<GeminiQuestionResult> {
-  const systemPrompt = `VAI TRÒ:
-Bạn là "ACTIONABLE QUESTION GENERATOR" cho hệ thống Tax Referee (MLAI Hackathon 2026).
-Nhiệm vụ của bạn là hỗ trợ Kế toán trưởng (KTT) hoặc Giám đốc Tài chính (CFO) ra phán quyết trong 3 giây khi phát hiện một hóa đơn có rủi ro thuế.
-
-CĂN CỨ PHÁP LÝ & QUY CHẾ:
-- Quy chế Quản trị Thuế nội bộ: Tax-SOP-2026 v2.5.
-- Nghị định 254/2026/NĐ-CP (Truy vết hóa đơn điều chỉnh/thay thế, bắt buộc mã HĐ gốc; sai tên địa chỉ nhưng đúng MST gửi Mẫu 04/SS-HĐĐT vẫn hợp lệ).
-- Nghị quyết 204/2025/QH15 & Nghị định 174/2025/NĐ-CP (Quy tắc thuế suất 8% áp dụng đến 31/12/2026, danh mục loại trừ bắt buộc 10% như viễn thông, tài chính, bds, hóa chất).
-- Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & NĐ 320/2025/NĐ-CP (Hóa đơn từ 5.000.000 VNĐ trở lên bắt buộc thanh toán không dùng tiền mặt).
-- Điều 2.2 Tax-SOP-2026: Nhà cung cấp đóng MST: Xuất SAU ngày đóng MST = bất hợp pháp 100%; Xuất TRƯỚC ngày đóng MST = tạm dừng để KTT xác minh bộ hồ sơ thực tế.
-- Điều 3.3 & Chương 4 Tax-SOP-2026: Hóa đơn điều chỉnh giảm hoặc chi phí bồi thường >= 200.000.000 VNĐ, hoặc hóa đơn làm biến động Tham số K vào Vùng Đỏ (< 0.95 hoặc > 1.35 theo CV 2392/TCT-QLRR) bắt buộc thẩm quyền CFO.
-
-YÊU CẦU ĐẦU RA (JSON THUẦN TÚY):
-Trả về JSON đúng cấu trúc sau (không markdown, không thêm text bên ngoài):
-{
-  "flaggedReason": "Lý do vi phạm ngắn gọn, súc tích (1 câu)",
-  "plainExplanation": "Lời giải thích bằng tiếng Việt bình dân, dễ hiểu cho người không chuyên kế toán (1-2 câu)",
-  "sopClause": "Điều khoản quy chế vi phạm (ví dụ: Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 1.2 Tax-SOP-2026)",
-  "actionableQuestion": "Câu hỏi ĐÓNG, NGẮN GỌN, CHÍNH XÁC. BẮT BUỘC chứa: Mã hóa đơn, Tên đối tác, Số tiền VNĐ, Căn cứ luật/SOP, và hỏi KTT/CFO lựa chọn giữa 2 phương án đối ứng.",
-  "requiresCFO": true/false (true nếu rủi ro thuộc Nhóm 3 EXCEED_AUTHORITY, số tiền >= 200M hoặc K-factor vào Vùng Đỏ; ngược lại false),
-  "options": [
-    {
-      "id": "A",
-      "label": "Tên ngắn trên nút bấm (dưới 35 ký tự)",
-      "actionDescription": "Mô tả hành động cụ thể khi chọn nút này",
-      "resultingAction": "ACCEPT_WITH_DOCS" | "REJECT_TAX_DEDUCTION" | "FORWARD_TO_CFO" | "REQUEST_SUPPLIER_REISSUE" | "ACCEPT_ADJUSTMENT" | "ACCEPT_WITH_DEFENSE_DOSSIER"
-    },
-    {
-      "id": "B",
-      "label": "Tên ngắn trên nút bấm (dưới 35 ký tự)",
-      "actionDescription": "Mô tả hành động cụ thể khi chọn nút này",
-      "resultingAction": "ACCEPT_WITH_DOCS" | "REJECT_TAX_DEDUCTION" | "FORWARD_TO_CFO" | "REQUEST_SUPPLIER_REISSUE" | "ACCEPT_ADJUSTMENT" | "ACCEPT_WITH_DEFENSE_DOSSIER"
-    }
-  ]
-}`;
+  const systemPrompt = `Bạn chỉ diễn đạt câu hỏi chuyển tiếp từ dữ kiện và quyết định đã cung cấp. Không tra luật, không suy ra tình trạng nhà cung cấp, không tự tính ngưỡng, không thêm số tiền hoặc thay đổi người nhận/phương án. Giữ nguyên số hóa đơn, tên nhà cung cấp, căn cứ SOP, câu mô tả phát hiện và nhãn A/B. Diễn giải pháp lý chưa được xác minh phải giữ nguyên trạng thái đó. Trả JSON gồm flaggedReason, plainExplanation, sopClause, actionableQuestion, requiresCFO và options A/B. Chứng từ chưa biết khác với chứng từ không có. Nếu thiếu căn cứ để diễn đạt, trả đúng câu hỏi mẫu.`;
 
   const userPrompt = `THÔNG TIN HÓA ĐƠN CẦN PHÁN QUYẾT:
 - Số HĐ: ${invoice.invoiceNumber || 'Chưa rõ'}
@@ -277,6 +207,7 @@ Trả về JSON đúng cấu trúc sau (không markdown, không thêm text bên 
 - Nhóm rủi ro hệ thống phát hiện: ${riskGroup}
 ${detectedHint ? `- Chi tiết rủi ro: ${detectedHint}` : ''}
 ${sopClauseHint ? `- Gợi ý điều khoản: ${sopClauseHint}` : ''}
+${canonicalDecision ? `- Quyết định đã khóa, bắt buộc giữ số liệu/người nhận/phương án: ${JSON.stringify(canonicalDecision)}`:''}
 
 Hãy trả về duy nhất chuỗi JSON hợp lệ theo đúng cấu trúc đã chỉ định.`;
 
@@ -284,7 +215,7 @@ Hãy trả về duy nhất chuỗi JSON hợp lệ theo đúng cấu trúc đã 
     const rawContent = await callGeminiChat([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
-    ]);
+    ],undefined,3500);
 
     const parsed = extractCleanJson(rawContent);
 

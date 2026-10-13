@@ -1,52 +1,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  BookOpen,
-  FileCheck2,
-  Scale,
-  Edit3,
-  Calendar,
-  Save,
-  RotateCcw,
-  Sparkles,
-  CheckCircle2,
-  Clock,
-  FileText,
-  AlertCircle,
-  Sliders,
-  ShieldAlert,
-  SlidersHorizontal,
-  BookmarkCheck,
-  Trash2,
-  Building2
-} from 'lucide-react';
+import { BookOpen, FileCheck2, Scale, Edit3, Calendar, Save, RotateCcw, Sparkles, CheckCircle2, Clock, FileText, AlertCircle, Sliders, ShieldAlert, SlidersHorizontal, BookmarkCheck, Trash2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  DEFAULT_TAX_SOP_2026_TEXT,
-  INITIAL_POLICY_METADATA,
-  PolicyVersionMetadata
-} from '@/data/sopText';
-import {
-  GOVERNMENT_REGULATORY_REGISTRY,
-  getApplicableRegulations,
-  RegulatoryDocument
-} from '@/data/regulatoryRegistry';
-import { LEGAL_CONSTANTS_2026, DEFAULT_POLICY_CONFIG } from '@/lib/constants';
+import { INITIAL_POLICY_METADATA, PolicyVersionMetadata } from '@/data/sopText';
+import { GOVERNMENT_REGULATORY_REGISTRY, getApplicableRegulations } from '@/data/regulatoryRegistry';
+import { DEFAULT_POLICY_CONFIG } from '@/lib/constants';
 import { CorporatePrecedent, LegalUpdateCandidate, SystemPolicyConfig, SystemPolicyConfigSchema } from '@/lib/schemas';
 import { formatVND } from '@/lib/utils';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PagePanel } from '@/components/workspace/PagePanel';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 interface PolicyViewerModalProps {
+  presentation?: 'dialog' | 'page';
   isOpen: boolean;
   onClose: () => void;
   onPolicyUpdated?: (newVersion: string) => void;
@@ -60,10 +30,15 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
   onClose,
   onPolicyUpdated,
   onConfigUpdated
+  , presentation = 'dialog'
 }) => {
+  const pathname=usePathname(); const router=useRouter(); const params=useSearchParams();
   const [activeTab, setActiveTab] = useState<'VIEW' | 'STUDIO' | 'EDIT' | 'TIMELINE' | 'LEGAL' | 'PRECEDENTS'>('STUDIO');
+  useEffect(()=>{if(presentation!=='page')return;const tab=params.get('tab');setActiveTab(tab==='VIEW'||tab==='EDIT'||tab==='TIMELINE'||tab==='LEGAL'||tab==='PRECEDENTS'?tab:'STUDIO');},[params,presentation]);
+  const Content=presentation==='page'?PagePanel:DialogContent;
   const [policyMetadata, setPolicyMetadata] = useState<PolicyVersionMetadata>(INITIAL_POLICY_METADATA);
-  const [editableText, setEditableText] = useState<string>(DEFAULT_TAX_SOP_2026_TEXT);
+  const [editableText, setEditableText] = useState<string>('');
+  const [policyValidation,setPolicyValidation]=useState<{valid:boolean;errors:string[];changes:Array<{invoiceId:string;before:string;after:string;beforeRole:string;afterRole:string}>;parameterChanges:string[]}|null>(null);
   const [changeLogNote, setChangeLogNote] = useState<string>('');
   const [pendingPolicyVersion, setPendingPolicyVersion] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -76,6 +51,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
 
   // Dynamic Policy Config State
   const [dynamicConfig, setDynamicConfig] = useState<SystemPolicyConfig>(DEFAULT_CONFIG);
+  useEffect(()=>{setPendingPolicyVersion(null);setPolicyValidation(null);},[dynamicConfig,editableText]);
 
   // Inspector ngày lập hóa đơn để tra cứu pháp luật theo thời gian
   const [testDate, setTestDate] = useState<string>('2026-08-10');
@@ -121,8 +97,8 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
       .then((data) => {
         const active = data.active;
         if (active?.version) {
-          setPolicyMetadata((previous) => ({ ...previous, version: active.version, releaseDate: active.effectiveFrom, text: active.policyText || previous.text }));
-          setEditableText(active.policyText || DEFAULT_TAX_SOP_2026_TEXT);
+          setPolicyMetadata((previous) => ({ ...previous, version: active.version, releaseDate: active.effectiveFrom, text: data.executableText || active.policyText || previous.text }));
+          setEditableText(data.notes || '');
         }
         const valid = SystemPolicyConfigSchema.safeParse(active?.config);
         if (valid.success) setDynamicConfig(valid.data);
@@ -171,11 +147,15 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
         const response = await fetch('/api/policy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ config: dynamicConfig, policyText: editableText, sourceDocumentVersions: ['TAX-SOP-2026'] })
+          body: JSON.stringify({ config: dynamicConfig, policyNotes: editableText, sourceDocumentVersions: ['TAX-SOP-2026'] })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Không thể tạo policy draft');
         setPendingPolicyVersion(data.policy.version);
+        const checked=await fetch('/api/policy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'validate',version:data.policy.version})});
+        const validation=await checked.json();if(!checked.ok)throw new Error(validation.error);
+        setPolicyValidation(validation);
+        if(!validation.valid)toast.error('Bản nháp chưa đạt kiểm tra. Xem chi tiết trước khi sửa.');
         toast.info(`Đã tạo bản nháp ${data.policy.version}. Bấm lại để duyệt và áp dụng.`);
       } else {
         const response = await fetch('/api/policy', {
@@ -208,32 +188,18 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
   // Lưu văn bản quy chế mới
   const handleSavePolicyText = async () => {
     try {
-      const currentVerNum = parseFloat(policyMetadata.version.replace('v', '')) || 2.5;
-      const nextVer = 'v' + (currentVerNum + 0.1).toFixed(1);
-      const newLog = changeLogNote.trim()
-        ? nextVer + ' (' + new Date().toLocaleDateString('vi-VN') + '): ' + changeLogNote.trim()
-        : nextVer + ' (' + new Date().toLocaleDateString('vi-VN') + '): Kế toán trưởng cập nhật bổ sung điều khoản quy chế.';
-
-      const updated: PolicyVersionMetadata = {
-        version: nextVer,
-        releaseDate: new Date().toISOString().split('T')[0],
-        updatedBy: 'Kế toán trưởng (Chỉnh sửa nội bộ)',
-        status: 'ACTIVE',
-        changeLog: [newLog, ...policyMetadata.changeLog],
-        text: editableText
-      };
-
-      setPolicyMetadata(updated);
+      const notes=editableText+(changeLogNote.trim()?`\nGhi chú sửa đổi: ${changeLogNote.trim()}`:'');
       setChangeLogNote('');
       const response = await fetch('/api/policy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: dynamicConfig, policyText: editableText, sourceDocumentVersions: ['TAX-SOP-2026'] })
+        body: JSON.stringify({ config: dynamicConfig, policyNotes: notes, sourceDocumentVersions: ['TAX-SOP-2026'] })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Không thể tạo policy draft');
       setPendingPolicyVersion(data.policy.version);
-      if (onPolicyUpdated) onPolicyUpdated(nextVer);
+      const checked=await fetch('/api/policy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'validate',version:data.policy.version})});
+      const validation=await checked.json();if(!checked.ok)throw new Error(validation.error);setPolicyValidation(validation);
       toast.success(`Đã tạo bản nháp ${data.policy.version}. Duyệt tại Policy Studio để kích hoạt.`);
       setActiveTab('VIEW');
     } catch (e) {
@@ -243,8 +209,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
 
   // Khôi phục quy chế văn bản chuẩn
   const handleResetPolicyText = () => {
-    setPolicyMetadata(INITIAL_POLICY_METADATA);
-    setEditableText(DEFAULT_TAX_SOP_2026_TEXT);
+    setEditableText('');
     setPendingPolicyVersion(null);
     toast.info('Đã khôi phục bản gốc chuẩn v2.5 vào trình soạn thảo.');
   };
@@ -252,12 +217,12 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-5xl h-[92vh] flex flex-col p-0 overflow-hidden bg-white border border-slate-200 text-slate-950 shadow-[0_16px_48px_rgba(0,0,0,0.08)]">
+    <Dialog open={isOpen} modal={presentation!=='page'} onOpenChange={(open) => !open && onClose()}>
+      <Content className={presentation==='page'?'w-full p-0':'max-w-5xl h-[90dvh] flex flex-col p-0 overflow-hidden bg-card border text-foreground shadow-modal'}>
         {/* Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between px-6 py-3.5 border-b border-slate-200 bg-slate-50/80 gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2 bg-slate-900 text-white rounded-xl shadow-xs shrink-0">
+            <div className="p-2 bg-slate-900 text-white rounded-xl shadow-none shrink-0">
               <Scale className="w-5 h-5 text-white" />
             </div>
             <div className="min-w-0">
@@ -279,13 +244,14 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
           <Tabs value={activeTab} onValueChange={(val) => {
             const nextTab = val as typeof activeTab;
             setActiveTab(nextTab);
+            if(presentation==='page'){const query=new URLSearchParams(params.toString());query.set('tab',nextTab);router.replace(pathname+'?'+query.toString(),{scroll:false});}
             if (nextTab === 'LEGAL') void loadLegalUpdates();
             if (nextTab === 'PRECEDENTS') void loadPrecedents();
           }} className="shrink-0 max-w-full">
             <TabsList className="bg-slate-100/90 border border-slate-200 h-9 p-1 flex items-center overflow-x-auto">
               <TabsTrigger value="STUDIO" className="flex items-center gap-1.5 px-3 py-1 text-xs whitespace-nowrap">
                 <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>Studio</span>
+                <span>Tham số</span>
               </TabsTrigger>
               <TabsTrigger value="VIEW" className="flex items-center gap-1.5 px-3 py-1 text-xs whitespace-nowrap">
                 <BookOpen className="w-3.5 h-3.5" />
@@ -293,7 +259,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
               </TabsTrigger>
               <TabsTrigger value="EDIT" className="flex items-center gap-1.5 px-3 py-1 text-xs whitespace-nowrap">
                 <Edit3 className="w-3.5 h-3.5" />
-                <span>Soạn thảo</span>
+                <span>Ghi chú</span>
               </TabsTrigger>
               <TabsTrigger value="TIMELINE" className="flex items-center gap-1.5 px-3 py-1 text-xs whitespace-nowrap">
                 <Clock className="w-3.5 h-3.5" />
@@ -316,12 +282,12 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
 
           {/* TAB 0: DYNAMIC POLICY STUDIO */}
           {activeTab === 'STUDIO' && (
-            <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="space-y-6">
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="space-y-0.5">
                   <h4 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-slate-800" />
-                    Tham số Quy chế Thuế Động
+                    Tham số thực thi
                   </h4>
                   <p className="text-xs text-slate-600 leading-relaxed">
                     Điều chỉnh tham số để tạo bản nháp kiểm tra trước khi phê duyệt áp dụng chính thức.
@@ -330,7 +296,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={handleResetDynamicConfig}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-medium transition-all border border-slate-200 shadow-xs cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-medium transition-colors border border-slate-200 shadow-none cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3 text-slate-500" />
                     <span>Chuẩn 2026</span>
@@ -338,7 +304,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                   <button
                     onClick={handleSaveDynamicConfig}
                     disabled={isSaving}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium shadow-xs transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium shadow-none transition-colors cursor-pointer"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>{isSaving ? 'Đang lưu...' : pendingPolicyVersion ? 'Duyệt & Áp dụng' : 'Tạo bản nháp'}</span>
@@ -347,30 +313,34 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
               </div>
 
               {/* Grid 4 Control Cards */}
+              {policyValidation&&<details open className="rounded-xl border border-slate-200 p-4 text-sm"><summary className="cursor-pointer font-semibold">Kiểm tra bản nháp · {policyValidation.valid?'Đạt':'Chưa đạt'} · {policyValidation.changes.length} hồ sơ đổi kết quả</summary>
+                <p className="mt-2 text-xs text-slate-600">Tham số đổi: {policyValidation.parameterChanges.join(', ')||'Không có'}.</p>
+                {policyValidation.errors.map(error=><p key={error} className="mt-1 text-sm text-red-700">{error}</p>)}
+                {policyValidation.changes.map(change=><p key={change.invoiceId} className="mt-2 text-xs">{change.invoiceId}: {change.before} ({change.beforeRole}) → {change.after} ({change.afterRole})</p>)}</details>}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
                 {/* Knob 1: Non-cash Threshold */}
-                <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-xs">
+                <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-none">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                       <Sliders className="w-3.5 h-3.5 text-slate-500" />
                       1. Ngưỡng TT không dùng tiền mặt
                     </span>
-                    <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 font-mono">
+                    <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 font-numeric">
                       {formatVND(dynamicConfig.nonCashThreshold)}
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    Ngưỡng bắt buộc chuyển khoản ngân hàng theo Luật Thuế GTGT 48/2024/QH15:
+                    Ngưỡng kiểm tra điều kiện thanh toán theo SOP.
                   </p>
                   <div className="grid grid-cols-4 gap-2">
                     {[5_000_000, 10_000_000, 15_000_000, 20_000_000].map((amt) => (
                       <button
                         key={amt}
                         onClick={() => setDynamicConfig({ ...dynamicConfig, nonCashThreshold: amt })}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-mono transition-all text-center cursor-pointer whitespace-nowrap ${
+                        className={`py-1.5 px-2 rounded-lg text-xs font-numeric transition-colors text-center cursor-pointer whitespace-nowrap ${
                           dynamicConfig.nonCashThreshold === amt
-                            ? 'bg-slate-900 text-white font-semibold shadow-xs'
+                            ? 'bg-slate-900 text-white font-semibold shadow-none'
                             : 'bg-slate-100/60 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                         }`}
                       >
@@ -381,13 +351,13 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                 </div>
 
                 {/* Knob 2: Chief Accountant Approval Limit */}
-                <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-xs">
+                <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-none">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                       <Scale className="w-3.5 h-3.5 text-slate-500" />
                       2. Hạn mức Kế toán trưởng tự duyệt
                     </span>
-                    <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 font-mono">
+                    <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 font-numeric">
                       {formatVND(dynamicConfig.kttApprovalLimit)}
                     </span>
                   </div>
@@ -399,9 +369,9 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                       <button
                         key={amt}
                         onClick={() => setDynamicConfig({ ...dynamicConfig, kttApprovalLimit: amt })}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-mono transition-all text-center cursor-pointer whitespace-nowrap ${
+                        className={`py-1.5 px-2 rounded-lg text-xs font-numeric transition-colors text-center cursor-pointer whitespace-nowrap ${
                           dynamicConfig.kttApprovalLimit === amt
-                            ? 'bg-slate-900 text-white font-semibold shadow-xs'
+                            ? 'bg-slate-900 text-white font-semibold shadow-none'
                             : 'bg-slate-100/60 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                         }`}
                       >
@@ -412,13 +382,13 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                 </div>
 
                 {/* Knob 3: K-Factor Heuristic Safe Range */}
-                <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-xs">
+                <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-none">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                       <Sliders className="w-3.5 h-3.5 text-slate-500" />
                       3. Dải an toàn hệ số K (CV 2392)
                     </span>
-                    <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 font-mono">
+                    <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 font-numeric">
                       {dynamicConfig.kFactorSafeMin} - {dynamicConfig.kFactorSafeMax}
                     </span>
                   </div>
@@ -433,7 +403,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                         step="0.05"
                         value={dynamicConfig.kFactorSafeMin}
                         onChange={(e) => setDynamicConfig({ ...dynamicConfig, kFactorSafeMin: parseFloat(e.target.value) || 1.05 })}
-                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 font-mono focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 font-numeric focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition"
                       />
                     </div>
                     <div>
@@ -443,20 +413,20 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                         step="0.05"
                         value={dynamicConfig.kFactorSafeMax}
                         onChange={(e) => setDynamicConfig({ ...dynamicConfig, kFactorSafeMax: parseFloat(e.target.value) || 1.25 })}
-                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 font-mono focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition"
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 font-numeric focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Knob 4: Staff Reimbursement Exception */}
-                <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-xs">
+                <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-none">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                       <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
                       4. Ngoại lệ hoàn ứng nhân viên
                     </span>
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold border font-mono ${
+                    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold border font-numeric ${
                       dynamicConfig.allowStaffReimbursement
                         ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                         : 'bg-rose-50 text-rose-800 border-rose-200'
@@ -469,7 +439,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                   </p>
                   <button
                     onClick={() => setDynamicConfig({ ...dynamicConfig, allowStaffReimbursement: !dynamicConfig.allowStaffReimbursement })}
-                    className={`w-full py-2 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                    className={`w-full py-2 px-3 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-none ${
                       dynamicConfig.allowStaffReimbursement
                         ? 'bg-slate-900 text-white hover:bg-slate-800'
                         : 'bg-slate-100/60 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
@@ -497,22 +467,22 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-medium flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    Đang nạp làm Ground Truth
+                    Quy tắc đang thực thi
                   </span>
                 </div>
               </div>
 
-              <div className="font-mono text-xs leading-relaxed text-slate-700 bg-slate-50/50 p-5 rounded-xl border border-slate-200 whitespace-pre-wrap">
+              <div className="font-numeric text-xs leading-relaxed text-slate-700 bg-slate-50/50 p-5 rounded-xl border border-slate-200 whitespace-pre-wrap">
                 {policyMetadata.text}
               </div>
 
               <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-2">
-                <h4 className="text-[11px] font-mono uppercase tracking-wider text-slate-500">
+                <h4 className="text-[11px] font-numeric uppercase tracking-wider text-slate-500">
                   Lịch sử Sửa đổi Phiên bản
                 </h4>
                 <div className="space-y-1.5">
                   {policyMetadata.changeLog.map((log, idx) => (
-                    <div key={idx} className="text-xs text-slate-700 font-mono flex items-start gap-2">
+                    <div key={idx} className="text-xs text-slate-700 font-numeric flex items-start gap-2">
                       <span className="text-slate-900">•</span>
                       <span>{log}</span>
                     </div>
@@ -538,20 +508,20 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
               </div>
 
               <div className="space-y-2">
-                <label className="text-[11px] font-mono uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <label className="text-[11px] font-numeric uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-slate-900" />
-                  Nội dung Quy chế Quản trị Thuế (TAX-SOP-2026):
+                  Ghi chú bổ sung (không thay đổi quy tắc):
                 </label>
                 <textarea
                   value={editableText}
                   onChange={(e) => setEditableText(e.target.value)}
                   rows={14}
-                  className="w-full p-4 bg-white border border-slate-200 rounded-xl font-mono text-xs text-slate-900 leading-relaxed focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition-colors"
+                  className="w-full p-4 bg-white border border-slate-200 rounded-xl font-numeric text-xs text-slate-900 leading-relaxed focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400 transition-colors"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] font-mono uppercase tracking-wider text-slate-500">
+                <label className="text-[11px] font-numeric uppercase tracking-wider text-slate-500">
                   Ghi chú sửa đổi (Change Log):
                 </label>
                 <input
@@ -567,7 +537,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                 <button
                   type="button"
                   onClick={handleResetPolicyText}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-all border border-slate-200 cursor-pointer shadow-xs"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors border border-slate-200 cursor-pointer shadow-none"
                 >
                   <RotateCcw className="w-3 h-3 text-slate-500" />
                   <span>Khôi phục bản gốc</span>
@@ -577,14 +547,14 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveTab('VIEW')}
-                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-medium transition-all hover:bg-slate-50 cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-medium transition-colors hover:bg-slate-50 cursor-pointer"
                   >
                     Hủy bỏ
                   </button>
                   <button
                     type="button"
                     onClick={handleSavePolicyText}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium shadow-xs transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium shadow-none transition-colors cursor-pointer"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>Lưu bản mới</span>
@@ -609,19 +579,19 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <label className="text-[11px] font-mono text-slate-700 uppercase tracking-wider">
+                    <label className="text-[11px] font-numeric text-slate-700 uppercase tracking-wider">
                       Ngày lập:
                     </label>
                     <input
                       type="date"
                       value={testDate}
                       onChange={(e) => handleDateChange(e.target.value)}
-                      className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 font-mono focus:outline-none focus:border-slate-400"
+                      className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 font-numeric focus:outline-none focus:border-slate-400"
                     />
                   </div>
                 </div>
 
-                <div className="mt-3 p-3 bg-white border border-slate-200 rounded-lg space-y-1 text-xs font-mono">
+                <div className="mt-3 p-3 bg-white border border-slate-200 rounded-lg space-y-1 text-xs font-numeric">
                   <div className="text-emerald-800 font-semibold">
                     ✓ {temporalResult.decreeSummary}
                   </div>
@@ -634,20 +604,20 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
               </div>
 
               <div className="space-y-3">
-                <h4 className="text-[11px] font-mono uppercase tracking-wider text-slate-500">
+                <h4 className="text-[11px] font-numeric uppercase tracking-wider text-slate-500">
                   Văn bản Quy phạm Pháp luật 2025 - 2026 ({GOVERNMENT_REGULATORY_REGISTRY.length} văn bản)
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {GOVERNMENT_REGULATORY_REGISTRY.map((doc) => (
                     <div
                       key={doc.id}
-                      className="p-4 bg-white border border-slate-200 rounded-xl space-y-2 shadow-xs"
+                      className="p-4 bg-white border border-slate-200 rounded-xl space-y-2 shadow-none"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-100 text-slate-900 border border-slate-200">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-numeric font-medium bg-slate-100 text-slate-900 border border-slate-200">
                           {doc.code}
                         </span>
-                        <span className="text-[10px] font-mono text-slate-500">
+                        <span className="text-[10px] font-numeric text-slate-500">
                           {doc.effectiveFrom} {doc.effectiveTo ? '-> ' + doc.effectiveTo : '(Hiện hành)'}
                         </span>
                       </div>
@@ -661,12 +631,12 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                       </p>
 
                       <div className="pt-2 border-t border-slate-200 space-y-1">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">
+                        <span className="text-[10px] font-numeric uppercase tracking-wider text-slate-500 block">
                           Quy chuẩn cốt lõi:
                         </span>
                         {doc.keyRules.map((rule, idx) => (
                           <div key={idx} className="text-[11px] text-slate-600 flex items-start gap-1.5">
-                            <span className="text-slate-400">•</span>
+                            <span className="text-slate-500">•</span>
                             <span>{rule}</span>
                           </div>
                         ))}
@@ -680,7 +650,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
 
           {/* TAB 4: LEGAL UPDATES */}
           {activeTab === 'LEGAL' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="space-y-4">
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
                   <h4 className="text-sm font-semibold text-slate-900">Theo dõi cập nhật văn bản pháp luật</h4>
@@ -689,7 +659,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                 <button
                   onClick={() => void handleSyncLegal()}
                   disabled={isSyncingLegal}
-                  className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-medium cursor-pointer shadow-xs transition-all"
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-medium cursor-pointer shadow-none transition-colors"
                 >
                   {isSyncingLegal ? 'Đang kiểm tra...' : 'Kiểm tra nguồn pháp lý'}
                 </button>
@@ -701,9 +671,9 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
               ) : (
                 <div className="space-y-3">
                   {legalUpdates.map((update) => (
-                    <div key={update.id} className="p-4 rounded-xl border border-slate-200 bg-white space-y-2 shadow-xs">
+                    <div key={update.id} className="p-4 rounded-xl border border-slate-200 bg-white space-y-2 shadow-none">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-slate-900 text-xs font-semibold">{update.documentCode}</span>
+                        <span className="font-numeric text-slate-900 text-xs font-semibold">{update.documentCode}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">{update.status}</span>
                       </div>
                       <h5 className="font-semibold text-xs text-slate-900">{update.title}</h5>
@@ -718,7 +688,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
 
           {/* TAB 5: SỔ TIỀN LỆ DOANH NGHIỆP */}
           {activeTab === 'PRECEDENTS' && (
-            <div className="space-y-5 animate-in fade-in duration-200">
+            <div className="space-y-5">
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="space-y-0.5">
                   <h4 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
@@ -732,7 +702,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                 <button
                   onClick={() => void loadPrecedents()}
                   disabled={isLoadingPrecedents}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-medium transition-all border border-slate-200 shrink-0 cursor-pointer shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-medium transition-colors border border-slate-200 shrink-0 cursor-pointer shadow-none"
                 >
                   <RotateCcw className={`w-3 h-3 ${isLoadingPrecedents ? 'animate-spin' : ''}`} />
                   <span>Làm mới</span>
@@ -746,7 +716,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                   <BookmarkCheck className="w-8 h-8 text-slate-300 mx-auto" />
                   <p className="text-xs font-semibold text-slate-900">Chưa có tiền lệ nào được thiết lập</p>
                   <p className="text-[11px] text-slate-500 max-w-md mx-auto">
-                    Khi CFO hoặc KTT phê duyệt một hóa đơn ngoại lệ và tích chọn "Lưu làm tiền lệ cho doanh nghiệp", tiền lệ sẽ xuất hiện ở đây.
+                    Khi CFO hoặc KTT phê duyệt một hóa đơn ngoại lệ và tích chọn &quot;Lưu làm tiền lệ cho doanh nghiệp&quot;, tiền lệ sẽ xuất hiện ở đây.
                   </p>
                 </div>
               ) : (
@@ -754,7 +724,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                   {precedents.map((p) => (
                     <div
                       key={p.id}
-                      className="p-4 rounded-xl border border-slate-200 bg-white transition space-y-3 shadow-xs"
+                      className="p-4 rounded-xl border border-slate-200 bg-white transition space-y-3 shadow-none"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
                         <div className="flex items-center gap-2.5">
@@ -768,7 +738,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                                 {p.status === 'ACTIVE' ? 'Đang hiệu lực' : 'Đã thu hồi'}
                               </span>
                             </div>
-                            <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                            <div className="text-[11px] text-slate-500 font-numeric mt-0.5">
                               ID: {p.id} · Ngày: {new Date(p.createdAt).toLocaleDateString('vi-VN')}
                             </div>
                           </div>
@@ -786,26 +756,26 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
 
                       <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          <span className="text-slate-500 block text-[10px] uppercase font-mono">Mô hình rủi ro</span>
+                          <span className="text-slate-500 block text-[10px] uppercase font-numeric">Mô hình rủi ro</span>
                           <span className="text-slate-900 font-medium text-xs">{p.riskPattern}</span>
                         </div>
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          <span className="text-slate-500 block text-[10px] uppercase font-mono">Phương án phê duyệt</span>
+                          <span className="text-slate-500 block text-[10px] uppercase font-numeric">Phương án phê duyệt</span>
                           <span className="text-slate-900 font-semibold text-xs">{p.approvedOption}</span>
                         </div>
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          <span className="text-slate-500 block text-[10px] uppercase font-mono">Người duyệt</span>
+                          <span className="text-slate-500 block text-[10px] uppercase font-numeric">Người duyệt</span>
                           <span className="text-slate-900 font-medium text-xs">{p.approvedBy}</span>
                         </div>
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
-                          <span className="text-slate-500 block text-[10px] uppercase font-mono">Căn cứ SOP</span>
-                          <span className="text-slate-900 font-mono text-xs">{p.sopClause}</span>
+                          <span className="text-slate-500 block text-[10px] uppercase font-numeric">Căn cứ SOP</span>
+                          <span className="text-slate-900 font-numeric text-xs">{p.sopClause}</span>
                         </div>
                       </div>
 
                       <div className="bg-slate-50/50 p-2.5 rounded-lg border border-slate-200 text-xs">
-                        <span className="text-slate-500 font-mono text-[10px] uppercase block mb-0.5">Lý do giải trình:</span>
-                        <p className="text-slate-700 italic text-[11px]">"{p.rationale}"</p>
+                        <span className="text-slate-500 font-numeric text-[10px] uppercase block mb-0.5">Lý do giải trình:</span>
+                        <p className="text-slate-700 italic text-[11px]">&quot;{p.rationale}&quot;</p>
                       </div>
                     </div>
                   ))}
@@ -817,19 +787,19 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-3.5 border-t border-slate-200 bg-slate-50/80">
-          <span className="text-xs text-slate-500 flex items-center gap-1.5 font-mono">
+          <span className="text-xs text-slate-500 flex items-center gap-1.5 font-numeric">
             <FileCheck2 className="w-3.5 h-3.5 text-emerald-700" />
-            Đồng bộ 100% với Luật & Nghị định niên độ 2025 - 2026
+            Quy tắc SOP và trạng thái đối chiếu căn cứ
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 text-xs font-medium cursor-pointer shadow-xs transition"
+            className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 text-xs font-medium cursor-pointer shadow-none transition"
           >
-            Đóng cửa sổ
+            {presentation==='page'?'Về Thẩm định':'Đóng cửa sổ'}
           </button>
         </div>
-      </DialogContent>
+      </Content>
     </Dialog>
   );
 };

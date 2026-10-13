@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     env_file: .env.production
     environment:
-      DOCUMENT_IMAGE_ENGINE: local-ocr
+      DOCUMENT_IMAGE_ENGINE: auto
       LOCAL_OCR_URL: http://ocr:3004
     depends_on:
       ocr:

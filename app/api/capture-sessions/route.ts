@@ -1,10 +1,43 @@
 import crypto from 'node:crypto';
+import dgram from 'node:dgram';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRequestUser } from '@/lib/server/auth';
 import { appendAuditEvent } from '@/lib/server/audit';
 import { getDatabase, isSandbox, jsonNow, withRequestDatabase } from '@/lib/server/db';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  return host === 'localhost' || host === '0.0.0.0' || host === '::1' || /^127(?:\.\d{1,3}){3}$/.test(host);
+}
+
+/**
+ * Ask the OS which IPv4 address it would route through, without sending a
+ * packet. This follows the active network when DHCP changes the laptop IP.
+ */
+function getRoutedIpv4Address(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const socket = dgram.createSocket('udp4');
+    let settled = false;
+    const finish = (address: string | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      try { socket.close(); } catch { /* socket may already be closed */ }
+      resolve(address);
+    };
+    const timeout = setTimeout(() => finish(null), 300);
+    socket.once('error', () => finish(null));
+    // UDP connect selects a local route/address; no datagram is sent.
+    socket.connect(53, '1.1.1.1', () => {
+      const selected = socket.address();
+      const address = typeof selected === 'object' && selected.family === 'IPv4' ? selected.address : '';
+      finish(address && !address.startsWith('127.') ? address : null);
+    });
+  });
+}
 
 async function handlePOST(request: NextRequest) {
   try {
@@ -31,8 +64,20 @@ async function handlePOST(request: NextRequest) {
     const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
     const requestProto = request.nextUrl.protocol.replace(':', '');
     const proto = forwardedProto === 'http' || forwardedProto === 'https' ? forwardedProto : requestProto;
-    const configuredOrigin = process.env.APP_PUBLIC_URL;
-    const publicOrigin = configuredOrigin || (host && !/^0\.0\.0\.0(?::\d+)?$/i.test(host) ? `${proto}://${host}` : request.nextUrl.origin);
+    const configuredOrigin = process.env.APP_PUBLIC_URL?.trim();
+    let publicOrigin = configuredOrigin || (host ? `${proto}://${host}` : request.nextUrl.origin);
+    if (!configuredOrigin && process.env.NODE_ENV !== 'production' && host) {
+      try {
+        const requestOrigin = new URL(`${proto}://${host}`);
+        if (isLoopbackHost(requestOrigin.hostname)) {
+          const lanAddress = await getRoutedIpv4Address();
+          if (lanAddress) {
+            const port = requestOrigin.port || request.nextUrl.port || process.env.PORT || '';
+            publicOrigin = `${proto}://${lanAddress}${port ? `:${port}` : ''}`;
+          }
+        }
+      } catch { /* retain the origin supplied by the current request */ }
+    }
     const captureUrl = new URL(`/capture/${id}`, publicOrigin);
     captureUrl.searchParams.set('token', token);
     const demoId = request.cookies.get('tax_referee_demo')?.value;

@@ -1,95 +1,45 @@
 'use client';
 import WorkflowAuditHistory from '@/components/WorkflowAuditHistory';
 import WorkflowControls from '@/components/WorkflowControls';
+import {HandoffContext} from '@/components/HandoffContext';
+
 import {caseDeadline, riskGroupLabels} from '@/lib/workflowPresentation';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import {
-  AlertTriangle,
-  ArrowRight,
-  CheckCircle2,
-  ClipboardCheck,
-  Clock,
-  FileText,
-  Inbox,
-  LogOut,
-  RefreshCw,
-  Settings2,
-  ShieldCheck,
-  UserRound,
-  XCircle,
-  BookmarkCheck,
-  Copy,
-  Columns2,
-  CheckSquare,
-  Square,
-  Sparkles,
-  Building2,
-  RotateCcw,
-  PanelLeftClose,
-  PanelLeftOpen,
-  SquarePen,
-  Search,
-  MessageSquare,
-  MoreHorizontal,
-  Bell,
-  Scale,
-  Landmark,
-  Building,
-  History,
-  BookOpen,
-  ShieldAlert
-} from 'lucide-react';
-import { InteractiveInputForm } from '@/components/InteractiveInputForm';
+import dynamic from 'next/dynamic';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import type { WorkspaceInvoice } from '@/lib/workspaceTypes';
+import { useWorkspaceData } from '@/components/workspace/useWorkspaceData';
+import { ReportsView } from '@/components/workspace/ReportsView';
+import { InvoiceList } from '@/components/workspace/InvoiceList';
+import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
+import { ScreenState, WorkspaceSkeleton } from '@/components/workspace/ScreenState';
+import { workspaceRoutes, viewForPath, invoiceIdForPath, readInboxFilters, writeInboxFilters, readInvoiceTab, invoiceReturnPath, readListPage, replaceWorkspaceQuery, type WorkspaceView } from '@/lib/workspaceNavigation';
+import { AlertTriangle, CheckCircle2, Clock, FileText, XCircle, ShieldAlert } from 'lucide-react';
+const InteractiveInputForm=dynamic(()=>import('@/components/InteractiveInputForm').then(module=>module.InteractiveInputForm),{loading:()=> <WorkspaceSkeleton/>});
 import { PolicyViewerModal } from '@/components/PolicyViewerModal';
 import { LedgerSyncModal } from '@/components/LedgerSyncModal';
 import { DocumentViewer } from '@/components/DocumentViewer';
 import { InboxFilterToolbar, InboxFilterState, DEFAULT_FILTER_STATE } from '@/components/InboxFilterToolbar';
-import { NotificationCenterView } from '@/components/NotificationCenterView';
-import { TctReconciliationView } from '@/components/reconciliation/TctReconciliationView';
-import { BankStatementView } from '@/components/banking/BankStatementView';
-import { SupplierMasterView } from '@/components/suppliers/SupplierMasterView';
+const NotificationCenterView=dynamic(()=>import('@/components/NotificationCenterView').then(module=>module.NotificationCenterView),{loading:()=> <WorkspaceSkeleton/>});
+const TctReconciliationView=dynamic(()=>import('@/components/reconciliation/TctReconciliationView').then(module=>module.TctReconciliationView),{loading:()=> <WorkspaceSkeleton/>});
+const BankStatementView=dynamic(()=>import('@/components/banking/BankStatementView').then(module=>module.BankStatementView),{loading:()=> <WorkspaceSkeleton/>});
+const SupplierMasterView=dynamic(()=>import('@/components/suppliers/SupplierMasterView').then(module=>module.SupplierMasterView),{loading:()=> <WorkspaceSkeleton/>});
 import { AuditTrailTable } from '@/components/AuditTrailTable';
 import { TaxDefenseModal } from '@/components/TaxDefenseModal';
-import { ActionOption, AuditEntry, InvoiceInput, MacroState, RefereeDecision, SystemPolicyConfig } from '@/lib/schemas';
-import { DEFAULT_POLICY_CONFIG, MACRO_DEFAULTS } from '@/lib/constants';
+import { ActionOption, AuditEntry, InvoiceInput, RefereeDecision } from '@/lib/schemas';
+
 import { formatVND } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Toaster } from '@/components/ui/sonner';
+import { Card } from '@/components/ui/card';
+
 import { toast } from 'sonner';
 
 type AppUser = { id: string; email: string; displayName: string; role: 'ACCOUNTANT' | 'CHIEF_ACCOUNTANT' | 'CFO' };
-type View = 'inbox' | 'receive' | 'approval' | 'dossier' | 'reports' | 'notifications' | 'reconciliation' | 'banking' | 'suppliers';
-type InboxItem = {
-  id: string;
-  revision?: number;
-  taxHold?: boolean;
-  internalVoucherId?:string|null;
-  allowedActions?: Record<string, any>;
-  review?: {unresolvedFields?:string[]};
-  invoiceNumber: string;
-  invoiceDate: string;
-  supplierTaxCode: string;
-  supplierName: string;
-  itemName: string;
-  totalAmount: number;
-  taxAmount: number;
-  status: string;
-  invoice: InvoiceInput;
-  decision: RefereeDecision | null;
-  evaluationId: string | null;
-  policyVersion: string | null;
-  legalVersion: string | null;
-  updatedAt: string;
-  createdAt?: string;
-  evaluatedAt?: string|null;
-  dossierReady?: boolean;
-  resolution: { role: string; option: string; action: string; accepted: boolean; resolvedAt: string } | null;
-  latestAudit?: { eventType: string; actorId: string; payload: Record<string, unknown>; at: string } | null;
-};
+type View = WorkspaceView;
+type InboxItem = WorkspaceInvoice;
 type DuplicateGroup = { supplierTaxCode: string; invoiceNumber: string; count: number; invoiceIds: string };
 
 const roleLabels: Record<AppUser['role'], string> = {
@@ -137,40 +87,52 @@ export function ProductionWorkspace({
   onRoleSwitched?: (nextUser: AppUser) => void;
 }) {
   const [auditInvoiceId,setAuditInvoiceId]=useState('');
-  const [isDemo,setIsDemo]=useState(false);
-  const [view, setView] = useState<View>('inbox');
-  const [items, setItems] = useState<InboxItem[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
+
+  const pathname=usePathname(); const router=useRouter(); const searchParams=useSearchParams();
+  const view=viewForPath(pathname);
+  const invoiceId=invoiceIdForPath(pathname);
+  const invoiceTab=readInvoiceTab(new URLSearchParams(searchParams.toString()));
+  const [detailError,setDetailError]=useState<'missing'|'network'|null>(null);
+  const [detailLoading,setDetailLoading]=useState(false);
+  const [detailAttempt,setDetailAttempt]=useState(0);
+  const [hasVisitedReceive,setHasVisitedReceive]=useState(view==='receive');
+  const [receiveDirty,setReceiveDirty]=useState(false);
+  useEffect(()=>{if(view==='receive')setHasVisitedReceive(true);},[view]);
+  const setView=useCallback((next:View):void=>{router.push(workspaceRoutes[next].path);},[router]);
+  const {items,counts,isDemo,config,setConfig,policyVersion,setPolicyVersion,macro,duplicateGroups,unreadNotifCount,setUnreadNotifCount,loading,error,revision:workspaceRevision,loadWorkspace}=useWorkspaceData(onLogout);
   const [selected, setSelected] = useState<InboxItem | null>(null);
   const [policyOpen, setPolicyOpen] = useState(false);
-  const [policyVersion, setPolicyVersion] = useState('TAX-SOP-2026-v2.5');
-  const [config, setConfig] = useState<SystemPolicyConfig>(DEFAULT_POLICY_CONFIG);
-  const [macro, setMacro] = useState<MacroState>({
-    totalSales: MACRO_DEFAULTS.TOTAL_SALES,
-    openingInventory: MACRO_DEFAULTS.OPENING_INVENTORY,
-    totalPurchases: MACRO_DEFAULTS.INITIAL_PURCHASES,
-    kFactor: 1.2,
-    zone: 'SAFE_GREEN',
-    totalDeductibleTax: 760_000_000
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [showDocumentPreview, setShowDocumentPreview] = useState(true);
   const [saveAsPrecedent, setSaveAsPrecedent] = useState(false);
-  const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
-  const [filters, setFilters] = useState<InboxFilterState>(DEFAULT_FILTER_STATE);
+  const [filters,setFilterState]=useState<InboxFilterState>(()=>readInboxFilters(new URLSearchParams(searchParams.toString())));
+  useEffect(()=>{if(!invoiceId)setFilterState(readInboxFilters(new URLSearchParams(searchParams.toString())));},[searchParams,invoiceId]);
+  const setFilters=useCallback((next:InboxFilterState):void=>{setFilterState(next);replaceWorkspaceQuery(workspaceRoutes[view].path,writeInboxFilters(next));},[view]);
+  const invoiceHref=(id:string):string=>{const params=writeInboxFilters(filters);const page=readListPage(new URLSearchParams(searchParams.toString()));if(page>1)params.set('page',String(page));params.set('from',view==='approval'?'approval':'inbox');return '/workspace/invoices/'+encodeURIComponent(id)+'?'+params.toString();};
+  const openInvoice=(item:InboxItem):void=>{setSelected(item);router.push(invoiceHref(item.id));};
+  useEffect(()=>{
+    if(!invoiceId){setSelected(null);setDetailError(null);return;}
+    const controller=new AbortController();setDetailLoading(true);setDetailError(null);
+    fetch('/api/invoices/'+encodeURIComponent(invoiceId),{signal:controller.signal,cache:'no-store'}).then(async response=>{
+      if(response.status===401){onLogout();return;}
+      if(response.status===404){setSelected(null);setDetailError('missing');return;}
+      if(!response.ok)throw new Error('Cannot load invoice');
+      const data:{item:InboxItem}=await response.json();setSelected(data.item);
+    }).catch(()=>{if(!controller.signal.aborted)setDetailError('network');}).finally(()=>{if(!controller.signal.aborted)setDetailLoading(false);});
+    return ()=>controller.abort();
+  },[invoiceId,detailAttempt,onLogout,workspaceRevision,user.role]);
   const [selectedRoutineIds, setSelectedRoutineIds] = useState<Set<string>>(new Set());
   const [isBulkConfirming, setIsBulkConfirming] = useState<boolean>(false);
   const [ledgerSyncOpen, setLedgerSyncOpen] = useState<boolean>(false);
   const [isResetting, setIsResetting] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
-  const [unreadNotifCount, setUnreadNotifCount] = useState<number>(0);
   const [selectedAuditEntry, setSelectedAuditEntry] = useState<AuditEntry | null>(null);
-  const [provisionalHoldIds, setProvisionalHoldIds] = useState<Set<string>>(new Set());
+  const provisionalHoldIds=useMemo(()=>new Set(items.filter(item=>item.taxHold).map(item=>item.id)),[items]);
 
   const [confirmedFindings,setConfirmedFindings]=useState<string[]>([]);
-  useEffect(()=>{setConfirmedFindings([]);setActionReason('');setSaveAsPrecedent(false);},[selected?.id,selected?.revision]);
+  useEffect(()=>{setConfirmedFindings([]);setActionReason('');setSaveAsPrecedent(false);},[selected?.id,selected?.revision,user.id]);
   const [actionReason,setActionReason] = useState('');
+  const [resolving,setResolving]=useState(false);const resolutionLock=useRef(false);const active=useRef(true);const activePath=useRef(pathname);activePath.current=pathname;
+  const listScrollPositions=useRef(new Map<string,number>());
+  useEffect(()=>{active.current=true;return ()=>{active.current=false;};},[]);
   const [precedentPurpose,setPrecedentPurpose] = useState('');
   const [precedentMaximum,setPrecedentMaximum] = useState('');
   const toggleProvisionalTaxHold = async (itemId:string) => {
@@ -251,51 +213,12 @@ export function ProductionWorkspace({
     else toast.info(message);
   }, []);
 
-  const loadWorkspace = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [inboxRes, runtimeRes, dupRes, notifRes] = await Promise.all([
-        fetch('/api/inbox'),
-        fetch('/api/runtime'),
-        fetch('/api/invoices/duplicates'),
-        fetch('/api/notifications')
-      ]);
-      if (inboxRes.status === 401 || runtimeRes.status === 401) {
-        onLogout();
-        return;
-      }
-      const inbox = await inboxRes.json().catch(()=>({error:`Không thể tải Inbox (HTTP ${inboxRes.status}).`}));
-      const runtime = await runtimeRes.json().catch(()=>({error:`Không thể tải dữ liệu Workspace (HTTP ${runtimeRes.status}).`}));
-      if(!runtimeRes.ok)throw new Error(runtime.error || 'Không thể tải dữ liệu Workspace.');
-      setIsDemo(runtime.demo===true);
-      if (!inboxRes.ok) throw new Error(inbox.error || 'Lỗi tải Inbox');
-      setItems(inbox.items || []);
-      setProvisionalHoldIds(new Set((inbox.items || []).filter((i:InboxItem)=>i.taxHold).map((i:InboxItem)=>i.id)));
-      setSelected(previous=>previous ? (inbox.items || []).find((i:InboxItem)=>i.id===previous.id) || null : null);
-      setCounts(inbox.counts || {});
-      if (runtime.policy?.version) setPolicyVersion(runtime.policy.version);
-      if (runtime.policy?.config) setConfig(runtime.policy.config);
-      if (runtime.macroState) setMacro(runtime.macroState);
-      if (dupRes.ok) {
-        const dupData = await dupRes.json();
-        setDuplicateGroups(dupData.groups || []);
-      }
-      if (notifRes.ok) {
-        const notifData = await notifRes.json();
-        if (typeof notifData.unreadCount === 'number') setUnreadNotifCount(notifData.unreadCount);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể tải dữ liệu');
-    } finally {
-      setLoading(false);
-    }
-  }, [onLogout]);
-
-  useEffect(() => { void loadWorkspace(); }, [loadWorkspace]);
-
-  const approvalItems = useMemo(() => items.filter((item) => roleCanApprove(user, item)), [items, user]);
-  const pendingCount = (counts.ROUTINE_PROPOSED || 0) + (counts.WAITING_CHIEF_ACCOUNTANT || 0) + (counts.WAITING_CFO || 0) + (counts.FORWARDED || 0);
+  const approvalItems=useMemo(()=>items.filter(item=>{
+    if(user.role==='ACCOUNTANT'||!['WAITING_CHIEF_ACCOUNTANT','WAITING_CFO','NEEDS_CONFIRMATION','FORWARDED','ON_HOLD'].includes(item.status))return false;
+    const cfo=item.status==='WAITING_CFO'||item.status==='FORWARDED'||(item.decision?.status==='ESCALATED'&&item.decision.requiresCFO);
+    return user.role==='CFO'||!cfo;
+  }),[items,user.role]);
+  const pendingCount=items.filter(item=>!['APPROVED','REJECTED','PAUSED'].includes(item.status)).length;
   const autoApprovedRoutineCount = items.filter((item) => item.status === 'APPROVED' && item.decision?.status === 'ROUTINE').length;
 
   const handleEvaluateResult = (decision: RefereeDecision, invoice: InvoiceInput) => {
@@ -318,12 +241,14 @@ export function ProductionWorkspace({
       resolution: null
     };
     setSelected(localItem);
-    setView('inbox');
+    router.push('/workspace/invoices/'+encodeURIComponent(invoice.id));
     void loadWorkspace();
   };
 
-  const handleResolve = async (option: ActionOption) => {
-    if (!selected?.decision || selected.decision.status !== 'ESCALATED') return;
+  const handleResolve = async (option: ActionOption):Promise<void> => {
+    if (!selected?.decision || selected.decision.status !== 'ESCALATED'||resolutionLock.current) return;
+    resolutionLock.current=true;setResolving(true);const origin=pathname;
+    try {
     showToast('Đang lưu phán quyết...', 'info');
     const response = await fetch('/api/resolutions', {
       method: 'POST',
@@ -341,8 +266,10 @@ export function ProductionWorkspace({
       })
     });
     const data = await response.json();
+    if(!active.current)return;
     if (!response.ok) {
-      showToast(data.error || 'Lỗi ghi nhận phán quyết', 'error');
+      if(response.status===409)await loadWorkspace();
+      showToast(data.error&&data.error.length<100?data.error:'Không thể lưu. Hãy tải lại hồ sơ.', 'error');
       return;
     }
     if (data.precedent) {
@@ -351,8 +278,10 @@ export function ProductionWorkspace({
       showToast('Đã lưu phán quyết thành công.', 'success');
     }
     setSaveAsPrecedent(false);
-    setSelected(null);
+    if(activePath.current===origin)router.push(invoiceReturnPath(new URLSearchParams(searchParams.toString())));
     await loadWorkspace();
+    } catch {if(active.current)showToast('Mất kết nối. Hãy thử lại.','error');}
+    finally{resolutionLock.current=false;if(active.current)setResolving(false);}
   };
 
   const confirmRoutine = async () => {
@@ -439,13 +368,6 @@ export function ProductionWorkspace({
     window.open(`/api/tax-forms?${params.toString()}`, '_blank', 'noopener,noreferrer');
   };
 
-  const navItems: Array<{ id: View; label: string; icon: React.ReactNode; count?: number }> = [
-    { id: 'inbox', label: 'Thẩm định', icon: <Inbox className="h-4 w-4" />, count: pendingCount },
-    { id: 'receive', label: 'Tiếp nhận', icon: <FileText className="h-4 w-4" /> },
-    { id: 'approval', label: 'Chờ duyệt', icon: <ClipboardCheck className="h-4 w-4" />, count: approvalItems.length },
-    { id: 'dossier', label: 'Nhật ký', icon: <History className="h-4 w-4" /> },
-  ];
-
   const visibleList = view === 'approval' ? approvalItems : [...items].sort((a,b)=>Number(['APPROVED','REJECTED'].includes(a.status))-Number(['APPROVED','REJECTED'].includes(b.status)));
 
   const filteredList = useMemo(() => {
@@ -518,9 +440,9 @@ export function ProductionWorkspace({
   const renderReview = () => {
     if (!selected) {
       return (
-        <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-subtle">
+        <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-none">
           <FileText className="mb-2 h-10 w-10 text-slate-300" />
-          <p className="font-bold text-slate-900 text-base">Chọn hóa đơn</p>
+          <p className="font-medium text-slate-900 text-base">Chọn hóa đơn</p>
 
         </div>
       );
@@ -528,7 +450,7 @@ export function ProductionWorkspace({
 
     const decision = selected.decision;
     return (
-      <Card className="space-y-5 p-6 sm:p-7 shadow-card">
+      <Card className="space-y-5 p-6 sm:p-7 shadow-none">
         {/* Header - To & Rõ */}
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
@@ -549,51 +471,23 @@ export function ProductionWorkspace({
             <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
               HĐ #{selected.invoiceNumber}
             </h2>
-            <p className="text-sm font-bold text-slate-700 mt-0.5">{selected.supplierName}</p>
+            <p className="text-sm font-medium text-slate-700 mt-0.5">{selected.supplierName}</p>
           </div>
 
           <div className="flex items-center gap-2">
             <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowDocumentPreview(!showDocumentPreview)}
-              className="text-xs h-8 px-3 font-bold"
-            >
-              <Columns2 className="w-3.5 h-3.5 mr-1" />
-              <span>{showDocumentPreview ? 'Ẩn bản gốc' : 'Xem song song'}</span>
-            </Button>
-            <Button
               size="icon"
               variant="ghost"
-              onClick={() => setSelected(null)}
+              onClick={() => router.push(invoiceReturnPath(new URLSearchParams(searchParams.toString())))}
               className="h-8 w-8 text-slate-400 hover:text-slate-950"
+              aria-label="Về danh sách"
             >
               <XCircle className="h-5 w-5" />
             </Button>
           </div>
         </div>
 
-        {/* 3 Stat Numbers - To, Rõ, Đậm */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs font-semibold text-slate-500">Tổng thanh toán</span>
-            <div className="text-lg font-extrabold font-numeric text-slate-950 mt-1">
-              {formatVND(selected.totalAmount)}
-            </div>
-          </div>
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs font-semibold text-slate-500">Thuế GTGT</span>
-            <div className="text-lg font-extrabold font-numeric text-slate-950 mt-1">
-              {formatVND(selected.taxAmount)}
-            </div>
-          </div>
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-            <span className="text-xs font-semibold text-slate-500">Ngày lập</span>
-            <div className="text-base font-bold text-slate-950 mt-1">
-              {selected.review?.unresolvedFields?.includes("invoiceDate")?"Chưa xác minh":formatDate(selected.invoiceDate)}
-            </div>
-          </div>
-        </div>
+        <dl className="grid gap-3 border-b pb-4 sm:grid-cols-3"><div><dt className="text-xs text-muted-foreground">Tổng thanh toán</dt><dd className="mt-1 text-lg font-semibold font-numeric">{formatVND(selected.totalAmount)}</dd></div><div><dt className="text-xs text-muted-foreground">Thuế GTGT</dt><dd className="mt-1 text-lg font-semibold font-numeric">{formatVND(selected.taxAmount)}</dd></div><div><dt className="text-xs text-muted-foreground">Ngày lập</dt><dd className="mt-1 text-base font-numeric">{selected.review?.unresolvedFields?.includes('invoiceDate')?'Chưa xác minh':formatDate(selected.invoiceDate)}</dd></div></dl>
 
         {/* Routine Outcome */}
         {decision?.status === 'ROUTINE' && (
@@ -615,14 +509,14 @@ export function ProductionWorkspace({
         {/* Escalated Outcome */}
         {decision?.status === 'ESCALATED' && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-5 space-y-2">
+            <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 space-y-2">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-700" />
                 <span className="text-xs font-semibold text-amber-900">
                   {riskGroupLabels[decision.riskGroup]}
                 </span>
               </div>
-              <h3 className="text-base font-bold text-slate-950 leading-snug">
+              <h3 className="text-sm font-medium text-foreground leading-6">
                 {decision.actionableQuestion}
               </h3>
               <p className="text-xs font-numeric font-medium text-slate-700 pt-1 flex items-center gap-1.5">
@@ -632,6 +526,7 @@ export function ProductionWorkspace({
             </div>
 
             {/* Danh sách toàn bộ vi phạm (IMP-P0: Multi-finding Engine) */}
+            <HandoffContext decision={decision} showIssues={false} />
             {decision.findings && decision.findings.length > 1 && (
               <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-2.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
@@ -641,9 +536,9 @@ export function ProductionWorkspace({
                 <div className="space-y-1.5">
                   {decision.findings.map((f, i) => (
                     <div key={i} className="flex items-start gap-2.5 text-xs bg-white p-2.5 rounded-lg border border-slate-200">
-                      <span className={`px-1.5 py-0.5 rounded font-bold text-[10px] uppercase shrink-0 ${
+                      <span className={`px-1.5 py-0.5 rounded font-medium text-[10px] uppercase shrink-0 ${
                         f.kind === 'STATUTORY' ? 'bg-red-100 text-red-800 border border-red-200' :
-                        f.kind === 'DATA_QUALITY' ? 'bg-purple-100 text-purple-800 border border-purple-200' :
+                        f.kind === 'DATA_QUALITY' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
                         f.kind === 'AUTHORITY' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
                         'bg-amber-100 text-amber-800 border border-amber-200'
                       }`}>
@@ -672,28 +567,28 @@ export function ProductionWorkspace({
                   onChange={(e) => setSaveAsPrecedent(e.target.checked)}
                   className="rounded border-slate-300 text-slate-950 focus:ring-slate-950 w-4 h-4 cursor-pointer"
                 />
-                <span className="text-xs font-bold text-slate-900">
+                <span className="text-xs font-medium text-slate-900">
                   Lưu làm Tiền lệ Ngoại lệ cho đối tác này (áp dụng 6 tháng)
                 </span>
               </label>
             )}
 
-            <label className="block text-sm">Lý do / bằng chứng (ít nhất 8 ký tự)<textarea value={actionReason} onChange={e=>setActionReason(e.target.value)} className="mt-1 w-full rounded border p-2" /></label>
+            <label htmlFor="workflow-reason" className="block text-sm">Lý do / bằng chứng (ít nhất 8 ký tự)<textarea id="workflow-reason" value={actionReason} onChange={e=>setActionReason(e.target.value)} className="mt-1 w-full rounded border p-2" /></label>
             {saveAsPrecedent && <div className="grid gap-2"><label>Mục đích được phép<input value={precedentPurpose} onChange={e=>setPrecedentPurpose(e.target.value)} className="w-full border p-2" /></label><label>Trần tiền CFO cho phép<input type="number" min="1" value={precedentMaximum} onChange={e=>setPrecedentMaximum(e.target.value)} className="w-full border p-2" /></label></div>}
-            {decision.findings?.map(f=><label key={f.ruleId} className="flex gap-2 text-sm"><input type="checkbox" checked={confirmedFindings.includes(f.ruleId)} onChange={e=>setConfirmedFindings(prev=>e.target.checked?[...prev,f.ruleId]:prev.filter(id=>id!==f.ruleId))} />Tôi đã xử lý phát hiện: {f.ruleId} — {f.flaggedReason}</label>)}
+            {decision.findings?.map(f=><label key={f.ruleId} className="flex gap-2 text-sm"><input type="checkbox" checked={confirmedFindings.includes(f.ruleId)} onChange={e=>setConfirmedFindings(prev=>e.target.checked?[...prev,f.ruleId]:prev.filter(id=>id!==f.ruleId))} />Đã xử lý: {f.flaggedReason}</label>)}
             {/* A/B Option Buttons */}
             <div className="grid gap-3 sm:grid-cols-2">
               {decision.options.map((option, idx) => (
                 <button
                   key={option.id}
                   onClick={() => void handleResolve(option)}
-                  disabled={actionReason.trim().length<8 || (["ACCEPT_WITH_DOCS","ACCEPT_ADJUSTMENT","ACCEPT_WITH_DEFENSE_DOSSIER"].includes(option.resultingAction) ? (!selected.allowedActions?.approve || decision.findings?.some(f=>!confirmedFindings.includes(f.ruleId))) : !selected.allowedActions?.requestInformation)}
-                  className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-950 hover:shadow-subtle text-left transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer group"
+                  disabled={resolving || actionReason.trim().length<8 || (["ACCEPT_WITH_DOCS","ACCEPT_ADJUSTMENT","ACCEPT_WITH_DEFENSE_DOSSIER"].includes(option.resultingAction) ? (!selected.allowedActions?.approve || decision.findings?.some(f=>!confirmedFindings.includes(f.ruleId))) : !selected.allowedActions?.requestInformation)}
+                  className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-950 hover:shadow-none text-left transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer group"
                 >
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wider block mb-1">
                     PHƯƠNG ÁN {idx === 0 ? 'A' : 'B'}
                   </span>
-                  <span className="block font-bold text-sm text-slate-950">{option.label}</span>
+                  <span className="block font-medium text-sm text-slate-950">{option.label}</span>
                   <span className="block text-xs font-medium text-slate-600 mt-1 leading-relaxed">
                     {option.actionDescription}
                   </span>
@@ -705,7 +600,7 @@ export function ProductionWorkspace({
             {/* Tách thuế tạm tính */}
             <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <div className="flex items-center gap-1.5 text-xs font-bold text-blue-950 uppercase tracking-wide">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-blue-950 uppercase tracking-wide">
                   <ShieldAlert className="h-4 w-4 text-blue-700" />
                   <span>Giữ thuế tạm thời</span>
                 </div>
@@ -719,7 +614,7 @@ export function ProductionWorkspace({
                 size="sm"
                 variant={provisionalHoldIds.has(selected.id) ? 'default' : 'outline'}
                 onClick={() => toggleProvisionalTaxHold(selected.id)}
-                className={`text-xs font-bold shrink-0 ${
+                className={`text-xs font-medium shrink-0 ${
                   provisionalHoldIds.has(selected.id)
                     ? 'bg-blue-700 hover:bg-blue-800 text-white'
                     : 'border-blue-300 text-blue-900 hover:bg-blue-100'
@@ -730,25 +625,21 @@ export function ProductionWorkspace({
             </div>
 
             </details>
-            {!roleCanApprove(user, selected) && (
-              <p className="text-xs font-bold text-amber-700 text-center">
-                Đang chờ cấp thẩm quyền ({['WAITING_CFO', 'FORWARDED'].includes(selected.status) ? 'CFO' : 'Kế toán trưởng'}) phê duyệt.
-              </p>
-            )}
+
           </div>
         )}
 
-        <WorkflowControls key={`${selected.id}:${selected.revision}`} item={selected} user={user} onRefresh={loadWorkspace} />
+        <WorkflowControls key={`${selected.id}:${selected.revision}`} item={selected} user={user} onRefresh={loadWorkspace} reasonValue={actionReason} onReasonChange={setActionReason} hideReasonInput={decision?.status==='ESCALATED'} />
         {/* Export actions */}
         {(selected.status === 'APPROVED' || selected.status === 'REJECTED') && (
           <div className="flex gap-2 pt-4 border-t border-slate-100">
-            <Button variant="outline" size="sm" onClick={() => void exportDossier('json')} className="font-bold">
+            <Button variant="outline" size="sm" onClick={() => void exportDossier('json')} className="font-medium">
               Xuất JSON
             </Button>
-            <Button variant="default" size="sm" onClick={() => void exportDossier('print')} className="font-bold">
+            <Button variant="default" size="sm" onClick={() => void exportDossier('print')} className="font-medium">
               Bản in PDF
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => openTaxFormDraft('04/SS-HĐĐT')} className="font-bold">
+            <Button variant="secondary" size="sm" onClick={() => openTaxFormDraft('04/SS-HĐĐT')} className="font-medium">
               Mẫu 04/SS-HĐĐT
             </Button>
           </div>
@@ -757,74 +648,7 @@ export function ProductionWorkspace({
     );
   };
 
-  // Inbox List Table
-  const renderList = (list: InboxItem[]) => (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-subtle">
-      <div className="hidden grid-cols-[1.5fr_1fr_1fr_0.8fr] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600 md:grid items-center">
-
-        <span>Hóa đơn</span>
-        <span>Nhà cung cấp</span>
-        <span className="text-right">Tổng tiền (VNĐ)</span>
-        <span className="text-center">Trạng thái</span>
-      </div>
-
-      {list.length === 0 && (
-        <div className="p-8 text-center text-sm font-semibold text-slate-500">
-          Không có hóa đơn nào phù hợp.
-        </div>
-      )}
-
-      {list.map((item) => {
-        const isRoutine = false;
-        const isChecked = selectedRoutineIds.has(item.id);
-        const isSelected = selected?.id === item.id;
-
-        return (
-          <div
-            key={item.id}
-            role="button"
-            tabIndex={0}
-            aria-label={`Mở hóa đơn ${item.invoiceNumber}`}
-            aria-pressed={isSelected}
-            onKeyDown={event=>{if(event.key==='Enter' || event.key===' '){event.preventDefault();setSelected(item);}}}
-            onClick={() => setSelected(item)}
-            className={`grid w-full gap-2 border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 md:grid-cols-[1.5fr_1fr_1fr_0.8fr] md:items-center md:gap-3 cursor-pointer ${
-              isSelected ? 'bg-slate-100/80 font-medium' : ''
-            } ${isChecked ? 'bg-amber-50/50' : ''}`}
-          >
-
-            <div>
-              <div className="font-bold text-sm text-slate-950 flex items-center gap-1.5 flex-wrap">
-                <span className="font-numeric tracking-tight">{item.invoiceNumber}</span>
-                {renderSlaBadge(item)}
-              </div>
-              <div className="text-xs text-slate-500 font-numeric font-medium">{formatDate(item.invoiceDate)}</div>
-            </div>
-
-            <div className="text-xs font-bold text-slate-800 truncate">
-              {item.supplierName}
-              <div className="font-numeric text-[11px] font-medium text-slate-500 tracking-tight">{item.supplierTaxCode}</div>
-            </div>
-
-            <div className="text-sm font-numeric font-bold text-slate-950 text-right">
-              {formatVND(item.totalAmount)}
-            </div>
-
-            <div className="text-center space-y-1">
-              <Badge className="normal-case tracking-normal font-medium" variant={statusConfig[item.status]?.variant || 'secondary'}>
-                {itemStatusLabel(item)}
-              </Badge>
-              {provisionalHoldIds.has(item.id) && (
-                <span className="inline-block text-[10px] font-bold text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                  CV 2392 (Tạm tính)
-                </span>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  const renderList=(list:InboxItem[]):React.ReactElement => <InvoiceList items={list} empty={items.length===0} href={invoiceHref} statusLabel={itemStatusLabel} variant={item=>statusConfig[item.status]?.variant||'secondary'} deadline={renderSlaBadge} scrollPositions={listScrollPositions.current}/>;
 
   const switchRole = async (targetRole: AppUser['role']) => {
     try {
@@ -844,405 +668,54 @@ export function ProductionWorkspace({
   };
 
   return (
-    <div className={`relative ${view === 'receive' ? 'min-h-screen md:h-screen md:overflow-hidden' : 'min-h-screen'} bg-slate-50/70 text-slate-900 selection:bg-brand-lime selection:text-slate-950 flex flex-col md:flex-row`}>
-      
-      <nav className="flex md:hidden flex-wrap gap-2 border-b bg-white p-3" aria-label="Điều hướng chính">{navItems.filter(i=>i.id!=='approval').map(i=><button key={i.id} onClick={()=>setView(i.id)} className={`rounded border p-2 text-xs ${view===i.id?'bg-slate-950 text-white':''}`}>{i.label}</button>)}<a className="rounded border p-2 text-xs" href="/verify">Verify</a>
-        <details className="w-full rounded border p-2 text-xs"><summary className="cursor-pointer font-semibold">Công cụ</summary>
-          <div className="mt-2 flex flex-wrap gap-2">{([{id:'banking',label:'Ngân hàng'},{id:'reconciliation',label:'TCT'},{id:'suppliers',label:'Nhà cung cấp'},{id:'reports',label:'Báo cáo'}] as const).map(i=><button key={i.id} onClick={()=>setView(i.id)} className="min-h-10 rounded border px-3">{i.label}</button>)}
-            <button className="min-h-10 rounded border px-3" onClick={()=>setLedgerSyncOpen(true)}>ERP · Xuất payload</button>
-            <button className="min-h-10 rounded border px-3" onClick={(event)=>{ event.currentTarget.focus(); setPolicyOpen(true); }}>Quy chế</button>
-          </div>
-        </details></nav>
-      {/* Collapsible Left Sidebar (Fixed Icon Coordinates & Persistent Slots) */}
-      <aside
-        id="stage-slideover-sidebar"
-        data-state={isSidebarCollapsed ? 'closed' : 'open'}
-        className={`hidden md:flex sticky top-0 h-screen flex-col bg-[#f9f9f9] text-slate-900 border-r border-slate-200/80 transition-[width] duration-200 ease-out shrink-0 z-40 select-none overflow-hidden ${
-          isSidebarCollapsed ? 'w-[56px]' : 'w-[260px]'
-        }`}
-      >
-        <div className="relative flex h-full flex-col w-[260px]">
-          
-          {/* ================= HEADER: LOGO + BRAND + CLOSE BUTTON ================= */}
-          <div className="h-[52px] px-2.5 flex items-center justify-between shrink-0 border-b border-slate-200/60 w-full overflow-hidden">
-            <div className="flex items-center gap-0 min-w-0">
-              {/* Logo slot: Luôn cố định tại x=10px, y=8px, size 36x36px */}
-              <button
-                type="button"
-                onClick={() => isSidebarCollapsed && setIsSidebarCollapsed(false)}
-                className={`group/logo flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                  isSidebarCollapsed ? 'hover:bg-black/5 cursor-e-resize' : 'cursor-default'
-                }`}
-                title={isSidebarCollapsed ? 'Mở thanh điều hướng' : 'Tax Referee'}
-                aria-label={isSidebarCollapsed ? 'Mở thanh điều hướng' : 'Tax Referee'}
-              >
-                <span className="grid place-items-center">
-                  <span className={`col-start-1 row-start-1 transition-opacity duration-150 flex h-7 w-7 items-center justify-center rounded-lg bg-slate-950 text-brand-lime shadow-xs ${
-                    isSidebarCollapsed ? 'group-hover/logo:opacity-0' : 'opacity-100'
-                  }`}>
-                    <ShieldCheck className="h-4 w-4" />
-                  </span>
-                  {isSidebarCollapsed && (
-                    <span className="col-start-1 row-start-1 opacity-0 transition-opacity duration-150 group-hover/logo:opacity-100 flex h-7 w-7 items-center justify-center rounded-lg bg-slate-200 text-slate-900">
-                      <PanelLeftOpen className="h-4 w-4" />
-                    </span>
-                  )}
-                </span>
-              </button>
-
-              {/* Brand Wordmark: Xuất hiện mượt mà khi mở rộng */}
-              <div className={`flex items-center gap-1.5 pl-2 whitespace-nowrap transition-opacity duration-150 ${
-                isSidebarCollapsed ? 'opacity-0 pointer-events-none hidden' : 'opacity-100'
-              }`}>
-                <span className="font-semibold text-[15px] tracking-tight text-slate-900">Tax Referee</span>
-
-              </div>
-            </div>
-
-            {/* Nút thu nhỏ bên phải (chỉ hiện khi mở) */}
-            <div className={`shrink-0 transition-opacity duration-150 ${
-              isSidebarCollapsed ? 'opacity-0 pointer-events-none hidden' : 'opacity-100'
-            }`}>
-              <button
-                type="button"
-                onClick={() => setIsSidebarCollapsed(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 hover:bg-black/5 transition-colors cursor-w-resize"
-                title="Thu gọn thanh điều hướng"
-                aria-label="Thu gọn thanh điều hướng"
-              >
-                <PanelLeftClose className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* ================= NAVIGATION ITEMS: VỊ TRÍ & KÍCH THƯỚC ICON CỐ ĐỊNH 100% ================= */}
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-3 px-2.5 space-y-1 w-full">
-            {navItems.map((item) => {
-              const isActive = view === item.id;
-              return (
-                <div key={item.id} className="relative group/navitem flex items-center h-9 w-[240px]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView(item.id);
-                      if (item.id !== 'receive') setSelected(null);
-                    }}
-                    className={`flex h-9 items-center rounded-lg text-[13px] transition-all duration-200 cursor-pointer overflow-hidden ${
-                      isSidebarCollapsed ? 'w-9' : 'w-[240px]'
-                    } ${
-                      isActive
-                        ? 'bg-black/10 text-slate-950 font-semibold'
-                        : 'text-slate-700 hover:bg-black/5 hover:text-slate-950 font-medium'
-                    }`}
-                    aria-label={item.label}
-                  >
-                    {/* Icon Slot: Luôn giữ nguyên width=36px, height=36px, icon size=16px (h-4 w-4) tại left: 0 */}
-                    <div className="w-9 h-9 shrink-0 flex items-center justify-center relative">
-                      <span className="flex items-center justify-center h-4 w-4">
-                        {item.icon}
-                      </span>
-                      {/* Chấm đỏ thông báo khi thu gọn */}
-                      {isSidebarCollapsed && Boolean(item.count) && (
-                        <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-[#f9f9f9]" />
-                      )}
-                    </div>
-
-                    {/* Text Label + Badge số lượng (Chỉ hiện khi mở rộng, không chèn ép icon) */}
-                    <div className={`flex items-center justify-between flex-1 min-w-0 pr-2.5 whitespace-nowrap transition-opacity duration-150 ${
-                      isSidebarCollapsed ? 'opacity-0 pointer-events-none hidden' : 'opacity-100'
-                    }`}>
-                      <span className="truncate">{item.label}</span>
-                      {Boolean(item.count) && (
-                        <span
-                          className={`inline-flex items-center justify-center min-w-[20px] h-5 rounded-full px-1.5 text-[11px] font-numeric font-bold shrink-0 ${
-                            isActive ? 'bg-black/10 text-slate-950' : 'bg-slate-200/80 text-slate-700'
-                          }`}
-                        >
-                          {item.count}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-
-                  {/* Floating Tooltip kiểu Radix UI khi thu gọn */}
-                  {isSidebarCollapsed && (
-                    <div className="pointer-events-none absolute left-[calc(100%+8px)] z-50 hidden rounded-md bg-slate-900/90 backdrop-blur-xs px-2.5 py-1 text-[11px] font-medium text-white shadow-lg group-hover/navitem:flex items-center gap-1 whitespace-nowrap animate-in fade-in-0 zoom-in-95 duration-100">
-                      <span>{item.label}</span>
-                      {Boolean(item.count) && (
-                        <span className="ml-1 px-1.5 py-0.2 rounded-full bg-rose-500/80 text-[10px] font-numeric font-bold">
-                          {item.count}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            <details className="my-3 rounded border p-2 text-xs"><summary className="cursor-pointer font-semibold">Công cụ</summary><p className="my-2 text-slate-500">Dữ liệu demo · ERP chỉ xuất payload.</p>{([{id:'banking',label:'Ngân hàng'},{id:'reconciliation',label:'TCT'},{id:'suppliers',label:'Nhà cung cấp'},{id:'reports',label:'Báo cáo'}] as const).map(i=><button key={i.id} onClick={()=>setView(i.id)} className="block w-full rounded p-2 text-left hover:bg-slate-100">{i.label}</button>)}<button onClick={()=>setLedgerSyncOpen(true)} className="block p-2">ERP · Xuất payload</button></details>
-          </div>
-
-          {/* ================= FOOTER: USER AVATAR CỐ ĐỊNH ================= */}
-          <div className="pb-3 px-2.5 pt-2 border-t border-slate-200/60 shrink-0 w-full overflow-hidden">
-            <div className="relative group/user flex items-center h-9 w-[240px]">
-              <div
-                onClick={() => isSidebarCollapsed && setIsSidebarCollapsed(false)}
-                className={`flex h-9 items-center rounded-lg transition-all duration-200 cursor-pointer overflow-hidden ${
-                  isSidebarCollapsed ? 'w-9 hover:bg-black/5' : 'w-[240px] hover:bg-black/5'
-                }`}
-              >
-                {/* Avatar Slot: Giữ nguyên vị trí x=10px, y cố định, size h-7 w-7 */}
-                <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-                  <div className="h-7 w-7 rounded-full bg-rose-500 text-white font-bold text-xs flex items-center justify-center shadow-xs transition hover:ring-2 hover:ring-rose-300">
-                    {userInitials}
-                  </div>
-                </div>
-
-                {/* Tên & Vai trò: Hiện khi mở rộng */}
-                <div className={`flex flex-col min-w-0 pr-2.5 whitespace-nowrap transition-opacity duration-150 ${
-                  isSidebarCollapsed ? 'opacity-0 pointer-events-none hidden' : 'opacity-100'
-                }`}>
-                  <span className="text-[13px] font-semibold text-slate-900 truncate leading-tight">
-                    {user.displayName}
-                  </span>
-                  <span className="text-[11px] text-slate-500 truncate leading-tight">
-                    {roleLabels[user.role]}
-                  </span>
-                </div>
-              </div>
-
-              {/* Floating Tooltip khi thu gọn */}
-              {isSidebarCollapsed && (
-                <div className="pointer-events-none absolute left-[calc(100%+8px)] z-50 hidden rounded-md bg-slate-900/90 backdrop-blur-xs px-2.5 py-1 text-[11px] font-medium text-white shadow-lg group-hover/user:flex flex-col whitespace-nowrap animate-in fade-in-0 zoom-in-95 duration-100">
-                  <span className="font-semibold text-white">{user.displayName}</span>
-                  <span className="text-[10px] text-slate-300">{roleLabels[user.role]}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Right Content Area: Top Header + Main Workspace */}
-      <div className={`flex-1 flex flex-col min-w-0 ${view === 'receive' ? 'h-full min-h-0' : 'min-h-screen'}`}>
-        
-        {/* Top Header */}
-        <header className="border-b border-slate-200 bg-white sticky top-0 z-30 shadow-subtle shrink-0">
-          <div className="mx-auto flex max-w-[1440px] items-center justify-between flex-wrap gap-3 px-4 py-3 sm:px-6">
-            
-            {/* Left: Role Switcher & Live Engine Beacon */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200">
-                {(['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'] as const).map((r) => {
-                  const isActive = user.role === r;
-                  return (
-                    <button
-                      key={r}
-                      aria-pressed={isActive}
-                      title="Chọn vai trò trải nghiệm MVP"
-                      onClick={() => void switchRole(r)}
-                      className={`rounded-lg px-2.5 sm:px-3 py-1 text-xs font-bold transition cursor-pointer ${
-                        isActive
-                          ? 'bg-slate-950 text-white shadow-sm'
-                          : 'text-slate-600 hover:text-slate-950'
-                      }`}
-                    >
-                      {roleLabels[r]}
-                    </button>
-                  );
-                })}
-              </div>
-
-
-            </div>
-
-            {/* Right: Actions, Benchmark link & logout */}
-            <div className="flex items-center gap-2.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(event) => { event.currentTarget.focus(); setPolicyOpen(true); }}
-                className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 border-slate-300 hover:bg-slate-100 h-8 px-3 shadow-xs"
-                title="Bảng Quản trị Tiền lệ & Quy chế SOP (FR-6)"
-              >
-                <BookOpen className="h-3.5 w-3.5 text-blue-600" />
-                Quy chế
-              </Button>
-
-              <Link
-                href="/verify"
-                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-900 transition h-8 shadow-xs"
-                title="Mở bộ kiểm thử tự động 90s theo Đề bài A"
-              >
-                <ArrowRight className="h-3.5 w-3.5 text-emerald-600" />
-                Verify
-              </Link>
-
-              <span className="hidden sm:inline text-xs text-slate-500">{isDemo ? 'Demo riêng' : 'Nội bộ'}</span>
-
-              <Button
-                size="icon"
-                variant="outline"
-                onClick={onLogout}
-                className="h-8 w-8 text-slate-600 hover:text-slate-950"
-                title="Đăng xuất"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </header>
-
+    <WorkspaceShell view={view} user={user} demo={isDemo} counts={{pending:pendingCount,approvals:approvalItems.length,notifications:unreadNotifCount}} onRoleChange={switchRole} onLogout={onLogout} onReset={handleResetWorkspace} resetting={isResetting} detail={Boolean(invoiceId)} dirty={receiveDirty}>
+      {hasVisitedReceive && <main className={view==='receive'?'workspace-content receive-active':'hidden'} aria-hidden={view!=='receive'}>
+        <InteractiveInputForm onEvaluateResult={handleEvaluateResult} dynamicConfig={config} onDirtyChange={setReceiveDirty}/>
+      </main>}
+      {view!=='receive' && <>
         {/* Center Workspace Content */}
         {view === 'notifications' ? (
+          <main>
           <NotificationCenterView
-            onOpenPolicyModal={(tab) => {
-              setPolicyOpen(true);
-            }}
+            onOpenPolicyModal={(tab) => {const allowed=['VIEW','EDIT','TIMELINE','LEGAL','PRECEDENTS','STUDIO'];router.push('/workspace/policy'+(tab&&allowed.includes(tab)?'?tab='+tab:''));}}
             onNavigateView={(nextView) => {
-              setView(nextView as View);
+              const path='/workspace/'+nextView;if(Object.values(workspaceRoutes).some(route=>route.path===path))router.push(path);
             }}
-            onUnreadChange={(count) => {
-              setUnreadNotifCount(count);
-            }}
+            onUnreadChange={setUnreadNotifCount}
           />
+          </main>
         ) : (
-          <main className={`${view === 'receive' ? 'flex-1 min-h-0 overflow-hidden flex flex-col p-2 sm:p-3 space-y-0' : 'flex-1 p-4 sm:p-6 space-y-5'} max-w-[1440px] w-full mx-auto`}>
+          <main className="workspace-content space-y-5">
             
-            {/* Action & Reset Bar */}
-            {view !== 'receive' && <div className="flex items-center justify-between gap-3">
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-                  {view === 'approval' ? 'Chờ duyệt' : view === 'dossier' ? 'Nhật ký' : view === 'reports' ? 'Báo cáo thuế' : view === 'reconciliation' ? 'Đối soát TCT' : view === 'banking' ? 'Đối soát ngân hàng' : view === 'suppliers' ? 'Nhà cung cấp' : 'Thẩm định'}
-                </h1>
-              </div>
-              {isDemo && <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void handleResetWorkspace()}
-                disabled={isResetting || !isDemo}
-                className="font-bold text-xs h-9 px-3 text-rose-700 hover:text-rose-800 hover:bg-rose-50 border-rose-200"
-                title="Reset về trạng thái chưa có hóa đơn nào được gửi lên"
-              >
-                <RotateCcw className={`h-3.5 w-3.5 mr-1.5 ${isResetting ? 'animate-spin' : ''}`} />
-                <span>{isResetting ? 'Đang xóa…' : 'Xóa dữ liệu demo'}</span>
-              </Button>}
+            {!invoiceId && <div className="workspace-heading"><h1>{workspaceRoutes[view].label}</h1><div className="flex items-center gap-3">{['reports','reconciliation','banking','suppliers'].includes(view)&&<details className="text-xs text-muted-foreground"><summary className="cursor-pointer">Dữ liệu demo / adapter</summary><p className="mt-2 max-w-xs">Chưa xác nhận kết nối ERP, ngân hàng, TCT hoặc cập nhật pháp luật trực tiếp.</p></details>}{['inbox','approval'].includes(view)&&<Link href="/workspace/receive" className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-primary px-4 text-sm font-medium text-primary-foreground"><FileText className="h-4 w-4"/>Tiếp nhận</Link>}</div></div>}
+            {error && <ScreenState error title="Không thể tải dữ liệu" description="Kiểm tra kết nối rồi thử lại." onRetry={()=>void loadWorkspace()}/>}
+            {loading && <WorkspaceSkeleton/>}
+            {!loading&&!error&&!invoiceId&&['inbox','approval'].includes(view)&&<div className="workspace-metrics">
+              <button type="button" onClick={()=>setFilters({...DEFAULT_FILTER_STATE,approvalStatus:'PENDING'})}><strong>{pendingCount}</strong><span>Cần xử lý</span></button>
+              <button type="button" onClick={()=>setFilters({...DEFAULT_FILTER_STATE,riskGroup:'ROUTINE',approvalStatus:'APPROVED'})}><strong>{autoApprovedRoutineCount}</strong><span>Đã tự duyệt</span></button>
+              <Link href="/workspace/approvals" className="flex flex-wrap items-baseline gap-2 rounded-lg px-3 py-2"><strong className="text-[22px] font-semibold">{counts.WAITING_CHIEF_ACCOUNTANT||0}</strong><span className="text-[13px] text-muted-foreground">Chờ KTT</span></Link>
+              <Link href="/workspace/approvals" className="flex flex-wrap items-baseline gap-2 rounded-lg px-3 py-2"><strong className="text-[22px] font-semibold">{counts.WAITING_CFO||0}</strong><span className="text-[13px] text-muted-foreground">Chờ CFO</span></Link>
             </div>}
-
-            {['reports','reconciliation','banking','suppliers'].includes(view) && <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm">Mở rộng sử dụng dữ liệu demo hoặc adapter xuất payload. Chưa xác nhận kết nối ERP, ngân hàng, TCT hoặc cập nhật pháp luật trực tiếp.</p>}
-            {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-700">{error}</div>}
-            
-            {loading && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-sm font-bold text-slate-500 shadow-subtle">
-                Đang tải dữ liệu...
-              </div>
-            )}
-
-            {/* 4 Stat Metric Cards (Swiss FinTech Precision & High Density) */}
-            {!loading && ['inbox','approval'].includes(view) && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-                <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-subtle hover:border-slate-300 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500">Cần xử lý</span>
-                    <span className="w-2 h-2 rounded-full bg-slate-400" />
-                  </div>
-                  <div className="text-2xl font-semibold font-numeric text-slate-950 mt-1.5">{pendingCount}</div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-white border border-emerald-100 shadow-subtle hover:border-emerald-300 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-emerald-700">Đã tự duyệt</span>
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  </div>
-                  <div className="text-2xl font-semibold font-numeric text-emerald-700 mt-1.5">{autoApprovedRoutineCount}</div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-white border border-amber-100 shadow-subtle hover:border-amber-300 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-amber-700">Chờ KTT</span>
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  </div>
-                  <div className="text-2xl font-semibold font-numeric text-amber-700 mt-1.5">{counts.WAITING_CHIEF_ACCOUNTANT || 0}</div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-white border border-rose-100 shadow-subtle hover:border-rose-300 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-rose-700">Chờ CFO</span>
-                    <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  </div>
-                  <div className="text-2xl font-semibold font-numeric text-rose-700 mt-1.5">{counts.WAITING_CFO || 0}</div>
-                </div>
-              </div>
-            )}
-
-            {/* Receive Form View */}
-            {!loading && view === 'receive' && (
-              <Card className="flex-1 min-h-0 p-2 sm:p-3 shadow-card overflow-hidden">
-                <InteractiveInputForm onEvaluateResult={handleEvaluateResult} dynamicConfig={config} />
-              </Card>
-            )}
-
-            {/* Reports View */}
-            {!loading && view === 'reports' && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <Card className="p-6">
-                  <span className="text-xs font-semibold text-slate-500">Chính sách hiện hành</span>
-                  <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{policyVersion}</p>
-                  <Button size="sm" variant="outline" onClick={(event) => { event.currentTarget.focus(); setPolicyOpen(true); }} className="mt-4 font-bold">
-                    Quản trị quy tắc SOP →
-                  </Button>
-                </Card>
-
-                <Card className="p-6">
-                  <span className="text-xs font-semibold text-slate-500">Hệ số K (MacroState)</span>
-                  <div className="mt-2 flex items-baseline justify-between">
-                    <span className="text-3xl font-bold tracking-tight text-slate-950">{macro.kFactor.toFixed(2)}</span>
-                    <Badge variant={macro.zone === 'SAFE_GREEN' ? 'success' : 'warning'}>
-                      {macro.zone === 'SAFE_GREEN' ? 'An toàn' : 'Cảnh báo'}
-                    </Badge>
-                  </div>
-                </Card>
-
-                <Card className="p-6 md:col-span-2">
-                  <h3 className="text-base font-bold text-slate-950 mb-2">Bản nháp tờ khai thuế</h3>
-                  <Button variant="default" onClick={() => openTaxFormDraft('01/GTGT')} className="font-bold">
-                    Mở tờ khai 01/GTGT
-                  </Button>
-                </Card>
-              </div>
-            )}
+            {/* Reports use server values and an explicit draft period. */}
+            {!loading&&!error&&view==='reports'&&<ReportsView macro={macro} items={items} policyVersion={policyVersion}/>}
 
             {/* TCT Reconciliation View */}
-            {!loading && view === 'reconciliation' && (
-              <TctReconciliationView onNavigateToInvoice={(invId: string) => {
-                const target = items.find(item => item.id === invId);
-                if (target) {
-                  setSelected(target);
-                  setShowDocumentPreview(true);
-                  setView('inbox');
-                }
-              }} />
+            {!loading && !error && view === 'reconciliation' && (
+              <TctReconciliationView onNavigateToInvoice={(invId: string) => {router.push('/workspace/invoices/'+encodeURIComponent(invId));              }} />
             )}
 
             {/* Bank Statement View */}
-            {!loading && view === 'banking' && (
-              <BankStatementView onNavigateToInvoice={(invId: string) => {
-                const target = items.find(item => item.id === invId);
-                if (target) {
-                  setSelected(target);
-                  setShowDocumentPreview(true);
-                  setView('inbox');
-                }
-              }} />
+            {!loading && !error && view === 'banking' && (
+              <BankStatementView onNavigateToInvoice={(invId: string) => {router.push('/workspace/invoices/'+encodeURIComponent(invId));              }} />
             )}
 
             {/* Supplier Master View */}
-            {!loading && view === 'suppliers' && (
+            {!loading && !error && view === 'suppliers' && (
               <SupplierMasterView />
             )}
 
             {/* Dossier / Audit Trail View (Tiêu chí 6: 20 Điểm) */}
-            {!loading && view === 'dossier' && (
+            {!loading && !error && view === 'dossier' && (
               <div className="space-y-4">
                 <label className="block text-sm">Chọn hồ sơ để xem đầu vào và lịch sử<select className="mt-1 w-full rounded border p-2" value={auditInvoiceId} onChange={e=>setAuditInvoiceId(e.target.value)}><option value="">Chọn hồ sơ</option>{items.map(i=><option key={i.id} value={i.id}>{i.invoiceNumber} · {i.supplierName} · {i.status}</option>)}</select></label>
                 {auditInvoiceId && <WorkflowAuditHistory key={`${auditInvoiceId}:${items.find(i=>i.id===auditInvoiceId)?.revision}`} invoiceId={auditInvoiceId} />}
@@ -1277,47 +750,25 @@ export function ProductionWorkspace({
               </div>
             )}
 
-            {/* Main List & Review Grid */}
-            {!loading && !['receive', 'reports', 'reconciliation', 'banking', 'suppliers', 'dossier'].includes(view) && (
-              selected && showDocumentPreview ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-subtle">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowDocumentPreview(false)}
-                      className="font-bold text-xs"
-                    >
-                      ← Quay lại danh sách
-                    </Button>
-                    <span className="font-numeric text-xs font-bold text-slate-950">
-                      HĐ #{selected.invoice.invoiceNumber || selected.id}
-                    </span>
-                  </div>
-
-                  <div className="grid gap-6 xl:grid-cols-2 items-start">
-                    {!selected.invoice.sourceArtifactId ? <div className="rounded border border-amber-200 bg-amber-50 p-4 text-sm">Chưa có chứng từ gốc. Hồ sơ này được nhập trực tiếp; dữ liệu và xác nhận có trong lịch sử xử lý.{Boolean(selected.review?.unresolvedFields?.length) && ' Các trường chưa rõ cần được đối chiếu với nguồn trước khi hoàn tất.'}</div> : <DocumentViewer invoice={selected.invoice} onClose={() => setShowDocumentPreview(false)} />}
-                    <div>{renderReview()}</div>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
-                  <div className="space-y-3">
-                    <InboxFilterToolbar
-                      filters={filters}
-                      onChange={setFilters}
-                      totalCount={visibleList.length}
-                      filteredCount={filteredList.length}
-                    />
-                    {renderList(filteredList)}
-                  </div>
-                  <div>{renderReview()}</div>
-                </div>
-              )
-            )}
+            {!loading&&!error&&view==='policy'&&<PolicyViewerModal isOpen onClose={()=>setView('inbox')} presentation="page" onPolicyUpdated={setPolicyVersion} onConfigUpdated={setConfig}/>}
+            {!loading&&!error&&view==='ledger'&&<LedgerSyncModal open onOpenChange={open=>{if(!open)setView('inbox');}} presentation="page"/>}
+            {!loading&&!error&&invoiceId&&<>
+              <Link href={invoiceReturnPath(new URLSearchParams(searchParams.toString()))} className="text-sm text-muted-foreground hover:text-foreground">← Quay lại danh sách</Link>
+              <nav className="invoice-detail-tabs" aria-label="Các phần của hồ sơ">{([{id:'review',label:'Xử lý'},{id:'source',label:'Chứng từ'},{id:'history',label:'Lịch sử'}] as const).map(tab=>{const query=new URLSearchParams(searchParams.toString());query.set('tab',tab.id);return <Link key={tab.id} href={pathname+'?'+query.toString()} aria-current={invoiceTab===tab.id?'page':undefined}>{tab.label}</Link>;})}</nav>
+              {detailLoading?<WorkspaceSkeleton/>:detailError?<ScreenState error title={detailError==='missing'?'Không tìm thấy hồ sơ':'Không thể tải hồ sơ'} description={detailError==='missing'?'Hồ sơ không có trong workspace đang mở.':'Kiểm tra kết nối rồi thử lại.'} onRetry={()=>setDetailAttempt(a=>a+1)}/>:selected&&<>
+                {invoiceTab==='review'&&<div className={selected.invoice.sourceArtifactId?'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]':'mx-auto max-w-4xl'}>{selected.invoice.sourceArtifactId&&<div className="hidden xl:block"><DocumentViewer invoice={selected.invoice}/></div>}{renderReview()}</div>}
+                {invoiceTab==='source'&&<DocumentViewer invoice={selected.invoice}/>}
+                {invoiceTab==='history'&&<WorkflowAuditHistory key={selected.id+':'+selected.revision} invoiceId={selected.id}/>}
+              </>}
+            </>}
+            {!loading&&!error&&!invoiceId&&['inbox','approval'].includes(view)&&<div className="space-y-3">
+              <InboxFilterToolbar filters={filters} onChange={setFilters} totalCount={visibleList.length} filteredCount={filteredList.length}/>
+              {renderList(filteredList)}
+              <p className="text-xs text-muted-foreground">{items.length} hồ sơ được tải, tối đa 200 hồ sơ gần nhất.</p>
+            </div>}
           </main>
         )}
-      </div>
+      </>}
 
       {/* Floating Bulk Action Bar (1-Click Approve Routine) */}
       {selectedRoutineIds.size > 0 && (
@@ -1326,7 +777,7 @@ export function ProductionWorkspace({
             <div className="text-xs font-semibold text-slate-400">
               Đã chọn {selectedRoutineIds.size} ca Routine
             </div>
-            <div className="text-lg font-extrabold font-numeric text-white mt-0.5">
+            <div className="text-lg font-semibold font-numeric text-white mt-0.5">
               {formatVND(totalSelectedAmount)}
             </div>
           </div>
@@ -1346,7 +797,7 @@ export function ProductionWorkspace({
               variant="brand"
               onClick={() => void handleBulkConfirm()}
               disabled={isBulkConfirming || user.role === 'ACCOUNTANT'}
-              className="font-extrabold"
+              className="font-semibold"
             >
               {isBulkConfirming ? 'Đang duyệt...' : user.role === 'ACCOUNTANT' ? 'CHỜ KTT DUYỆT' : 'DUYỆT HÀNG LOẠT'}
             </Button>
@@ -1370,7 +821,6 @@ export function ProductionWorkspace({
         entry={selectedAuditEntry}
         onClose={() => setSelectedAuditEntry(null)}
       />
-      <Toaster />
-    </div>
+    </WorkspaceShell>
   );
 }

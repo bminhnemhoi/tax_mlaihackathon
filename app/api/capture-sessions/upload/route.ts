@@ -1,13 +1,11 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { NextRequest, NextResponse } from 'next/server';
 import { appendAuditEvent } from '@/lib/server/audit';
 import { assertArtifactCapacity, ArtifactQuotaError } from '@/lib/server/artifactQuota';
 import { artifactRoot, getDatabase, jsonNow, withDemoDatabase, withRequestDatabase } from '@/lib/server/db';
-import { isAppleVisionAvailable, runAppleVisionOcr } from '@/services/localOcrService';
-import { getNonInvoiceReason } from '@/services/invoiceImagePreflight';
+import { screenInvoiceImage, imageScreeningMessage } from '@/services/invoiceImagePreflight';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -42,26 +40,18 @@ async function handlePOST(request: NextRequest) {
     const now = jsonNow();
     const activeSession = db.prepare('SELECT id,status,expires_at FROM capture_sessions WHERE token_hash=?').get(tokenHash) as { id: string; status: string; expires_at: string } | undefined;
     if (!activeSession) return NextResponse.json({ error: 'Liên kết chụp không hợp lệ.' }, { status: 404 });
+    if (!['WAITING', 'READY', 'UPLOADED'].includes(activeSession.status)) {
+      return NextResponse.json({ error: 'Phiên chụp không còn hoạt động.' }, { status: 410 });
+    }
     if (['WAITING', 'READY'].includes(activeSession.status) && Date.parse(activeSession.expires_at) <= Date.now()) {
       return NextResponse.json({ error: 'Mã QR đã hết hạn. Hãy tạo mã mới trên laptop.' }, { status: 410 });
     }
 
-    // On macOS, Apple Vision screens the photo locally in fast mode before it
-    // is stored or passed to the extraction model. No external AI API is called
-    // for an obvious non-invoice image. Other hosts safely keep the old flow.
-    if (['WAITING', 'READY'].includes(activeSession.status) && process.env.LOCAL_IMAGE_PREFLIGHT !== 'false'
-      && process.platform === 'darwin' && isAppleVisionAvailable()) {
-      const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'tax-referee-preflight-'));
-      const tempImage = path.join(tempDirectory, `capture${extension}`);
-      try {
-        fs.writeFileSync(tempImage, buffer, { mode: 0o600 });
-        const localOcr = await runAppleVisionOcr(tempImage, 'fast');
-        if (localOcr.success && getNonInvoiceReason(localOcr.fullText, localOcr.totalLines)) {
-          return NextResponse.json({ error: 'Ảnh chưa có dấu hiệu của hóa đơn. Hãy chụp rõ hóa đơn hoặc chọn ảnh khác.' }, { status: 422 });
-        }
-      } finally {
-        fs.rmSync(tempDirectory, { recursive: true, force: true });
-      }
+    const screening = await screenInvoiceImage(buffer);
+    if (screening.decision === 'REJECT') {
+      appendAuditEvent({ eventType: 'CAPTURE_IMAGE_REJECTED', entityId: activeSession.id,
+        payload: { reason: screening.reason, source: 'LOCAL_IMAGE_SCREENING' } });
+      return NextResponse.json({ error: imageScreeningMessage(screening), code: 'IMAGE_PREFLIGHT_REJECTED' }, { status: 422 });
     }
 
     const result = db.transaction(() => {

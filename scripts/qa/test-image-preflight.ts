@@ -1,48 +1,67 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { getNonInvoiceReason } from '@/services/invoiceImagePreflight';
-import { isAppleVisionAvailable, runAppleVisionOcr } from '@/services/localOcrService';
+import { NextRequest } from 'next/server';
+import { screenInvoiceImage } from '../../services/invoiceImagePreflight';
+import { runIsolated, getDatabase } from '../../lib/server/db';
+import { switchRole } from '../../lib/server/auth';
+import { POST as parseDocument } from '../../app/api/documents/parse/route';
+import { createInvoiceImageFixture } from './invoice-image-fixture';
 
 async function main() {
-assert.equal(getNonInvoiceReason('', 0), 'NO_READABLE_TEXT');
-assert.equal(getNonInvoiceReason('---', 1), 'NO_READABLE_TEXT');
-assert.equal(
-  getNonInvoiceReason('Hóa đơn giá trị gia tăng\nMã số thuế 0312345678\nTổng thanh toán 1.250.000', 8),
-  null
-);
-assert.equal(
-  getNonInvoiceReason('Cửa hàng\nĐơn giá\nThành tiền\nSố lượng\n1.250.000', 7),
-  null
-);
-assert.equal(
-  getNonInvoiceReason(('The morning light crossed the mountain and the river. People walked along the forest path. ').repeat(5), 18),
-  'NO_INVOICE_CLUES'
-);
-assert.equal(getNonInvoiceReason('Tên cửa hàng\nTổng cộng 50.000', 2), null, 'short/ambiguous OCR should fail open');
-
-if (process.platform === 'darwin' && isAppleVisionAvailable()) {
-  const realInvoice = await runAppleVisionOcr(path.resolve('input-sample/11_real_invoice_photo.jpg'), 'fast');
-  assert.equal(realInvoice.success, true);
-  assert.equal(getNonInvoiceReason(realInvoice.fullText, realInvoice.totalLines), null, 'real invoice OCR must pass');
-
-  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'tax-preflight-qa-'));
+  let checked = 0;
+  const elapsed: number[] = [];
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error('Image screening must not call a network service'); };
   try {
-    const text = ['The morning light crossed the mountain and the river.', 'People walked along the forest path.', 'Birds moved between the trees.', 'The road follows the quiet valley.', 'A small house stands beyond the hill.', 'Clouds drift across the sky.'];
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="800"><rect width="100%" height="100%" fill="white"/>${text.map((line, index) => `<text x="36" y="${90 + index * 72}" font-family="Arial" font-size="32" fill="black">${line}</text>`).join('')}</svg>`;
-    const imagePath = path.join(temporaryDirectory, 'non-invoice.jpg');
-    await sharp(Buffer.from(svg)).jpeg().toFile(imagePath);
-    const nonInvoice = await runAppleVisionOcr(imagePath, 'fast');
-    assert.equal(nonInvoice.success, true);
-    assert.equal(getNonInvoiceReason(nonInvoice.fullText, nonInvoice.totalLines), 'NO_INVOICE_CLUES');
-  } finally {
-    await fs.rm(temporaryDirectory, { recursive: true, force: true });
-  }
+    const screen = async (buffer: Buffer) => {
+      const start = performance.now();
+      const result = await screenInvoiceImage(buffer);
+      elapsed.push(performance.now() - start); checked++;
+      return result;
+    };
+    for (const color of ['white', 'black', '#888888']) {
+      const blank = await sharp({ create: { width: 800, height: 800, channels: 3, background: color } }).png().toBuffer();
+      assert.equal((await screen(blank)).reason, 'BLANK_IMAGE');
+    }
+    assert.equal((await screen(Buffer.from('not an image'))).reason, 'INVALID_IMAGE');
+    const tiny = await sharp({ create: { width: 16, height: 16, channels: 3, background: 'white' } }).png().toBuffer();
+    assert.equal((await screen(tiny)).reason, 'TOO_SMALL');
+    const pattern = Buffer.alloc(512 * 512 * 3);
+    for (let y = 0; y < 512; y++) for (let x = 0; x < 512; x++) {
+      const i = (y * 512 + x) * 3;
+      const light = Math.floor(y / 4) % 2 === 0;
+      pattern[i] = light ? 250 : 110; pattern[i + 1] = light ? 130 : 5; pattern[i + 2] = light ? 20 : 80;
+    }
+    const stripes = await sharp(pattern, { raw: { width: 512, height: 512, channels: 3 } }).png().toBuffer();
+    assert.equal((await screen(stripes)).decision, 'REJECT', 'color scene without document/text structure');
+    const realPhotos = (await fs.readdir('input-sample')).filter(file => file.endsWith('.jpg'));
+    for (const file of realPhotos) {
+      const result = await screen(await fs.readFile(path.join('input-sample', file)));
+      assert.notEqual(result.decision, 'REJECT', `${file}: ${JSON.stringify(result)}`);
+    }
+    const original = await createInvoiceImageFixture();
+    for (const buffer of [original,
+      await sharp(original).rotate(90).png().toBuffer(),
+      await sharp(original).rotate(17, { background: '#54462f' }).png().toBuffer(),
+      await sharp(original).blur(1.8).png().toBuffer(),
+      await sharp(original).negate({ alpha: false }).png().toBuffer(),
+      await sharp(original).modulate({ brightness: .45 }).png().toBuffer()]) {
+      assert.notEqual((await screen(buffer)).decision, 'REJECT', 'rotated/blurred/dark invoice must remain eligible');
+    }
+    await runIsolated(async () => {
+      const session = switchRole('ACCOUNTANT')!;
+      const blank = await sharp({ create: { width: 500, height: 500, channels: 3, background: 'white' } }).png().toBuffer();
+      const form = new FormData(); form.append('file', new File([blank], 'blank.png', { type: 'image/png' }));
+      const response = await parseDocument(new NextRequest('http://localhost/api/documents/parse', {
+        method: 'POST', headers: { cookie: `tax_referee_session=${session.token}` }, body: form
+      }));
+      assert.equal(response.status, 422);
+      assert.equal((await response.json()).code, 'IMAGE_PREFLIGHT_REJECTED');
+      assert.equal((getDatabase().prepare('SELECT count(*) n FROM document_artifacts').get() as { n: number }).n, 0);
+    });
+    console.log(`PASS ${checked} image variants + API gate; no network/OCR. Mean local screening ${(elapsed.reduce((a,b)=>a+b,0)/elapsed.length).toFixed(1)} ms. This is a fixture check, not semantic accuracy.`);
+  } finally { globalThis.fetch = previousFetch; }
 }
-
-console.log('PASS local image preflight: rejects blank and readable non-invoice text; keeps real invoices and ambiguous OCR.');
-}
-
-main().catch((error) => { console.error(error); process.exitCode = 1; });
+main().catch(error => { console.error(error); process.exitCode = 1; });

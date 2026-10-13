@@ -207,9 +207,8 @@ export function checkSameDayMultipleInvoicesRule(
   const currentDate = currentInvoice.invoiceDate;
 
   // Lọc tất cả hóa đơn cùng nhà cung cấp và cùng ngày lập
-  const sameDayInvoices = allInvoices.filter(inv => {
-    return normalizeMst(inv.supplierTaxCode) === currentMst && inv.invoiceDate === currentDate;
-  });
+  const sameDayInvoices = [...new Map(allInvoices.filter(inv => normalizeMst(inv.supplierTaxCode)===currentMst && inv.invoiceDate===currentDate && inv.totalAmount>0 && !inv.isAdjustment)
+    .map(inv=>[`${inv.supplierTaxCode}:${inv.invoiceSeries || ''}:${inv.invoiceNumber}`,inv])).values()];
 
   // Nếu chỉ có 1 hóa đơn và chính là currentInvoice thì chưa kích hoạt quy tắc gộp
   if (sameDayInvoices.length <= 1) {
@@ -226,7 +225,7 @@ export function checkSameDayMultipleInvoicesRule(
   // Nếu tổng các hóa đơn trong ngày >= 5.000.000 VNĐ
   if (dailyTotal >= threshold) {
     // Kiểm tra xem có hóa đơn nào thanh toán tiền mặt hoặc chưa có chứng từ ngân hàng không
-    const violatingInvoices = sameDayInvoices.filter(inv => inv.paymentMethod === 'CASH' || !inv.hasBankSlip);
+    const violatingInvoices = sameDayInvoices.filter(inv => inv.paymentMethod === 'CASH' && !(inv.isStaffReimbursed && inv.hasBankSlip===true));
     if (violatingInvoices.length > 0) {
       return {
         isViolation: true,

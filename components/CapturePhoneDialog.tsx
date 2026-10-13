@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
@@ -156,7 +157,7 @@ export function CapturePhoneDialog({ open, onOpenChange, onProcessingStart, onPr
     };
     void poll();
     return () => { stopped = true; window.clearTimeout(timer); };
-  }, [session, onProcessingStart, onProcessingEnd, onExtraction]);
+  }, [session, onProcessingStart, onProcessingEnd, onExtraction,onOpenChange]);
 
   const close = async (nextOpen: boolean) => {
     if (!nextOpen && sessionRef.current && status === 'WAITING' && !processingRef.current) {
@@ -185,7 +186,7 @@ export function CapturePhoneDialog({ open, onOpenChange, onProcessingStart, onPr
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { void close(nextOpen); }}>
-      <DialogContent className="w-[min(94vw,760px)] max-w-[760px] gap-0 overflow-hidden rounded-2xl p-0">
+      <DialogContent className="w-[min(calc(100vw-32px),760px)] max-w-[760px] gap-0 overflow-y-auto rounded-2xl p-0">
         <div className="grid md:grid-cols-[1fr_290px]">
           <section className="p-5 sm:p-7">
             <DialogHeader>
@@ -221,12 +222,13 @@ export function CapturePhoneDialog({ open, onOpenChange, onProcessingStart, onPr
             </div>
           </section>
 
-          <aside className="flex flex-col items-center justify-center border-t border-slate-100 bg-[#f6f8f6] p-5 md:border-l md:border-t-0">
-            {qrImage ? <img src={qrImage} alt="Mã QR để mở camera trên điện thoại" className="h-56 w-56 rounded-xl border border-slate-200 bg-white p-2" /> : (
-              <div className="grid h-56 w-56 place-items-center rounded-xl border border-slate-200 bg-white text-slate-400">
+          <aside className="flex flex-col items-center justify-center border-t border-slate-100 bg-muted/40 p-5 md:border-l md:border-t-0">
+            {qrImage ? <Image src={qrImage} alt="Mã QR để mở camera trên điện thoại" width={224} height={224} unoptimized className="h-56 w-56 rounded-xl border border-slate-200 bg-white p-2" /> : (
+              <div className="grid h-56 w-56 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500">
                 <LoaderCircle className="h-6 w-6 animate-spin" />
               </div>
             )}
+            {session&&qrImage&&<a href={session.captureUrl} target="_blank" rel="noopener noreferrer" className="mt-3 text-xs text-muted-foreground underline underline-offset-4">Mở trang chụp</a>}
             <div className="mt-4 flex items-center gap-1.5 text-xs font-medium text-slate-600">
               <Clock3 className="h-3.5 w-3.5" />
               {secondsLeft > 0 ? `Mã hết hạn sau ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}` : 'Mã đã hết hạn'}

@@ -2,6 +2,20 @@ import { InvoiceInput } from './schemas';
 import { parseNumberValue } from './utils';
 import { validateTaxCode } from '@/services/taxLookupService';
 
+type InvoiceParty = 'supplier' | 'buyer';
+
+function normalizePartyText(value: string): string {
+  return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+}
+
+function invoicePartyInLine(value: string): InvoiceParty | undefined {
+  const text = normalizePartyText(value);
+  const supplier = /\b(?:seller|supplier|vendor|ben ban|nguoi ban|don vi ban|nha cung cap|ten ben ban)\b/.test(text);
+  const buyer = /\b(?:buyer|customer|ben mua|nguoi mua|don vi mua|ten ben mua|ten khach hang)\b/.test(text);
+  if (supplier === buyer) return undefined;
+  return supplier ? 'supplier' : 'buyer';
+}
+
 /**
  * Bóc tách nhanh dữ liệu hóa đơn từ đoạn văn bản thô (Email, Tin nhắn, Ghi chú kế toán)
  * Sử dụng bộ phân tích quy tắc Heuristic tiếng Việt tất định (Deterministic Text Extractor)
@@ -20,19 +34,60 @@ export function parseInvoiceFromRawText(text: string): {
 
   const cleanText = text.replace(/\r/g, '').replace(/^([^\n:]+?)\s*\/\s*[^\n:]+:/gm, '$1:').trim();
 
-  // 1. Mã số thuế người bán (MST: 10 chữ số hoặc 13 chữ số có gạch nối)
-  const buyerMst = cleanText.match(/(?:Buyer\s*(?:tax\s*code|tax\s*id)|MST\s*(?:bên\s*mua|người\s*mua)|Mã số thuế\s*(?:bên\s*mua|người\s*mua))[\s:.-]+([0-9]{10}(?:-?[0-9]{3})?)/i);
-  if (buyerMst) { invoice.buyerTaxCode=buyerMst[1]; extractedFields.push('buyerTaxCode'); }
-  const sellerMst = cleanText.match(/(?:Seller\s*(?:tax\s*code|tax\s*id)|MST\s*(?:bên\s*bán|người\s*bán)|Mã số thuế\s*(?:bên\s*bán|người\s*bán))[\s:.-]+([0-9]{10}(?:-?[0-9]{3})?)/i);
-  // Generic MST is usable only when its line does not explicitly identify the buyer.
-  const genericLine = cleanText.split('\n').filter(line=>!/(?:Buyer|bên mua|người mua)/i.test(line)).join('\n');
-  const explicitMstMatch = sellerMst || genericLine.match(/(?:MST|Mã số thuế|Tax code|Tax ID|Mã thuế)[\s:.-]+([0-9]{10}(?:-?[0-9]{3})?)/i);
-  if (explicitMstMatch) {
-    invoice.supplierTaxCode = explicitMstMatch[1]; extractedFields.push('supplierTaxCode');
-  } else {
-    const candidates = Array.from(genericLine.matchAll(/\b([0-9]{10}(?:-[0-9]{3})?)\b/g))
-      .filter(c=>c[1]!==invoice.buyerTaxCode && validateTaxCode(c[1]).isValid && !validateTaxCode(c[1]).reason);
-    if (candidates.length === 1) { invoice.supplierTaxCode=candidates[0][1]; extractedFields.push('supplierTaxCode'); }
+  // 1. Seller/buyer MST: preserve party context across OCR text lines.
+  // A generic "Mã số thuế" under a buyer heading must never become seller MST.
+  const mstPattern = '(?:[0-9]{12}|[0-9]{10}(?:-?[0-9]{3})?)';
+  const lines = cleanText.split('\n');
+  const firstBuyerSectionIndex = lines.findIndex((line) => invoicePartyInLine(line) === 'buyer');
+  const hasBuyerSection = firstBuyerSectionIndex >= 0;
+  let currentParty: InvoiceParty | undefined;
+  const unassignedTaxCodes: Array<{ code: string; lineIndex: number }> = [];
+  const unassignedBusinessCodes: string[] = [];
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const line = lines[lineIndex];
+    const explicitParty = invoicePartyInLine(line);
+    if (explicitParty) currentParty = explicitParty;
+    const normalizedLine = normalizePartyText(line);
+    const labeledMst = normalizedLine.match(new RegExp(`\\b(?:ma so thue|mst|tax code|tax id|ma thue)(?:\\s+(?:(?:ben|nguoi|don vi)\\s+)?(?:ban|mua|seller|buyer))?\\s*[:：.\\-]?\\s*(${mstPattern})(?![0-9])`, 'i'));
+    const role = explicitParty || currentParty;
+    if (labeledMst) {
+      const code = labeledMst[1];
+      if (role === 'buyer' && !invoice.buyerTaxCode) {
+        invoice.buyerTaxCode = code;
+        extractedFields.push('buyerTaxCode');
+      } else if (role === 'supplier' && !invoice.supplierTaxCode) {
+        invoice.supplierTaxCode = code;
+        extractedFields.push('supplierTaxCode');
+      } else if (!role) {
+        unassignedTaxCodes.push({ code, lineIndex });
+      }
+    }
+    if (!role) {
+      for (const match of line.matchAll(/\b([0-9]{10}(?:-?[0-9]{3})?)\b/g)) {
+        if (validateTaxCode(match[1]).isValid && !validateTaxCode(match[1]).reason) unassignedBusinessCodes.push(match[1]);
+      }
+    }
+  }
+  // A lone generic MST is safe when no buyer section exists. If both parties
+  // are present, a generic code before the buyer block may be used only when a
+  // clear seller-name/header line precedes it; otherwise the role is unknown.
+  if (!invoice.supplierTaxCode) {
+    const beforeBuyer = unassignedTaxCodes.filter((entry) =>
+      !hasBuyerSection || entry.lineIndex < firstBuyerSectionIndex
+    );
+    const candidates = [...new Set(beforeBuyer.map((entry) => entry.code))];
+    const sellerNameAnchor = lines.slice(0, hasBuyerSection ? firstBuyerSectionIndex : lines.length)
+      .some((line) => /\b(?:seller|supplier|vendor|ben ban|nguoi ban|don vi ban|nha cung cap|cong ty|cty|tnhh|company)\b/i.test(normalizePartyText(line)));
+    if (candidates.length === 1 && (!hasBuyerSection || sellerNameAnchor)) {
+      invoice.supplierTaxCode = candidates[0];
+      extractedFields.push('supplierTaxCode');
+    } else if (!hasBuyerSection) {
+      const bareCandidates = [...new Set(unassignedBusinessCodes)];
+      if (bareCandidates.length === 1) {
+        invoice.supplierTaxCode = bareCandidates[0];
+        extractedFields.push('supplierTaxCode');
+      }
+    }
   }
 
   // 2. Số hóa đơn
@@ -51,14 +106,32 @@ export function parseInvoiceFromRawText(text: string): {
   }
 
   // 3. Tên nhà cung cấp / Bên bán
+  const firstBuyerSection = lines.findIndex((line) => invoicePartyInLine(line) === 'buyer');
+  const supplierNameSource = lines.filter((line, index) => {
+    const party = invoicePartyInLine(line);
+    return party === 'supplier' || firstBuyerSection < 0 || index < firstBuyerSection;
+  }).join('\n');
   const supplierMatch =
-    cleanText.match(/(?:Seller|Đơn vị bán|Bên bán|Người bán|Nhà cung cấp|Cung cấp|Công ty|Cty|Doanh nghiệp)[\s:.-]+([^\n,;]{4,100})/i) ||
-    cleanText.match(/(?:Công ty [^\n,;]{4,100}|Cty [^\n,;]{4,100}|TNHH [^\n,;]{4,100}|CP [^\n,;]{4,100})/i);
+    supplierNameSource.match(/(?:Seller|Đơn vị bán|Bên bán|Người bán|Nhà cung cấp|Cung cấp|Công ty|Cty|Doanh nghiệp)[ \t:.-]+([^\n,;]{4,100})/i) ||
+    supplierNameSource.match(/(?:Công ty [^\n,;]{4,100}|Cty [^\n,;]{4,100}|TNHH [^\n,;]{4,100}|CP [^\n,;]{4,100})/i);
   if (supplierMatch) {
     const rawName = (supplierMatch[1] || supplierMatch[0]).trim();
     // Bỏ các từ khóa thừa nếu có
     invoice.supplierName = rawName.replace(/^[\s:.-]+/, '').trim();
     extractedFields.push('supplierName');
+  }
+  const buyerSection = cleanText.search(/(?:Bên\s*mua|Người\s*mua|Buyer\s*(?:name|tax|address)?)/i);
+  const supplierAddressMatch = Array.from(cleanText.matchAll(/(?:Địa\s*chỉ|D\s*\/\s*C|Address)[\s:.-]+([^\n;]{8,180})/gi))
+    .find((match) => {
+      const index = match.index || 0;
+      const lineStart = cleanText.lastIndexOf('\n', index) + 1;
+      const lineEnd = cleanText.indexOf('\n', index);
+      const line = cleanText.slice(lineStart, lineEnd < 0 ? cleanText.length : lineEnd);
+      return !/(?:bên\s*mua|người\s*mua|buyer)/i.test(line) && (buyerSection < 0 || index < buyerSection);
+    });
+  if (supplierAddressMatch) {
+    invoice.supplierAddress = supplierAddressMatch[1].trim();
+    extractedFields.push('supplierAddress');
   }
 
   // 4. Ngày hóa đơn (hỗ trợ DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY)

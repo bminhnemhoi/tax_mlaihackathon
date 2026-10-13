@@ -18,7 +18,7 @@ import { parseBankStatement } from '../../lib/banking/bankStatementParser';
 import { parseTctExport } from '../../lib/reconciliation/tctParser';
 import { visionRequestOptions, expandVisionFields } from '../../services/qwenService';
 import { optimizeImageBuffer } from '../../lib/server/pdfToImage';
-import { GEMINI_API_CONFIG, OPENROUTER_API_CONFIG } from '../../lib/constants';
+import { GEMINI_API_CONFIG, SHOPAIKEY_GEMINI_API_CONFIG, OPENROUTER_API_CONFIG } from '../../lib/constants';
 
 let checks=0;
 function pass(name:string) { checks++; console.log('PASS '+name); }
@@ -26,6 +26,7 @@ function req(path:string,token='',body?:unknown,method=body===undefined?'GET':'P
  return new NextRequest('http://localhost'+path,{method,headers:{cookie:token?`tax_referee_session=${token}`:'','content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});
 }
 async function main() {
+ SHOPAIKEY_GEMINI_API_CONFIG.API_KEY='qa-mocked-only';
  assert.equal(process.env.TAX_REFEREE_DB_PATH,':memory:');
  await runIsolated(async()=>{
   const db=getDatabase();const cfoSession=switchRole('CFO')!;const importerSession=switchRole('ACCOUNTANT')!;
@@ -92,19 +93,25 @@ async function main() {
   assert.equal(namespaced.rawInvoice.buyerTaxCode,'0100109106');
   assert.equal(namespaced.rawInvoice.totalAmount,110000);
   pass('Namespace-aware XML fallback preserves seller/buyer and totals');
-  const fetchOriginal=globalThis.fetch;globalThis.fetch=async(input,init)=>{if(String(input).includes('/v1beta/')) return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({preTaxAmount:0,taxAmount:0,totalAmount:0,taxRate:0,isImageBlurry:false})}]}}]}),{status:200});const body=JSON.parse(String(init?.body));assert.equal(body.model,GEMINI_API_CONFIG.MODEL);return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({preTaxAmount:0,taxAmount:0,totalAmount:0,taxRate:0,isImageBlurry:false})}}]}),{status:200});};
-  try { const result=await upload('blurred.jpg',fs.readFileSync('docs/qa-2026-10-10/fixtures/blurred.jpg'),'image/jpeg');assert.equal(result.status,200);const parsed=await result.json();assert.equal(parsed.needsReview,true);assert.ok(parsed.uncertainFields.includes('totalAmount'));assert.ok(parsed.confidence.totalAmount<0.85);pass('OCR balanced zeros require source review with low confidence'); } finally {globalThis.fetch=fetchOriginal;}
+  const fetchOriginal=globalThis.fetch;
+  globalThis.fetch=async(input,init)=>{
+   const visionUrl=new URL(String(input));assert.equal(visionUrl.hostname,'api.shopaikey.com');assert.match(visionUrl.pathname,/^\/v1beta\/models\//);assert.equal(visionUrl.searchParams.get('key'),'qa-mocked-only');
+   const requestBody=JSON.parse(String(init?.body));
+   assert.ok(requestBody.contents?.[0]?.parts?.some((part:any)=>part.inlineData));
+   return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({documentType:'INVOICE',invoice:{preTaxAmount:0,taxAmount:0,totalAmount:0,taxRate:0,isImageBlurry:false}})}]}}]}),{status:200});
+  };
+  try { const result=await upload('blurred.jpg',fs.readFileSync('docs/qa-2026-10-10/fixtures/blurred.jpg'),'image/jpeg');assert.equal(result.status,200);const parsed=await result.json();assert.equal(parsed.needsReview,true);assert.ok(parsed.uncertainFields.includes('totalAmount'));assert.ok(parsed.confidence.totalAmount<0.85);pass('Gemini Vision balanced zeros require source review with low confidence'); } finally {globalThis.fetch=fetchOriginal;}
   const nexOptions=visionRequestOptions('nex-agi/nex-n2.5-mini') as any;assert.equal(nexOptions.response_format,undefined);assert.deepEqual(nexOptions.provider.only,['nex-agi']);assert.equal(nexOptions.reasoning.enabled,false);
   const googleOptions=visionRequestOptions('google/gemini-2.5-flash-lite') as any;assert.deepEqual(googleOptions.provider.only,['google-ai-studio']);assert.equal(googleOptions.provider.allow_fallbacks,false);pass('Vision profiles disable reasoning and respect provider capabilities');
   for(const id of ['HD198735','HD-00001','HB_001']) assert.equal(sanitizeInvoice({invoiceNumber:id}).invoice.invoiceNumber,id);assert.equal(sanitizeInvoice({invoiceNumber:'HĐ: 00180477'}).invoice.invoiceNumber,'00180477');pass('Document normalization preserves invoice identifier prefixes and zeros');
   const wire=expandVisionFields({n:'HD-00001',s:'0100000001',b:'0100109106',p:0,r:0,a:0,blur:true,unknown:'ignored',v:null});assert.equal(wire.invoiceNumber,'HD-00001');assert.equal(wire.preTaxAmount,0);assert.equal(wire.buyerTaxCode,'0100109106');assert.equal(wire.isImageBlurry,true);assert.ok(!('supplierName' in wire));assert.throws(()=>expandVisionFields([]));pass('Compact Vision preserves source values, missing fields and zero');
-  const cached=await (await upload('blurred.jpg',fs.readFileSync('docs/qa-2026-10-10/fixtures/blurred.jpg'),'image/jpeg')).json();assert.equal(cached.performance.cacheHit,true);assert.equal(cached.needsReview,true);assert.ok(cached.uncertainFields.includes('totalAmount'));pass('Scoped persisted cache preserves OCR uncertainty');
-  let providerCalls=0;globalThis.fetch=async(input)=>{providerCalls++;if(String(input).includes('/v1beta/')) return new Response(JSON.stringify({candidates:[{content:{parts:[{text:'{"blur":true}'}]}}]}));return new Response(JSON.stringify({choices:[{message:{content:'{"blur":true}'}}]}));};
+  const cached=await (await upload('blurred.jpg',fs.readFileSync('docs/qa-2026-10-10/fixtures/blurred.jpg'),'image/jpeg')).json();assert.equal(cached.performance.cacheHit,true);assert.equal(cached.needsReview,true);assert.ok(cached.uncertainFields.includes('totalAmount'));pass('Scoped persisted cache preserves Vision uncertainty');
+  let providerCalls=0;globalThis.fetch=async(input)=>{providerCalls++;return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({documentType:'INVOICE',invoice:{isImageBlurry:true}})}]}}]}));};
   try {await withDemoDatabase('00000000-0000-4000-8000-000000000124',async()=>{
     const fresh=switchRole('CFO')!;const result=await (await upload('blurred.jpg',fs.readFileSync('docs/qa-2026-10-10/fixtures/blurred.jpg'),'image/jpeg',fresh.token)).json();assert.equal(result.performance.cacheHit,false);assert.equal(providerCalls,1);
   });pass('Another session never receives extraction cache or artifact');}finally{globalThis.fetch=fetchOriginal;}
   const small=fs.readFileSync('docs/qa-2026-10-10/fixtures/clear.png');const optimized=await optimizeImageBuffer(small,'image/png');assert.equal(optimized.mimeType,'image/png');assert.deepEqual(optimized.buffer,small);pass('Image optimizer preserves small source legibility');
-  globalThis.fetch=async()=>new Response(JSON.stringify({choices:[{finish_reason:'length',message:{content:'{"n":"TRUNCATED"}'}}]}));
+  globalThis.fetch=async()=>new Response(JSON.stringify({candidates:[{finishReason:'MAX_TOKENS',content:{parts:[]}}]}));
   const previousConsole=console.error;console.error=()=>{};
   try {assert.equal((await upload('clear.jpg',fs.readFileSync('docs/qa-2026-10-10/fixtures/clear.jpg'),'image/jpeg')).status,502);pass('Truncated Vision response cannot be accepted as complete extraction');} finally {globalThis.fetch=fetchOriginal;console.error=previousConsole;}
   assert.equal(OPENROUTER_API_CONFIG.MODEL,GEMINI_API_CONFIG.MODEL);pass('Vision config uses the current provider/model fallback');
