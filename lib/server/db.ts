@@ -359,6 +359,17 @@ function applyMigrations(db: Database.Database): void {
     record.run(19, now());
   }
 
+  // 20: nhật ký kiểm toán chỉ ghi thêm (trigger chặn UPDATE/DELETE) + cột HMAC để chuỗi hash không thể bị tính lại
+  // bởi người chỉ có quyền ghi file database (khóa nằm ngoài database, trong biến môi trường).
+  if (!applied.has(20)) {
+    if (!hasColumn(db, 'audit_events', 'event_mac')) db.exec('ALTER TABLE audit_events ADD COLUMN event_mac TEXT');
+    for (const table of ['audit_events', 'immutable_audit_trail']) {
+      db.exec(`CREATE TRIGGER IF NOT EXISTS ${table}_no_update BEFORE UPDATE ON ${table} BEGIN SELECT RAISE(ABORT, 'Nhật ký kiểm toán chỉ được ghi thêm'); END;
+        CREATE TRIGGER IF NOT EXISTS ${table}_no_delete BEFORE DELETE ON ${table} BEGIN SELECT RAISE(ABORT, 'Nhật ký kiểm toán chỉ được ghi thêm'); END;`);
+    }
+    record.run(20, now());
+  }
+
 }
 
 function initializeDatabase(db: Database.Database): void {

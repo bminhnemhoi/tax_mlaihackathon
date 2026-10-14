@@ -35,6 +35,13 @@ export type AuditEventInput = {
   payload: unknown;
 };
 
+/** Khóa HMAC cho chuỗi audit (≥ 32 ký tự, đặt ngoài database). Không có khóa thì chỉ còn chuỗi hash. */
+function auditKey(): string | null {
+  const key = process.env.TAX_REFEREE_AUDIT_KEY || '';
+  return key.length >= 32 ? key : null;
+}
+const macOf = (key: string, eventHash: string) => crypto.createHmac('sha256', key).update(eventHash).digest('hex');
+
 export function appendAuditEvent(input: AuditEventInput): { id: string; eventHash: string; createdAt: string } {
   const db = getDatabase();
   return db.transaction(() => {
@@ -46,9 +53,10 @@ export function appendAuditEvent(input: AuditEventInput): { id: string; eventHas
       .update([previous?.event_hash || '', input.eventType, input.entityId, input.actorId || '', payloadJson, createdAt].join('|'))
       .digest('hex');
 
+    const key = auditKey();
     db.prepare(`
-      INSERT INTO audit_events (id, event_type, entity_id, actor_id, payload_json, previous_hash, event_hash, created_at)
-      VALUES (@id, @eventType, @entityId, @actorId, @payload, @previousHash, @eventHash, @createdAt)
+      INSERT INTO audit_events (id, event_type, entity_id, actor_id, payload_json, previous_hash, event_hash, event_mac, created_at)
+      VALUES (@id, @eventType, @entityId, @actorId, @payload, @previousHash, @eventHash, @eventMac, @createdAt)
     `).run({
       id,
       eventType: input.eventType,
@@ -57,6 +65,7 @@ export function appendAuditEvent(input: AuditEventInput): { id: string; eventHas
       payload: payloadJson,
       previousHash: previous?.event_hash || null,
       eventHash,
+      eventMac: key ? macOf(key, eventHash) : null,
       createdAt
     });
 
@@ -85,29 +94,44 @@ export function listAuditEventsForEntity(entityId: string, limit = 5000): Array<
   return rows.map((row) => presentAuditEvent({ ...row, payload: JSON.parse(String(row.payload)) }));
 }
 
-export function verifyAuditChain(): { valid: boolean; checked: number; legacy: boolean; warning?: string; error?: string } {
+export function auditHead(): { count: number; headHash: string | null; keyed: boolean } {
+  const db = getDatabase();
+  const row = db.prepare('SELECT COUNT(*) n, (SELECT event_hash FROM audit_events ORDER BY rowid DESC LIMIT 1) head FROM audit_events').get() as { n: number; head: string | null };
+  return { count: row.n, headHash: row.head, keyed: Boolean(auditKey()) };
+}
+
+export function verifyAuditChain(): { valid: boolean; checked: number; legacy: boolean; keyed: boolean; macVerified: number; warning?: string; error?: string } {
   const db = getDatabase();
   const checkpoint = db.prepare('SELECT cutoff_rowid, anchor_hash FROM audit_chain_checkpoints ORDER BY id DESC LIMIT 1').get() as { cutoff_rowid?: number; anchor_hash?: string } | undefined;
   const rows = db.prepare(`
     SELECT event_type as eventType, entity_id as entityId, actor_id as actorId,
-           payload_json as payload, previous_hash as previousHash, event_hash as eventHash, created_at as createdAt
+           payload_json as payload, previous_hash as previousHash, event_hash as eventHash, event_mac as eventMac, created_at as createdAt
     FROM audit_events WHERE rowid > ? ORDER BY rowid ASC
   `).all(checkpoint?.cutoff_rowid || 0) as Array<Record<string, unknown>>;
-  let previous = checkpoint?.anchor_hash || '';
+  const key = auditKey();
+  let previous = checkpoint?.anchor_hash || '', macVerified = 0;
   for (const row of rows) {
     const expected = crypto.createHash('sha256')
       .update([previous, row.eventType, row.entityId, row.actorId || '', row.payload, row.createdAt].join('|'))
       .digest('hex');
     if (row.previousHash !== (previous || null) || row.eventHash !== expected) {
-      return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), error: 'Chuỗi hash audit không hợp lệ' };
+      return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), keyed: Boolean(key), macVerified, error: 'Chuỗi hash audit không hợp lệ' };
+    }
+    if (key && row.eventMac) {
+      if (row.eventMac !== macOf(key, String(row.eventHash))) return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), keyed: true, macVerified, error: 'Chữ ký HMAC audit không khớp: chuỗi đã bị tính lại hoặc sửa' };
+      macVerified++;
     }
     previous = String(row.eventHash);
   }
+  const warnings = [checkpoint ? 'Các event trước checkpoint là audit legacy và chưa được xác minh lại.' : '',
+    key ? (macVerified < rows.length ? `${rows.length - macVerified} event ghi trước khi bật khóa HMAC chỉ được kiểm bằng chuỗi hash.` : '') : 'Chưa đặt TAX_REFEREE_AUDIT_KEY: chuỗi hash phát hiện sửa giữa chuỗi nhưng chưa chống tính lại toàn bộ chuỗi.'].filter(Boolean);
   return {
     valid: true,
     checked: rows.length,
     legacy: Boolean(checkpoint),
-    warning: checkpoint ? 'Các event trước checkpoint là audit legacy và chưa được xác minh lại.' : undefined
+    keyed: Boolean(key),
+    macVerified,
+    warning: warnings.length ? warnings.join(' ') : undefined
   };
 }
 
