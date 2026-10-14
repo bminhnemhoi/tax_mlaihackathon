@@ -28,17 +28,39 @@ export function submitFeedback(raw:unknown,user:AppUser) {
  return calibrateThreshold(input.precedentId,user);
  })();
 }
+type Sample={amount:number;should_escalate:number};
+/** Khoảng tin cậy Wilson 95% cho tỉ lệ k/n (mẫu nhỏ vẫn cho khoảng trung thực, thường rất rộng). */
+export function wilson95(k:number,n:number):{rate:number|null;low:number|null;high:number|null} {
+ if(!n)return {rate:null,low:null,high:null};
+ const z=1.96,p=k/n,d=1+z*z/n,c=p+z*z/(2*n),m=z*Math.sqrt(p*(1-p)/n+z*z/(4*n*n));
+ return {rate:p,low:Math.max(0,(c-m)/d),high:Math.min(1,(c+m)/d)};
+}
+/** Miss: ca lẽ ra phải chuyển tiếp nhưng ngưỡng cho tự giải tỏa. Unnecessary: ca không cần chuyển tiếp nhưng vẫn bị giữ. */
+function scoreThreshold(samples:Sample[],threshold:number) {
+ const positives=samples.filter(s=>s.should_escalate),negatives=samples.filter(s=>!s.should_escalate);
+ const missed=positives.filter(s=>s.amount<=threshold).length,unnecessary=negatives.filter(s=>s.amount>threshold).length;
+ return {missed,unnecessary,positives:positives.length,negatives:negatives.length,missRate:wilson95(missed,positives.length),unnecessaryRate:wilson95(unnecessary,negatives.length)};
+}
 export function calibrateThreshold(precedentId:string,user:AppUser) {
  const db=getDatabase();const scope=db.prepare('SELECT * FROM precedent_scopes WHERE precedent_id=?').get(precedentId) as {maximum_amount:number;current_threshold:number;version:number}|undefined;
  if(!scope)throw new WorkflowError('Không tìm thấy phạm vi tiền lệ.');
- const samples=db.prepare('SELECT amount,should_escalate FROM precedent_feedback WHERE precedent_id=?').all(precedentId) as {amount:number;should_escalate:number}[];
+ // Thứ tự thời gian: học trên phản hồi cũ, kiểm chứng trên phản hồi mới nhất (holdout) — không chấm trên chính dữ liệu đã học.
+ const samples=db.prepare('SELECT amount,should_escalate FROM precedent_feedback WHERE precedent_id=? ORDER BY created_at, rowid').all(precedentId) as Sample[];
  if(samples.length<10)return {status:'INSUFFICIENT_FEEDBACK',sampleCount:samples.length,threshold:scope.current_threshold};
- const score=(threshold:number)=>({missed:samples.filter(s=>s.should_escalate && s.amount<=threshold).length,unnecessary:samples.filter(s=>!s.should_escalate && s.amount>threshold).length});
- const baseline=score(scope.current_threshold);
- const candidates=[...new Set([0,...samples.map(s=>s.amount)])].filter(n=>n<=scope.maximum_amount).map(threshold=>({threshold,...score(threshold)})).filter(c=>c.missed===0).sort((a,b)=>a.unnecessary-b.unnecessary || a.threshold-b.threshold);
+ const holdoutSize=Math.max(3,Math.round(samples.length*0.3));
+ const train=samples.slice(0,samples.length-holdoutSize),holdout=samples.slice(samples.length-holdoutSize);
+ const candidates=[...new Set([0,...train.map(s=>s.amount)])].filter(n=>n<=scope.maximum_amount).map(threshold=>({threshold,...scoreThreshold(train,threshold)})).filter(c=>c.missed===0).sort((a,b)=>a.unnecessary-b.unnecessary || a.threshold-b.threshold);
  const best=candidates[0];
+ const baselineAll=scoreThreshold(samples,scope.current_threshold);
  // The fixed envelope prevents statutory/data/authority findings being cleared; only this scoped internal finding changes.
- if(!best || (baseline.missed===0 && best.unnecessary>=baseline.unnecessary))return {status:'UNCHANGED',sampleCount:samples.length,threshold:scope.current_threshold};
+ if(!best || best.threshold===scope.current_threshold)return {status:'UNCHANGED',sampleCount:samples.length,threshold:scope.current_threshold,baseline:baselineAll};
+ const holdoutBaseline=scoreThreshold(holdout,scope.current_threshold),holdoutCandidate=scoreThreshold(holdout,best.threshold);
+ const evaluation={trainSize:train.length,holdoutSize:holdout.length,holdout:{baseline:holdoutBaseline,candidate:holdoutCandidate},all:{baseline:baselineAll,candidate:scoreThreshold(samples,best.threshold)}};
+ // Chỉ chấp nhận khi trên holdout không bỏ sót thêm và chuyển tiếp thừa giảm (hoặc không tăng) — đồng thời toàn tập phải giảm chuyển tiếp thừa.
+ if(holdoutCandidate.missed>holdoutBaseline.missed || holdoutCandidate.unnecessary>holdoutBaseline.unnecessary || evaluation.all.candidate.unnecessary>=baselineAll.unnecessary || evaluation.all.candidate.missed>baselineAll.missed){
+  appendAuditEvent({eventType:'THRESHOLD_CANDIDATE_REJECTED',entityId:precedentId,actorId:user.id,payload:{candidate:best.threshold,currentThreshold:scope.current_threshold,evaluation,reason:'Ngưỡng đề xuất không cải thiện trên tập kiểm chứng (holdout) theo thời gian.'}});
+  return {status:'REJECTED_BY_HOLDOUT',sampleCount:samples.length,threshold:scope.current_threshold,candidate:best.threshold,evaluation};
+ }
  const config=getActivePolicy().config;
  const precedent=db.prepare('SELECT p.supplier_tax_code,p.effective_from,s.purpose FROM corporate_precedents p JOIN precedent_scopes s ON p.id=s.precedent_id WHERE p.id=?').get(precedentId) as {supplier_tax_code:string;effective_from:string;purpose:string};
  const amount=Math.max(1,best.threshold);
@@ -57,8 +79,8 @@ export function calibrateThreshold(precedentId:string,user:AppUser) {
  const version=scope.version+1;
  db.prepare('INSERT INTO threshold_versions VALUES (?,?,?,?,?,?,1,?)').run(crypto.randomUUID(),precedentId,version,scope.current_threshold,best.threshold,samples.length,jsonNow());
  db.prepare('UPDATE precedent_scopes SET current_threshold=?,version=? WHERE precedent_id=?').run(best.threshold,version,precedentId);
- appendAuditEvent({eventType:'THRESHOLD_ADAPTED',entityId:precedentId,actorId:user.id,payload:{version,previousThreshold:scope.current_threshold,threshold:best.threshold,sampleCount:samples.length,missed:0,unnecessary:best.unnecessary,validation:'Feedback within CFO envelope; not an independent accuracy estimate'}});
- return {status:'ADAPTED',version,previousThreshold:scope.current_threshold,threshold:best.threshold,sampleCount:samples.length,safetyCases:adversarial.length};
+ appendAuditEvent({eventType:'THRESHOLD_ADAPTED',entityId:precedentId,actorId:user.id,payload:{version,previousThreshold:scope.current_threshold,threshold:best.threshold,sampleCount:samples.length,evaluation,validation:'Học trên phản hồi cũ, kiểm chứng trên holdout mới nhất; trong biên CFO đặt; không phải đánh giá độc lập quy mô lớn.'}});
+ return {status:'ADAPTED',version,previousThreshold:scope.current_threshold,threshold:best.threshold,sampleCount:samples.length,safetyCases:adversarial.length,evaluation};
 }
 export function rollbackThreshold(precedentId:string,user:AppUser,reason='CFO phục hồi ngưỡng trước') {
  if(user.role!=='CFO')throw new WorkflowError('Rollback ngưỡng cần CFO.',403);
