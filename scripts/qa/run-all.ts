@@ -5,6 +5,7 @@
  * - Chạy các bộ hồi quy trong scripts/qa, mỗi bộ trong một tiến trình riêng với thư mục dữ liệu tạm riêng
  *   (TAX_REFEREE_DATA_DIR), nên không bao giờ ghi vào database thật và chạy được trên Windows/macOS/Linux.
  * - In bảng PASS/FAIL kèm dấu thời gian; thoát mã 1 nếu có bộ thất bại.
+ * - Mỗi bộ có số kiểm tra tối thiểu (minChecks): bộ thoát sớm với mã 0 nhưng in ít dòng PASS hơn vẫn bị tính là FAIL.
  *
  * Dùng: `npm test` (tất cả) hoặc `npm test -- referee-core workflow` (lọc theo tên).
  */
@@ -14,27 +15,27 @@ import os from 'node:os';
 import path from 'node:path';
 import {ensureQaFixtures} from './qa-fixtures';
 
-type Suite = {name: string; files: string[]; env?: Record<string, string>; memoryDb?: boolean};
+type Suite = {name: string; files: string[]; minChecks: number; env?: Record<string, string>; memoryDb?: boolean};
 
 const MOCK_AI = {OPENROUTER_API_KEY: 'qa-mocked-only', QWEN_API_KEY: 'qa-mocked-only'};
 
 export const suites: Suite[] = [
-  {name: 'unit', files: []},
-  {name: 'manifest', files: ['scripts/qa/test-regression-manifest.ts']},
-  {name: 'referee-core', files: ['scripts/qa/test-referee-core.ts']},
-  {name: 'redteam', files: ['scripts/qa/test-redteam.ts']},
-  {name: 'referee-labels', files: ['scripts/qa/test-referee-labeling.ts']},
-  {name: 'workflow', files: ['scripts/qa/test-workflow-safety.ts']},
-  {name: 'phase0', files: ['scripts/qa/test-phase0-safety.ts']},
-  {name: 'challenge-a', files: ['scripts/qa/test-challenge-a-improvements.ts'], env: MOCK_AI},
-  {name: 'supplier-inference', files: ['scripts/qa/test-supplier-inference-safety.ts'], memoryDb: true},
-  {name: 'official-supplier', files: ['scripts/qa/test-official-supplier-lookup.ts', 'scripts/qa/test-supplier-identity-resolver.ts']},
-  {name: 'ai-fallback', files: ['scripts/qa/test-ai-fallback.ts']},
-  {name: 'review-regressions', files: ['scripts/qa/test-review-regressions.ts'], memoryDb: true},
-  {name: 'receipt-entities', files: ['scripts/qa/test-receipt-entities.ts']},
-  {name: 'image-preflight', files: ['scripts/qa/test-image-preflight.ts']},
-  {name: 'qa-regressions', files: ['scripts/qa/test-qa-regressions.ts'], memoryDb: true, env: {...MOCK_AI, DOCUMENT_IMAGE_ENGINE: 'vision'}},
-  {name: 'workspace-ui', files: ['scripts/qa/test-workspace-ui.ts']}
+  {name: 'unit', files: [], minChecks: 32},
+  {name: 'manifest', files: ['scripts/qa/test-regression-manifest.ts'], minChecks: 4},
+  {name: 'referee-core', files: ['scripts/qa/test-referee-core.ts'], minChecks: 14},
+  {name: 'redteam', files: ['scripts/qa/test-redteam.ts'], minChecks: 1},
+  {name: 'referee-labels', files: ['scripts/qa/test-referee-labeling.ts'], minChecks: 1},
+  {name: 'workflow', files: ['scripts/qa/test-workflow-safety.ts'], minChecks: 20},
+  {name: 'phase0', files: ['scripts/qa/test-phase0-safety.ts'], minChecks: 30},
+  {name: 'challenge-a', files: ['scripts/qa/test-challenge-a-improvements.ts'], minChecks: 20, env: MOCK_AI},
+  {name: 'supplier-inference', files: ['scripts/qa/test-supplier-inference-safety.ts'], minChecks: 1, memoryDb: true},
+  {name: 'official-supplier', files: ['scripts/qa/test-official-supplier-lookup.ts', 'scripts/qa/test-supplier-identity-resolver.ts'], minChecks: 30},
+  {name: 'ai-fallback', files: ['scripts/qa/test-ai-fallback.ts'], minChecks: 2},
+  {name: 'review-regressions', files: ['scripts/qa/test-review-regressions.ts'], minChecks: 7, memoryDb: true},
+  {name: 'receipt-entities', files: ['scripts/qa/test-receipt-entities.ts'], minChecks: 1},
+  {name: 'image-preflight', files: ['scripts/qa/test-image-preflight.ts'], minChecks: 1},
+  {name: 'qa-regressions', files: ['scripts/qa/test-qa-regressions.ts'], minChecks: 39, memoryDb: true, env: {...MOCK_AI, DOCUMENT_IMAGE_ENGINE: 'vision'}},
+  {name: 'workspace-ui', files: ['scripts/qa/test-workspace-ui.ts'], minChecks: 3}
 ];
 
 const root = path.resolve(__dirname, '..', '..');
@@ -58,6 +59,7 @@ function run(suite: Suite) {
   const startedAt = new Date();
   let ok = true;
   let detail = '';
+  let passLines = 0;
   const commands: string[][] = suite.name === 'unit'
     ? (unitTestFiles().length ? [['--import', 'tsx', '--test', ...unitTestFiles()]] : [])
     : suite.files.map(file => [tsxCli, file]);
@@ -69,8 +71,12 @@ function run(suite: Suite) {
       detail = output.split(/\r?\n/).filter(Boolean).slice(-25).join('\n');
       break;
     }
-    const passLines = output.split(/\r?\n/).filter(line => /^\s*(PASS\b|✓|✔|ok \d)/.test(line)).length;
+    passLines += output.split(/\r?\n/).filter(line => /^\s*(PASS\b|✓|✔|ok \d)/.test(line)).length;
     detail = `${passLines} kiểm tra`;
+  }
+  if (ok && passLines < suite.minChecks) {
+    ok = false;
+    detail = `Chỉ ${passLines}/${suite.minChecks} kiểm tra được in ra: bộ có thể đã thoát sớm mà không chạy hết.`;
   }
   fs.rmSync(dataDir, {recursive: true, force: true});
   return {suite: suite.name, ok, startedAt, ms: Date.now() - startedAt.getTime(), detail};
