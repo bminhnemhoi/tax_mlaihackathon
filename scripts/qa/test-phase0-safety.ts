@@ -354,7 +354,7 @@ async function runTests() {
     'Rủi ro rượu bia xếp vào UNCERTAIN_INFO (chưa đủ thông tin mục đích chi), không gán tuyệt đối OUT_OF_POLICY'
   );
   assert(
-    alcoholDecision.actionableQuestion.includes('Khoản chi này phục vụ tiếp khách đối tác nào hay phúc lợi nhân viên? Có quy chế không?'),
+    Boolean(alcoholDecision.findings?.some(f => f.ruleId === 'INTERNAL_POLICY_GUEST_ENTERTAINMENT' && f.actionableQuestion.includes('Khoản chi này phục vụ tiếp khách đối tác nào hay phúc lợi nhân viên? Có quy chế không?'))),
     'Câu hỏi hành động hướng dẫn kế toán kiểm tra quy chế và mục đích chi hợp lý theo luật thuế'
   );
   const alcoholFinding = alcoholDecision.findings?.find(f => f.ruleId === 'INTERNAL_POLICY_GUEST_ENTERTAINMENT');
