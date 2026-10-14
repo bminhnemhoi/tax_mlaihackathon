@@ -17,10 +17,22 @@ const VAT8_EXCLUDED_PATTERN=/CƯỚC INTERNET|INTERNET|CƯỚC DI ĐỘNG|DI Đ�
 /** Chi phí nhạy cảm: so khớp nguyên từ để "BAVIA" hay "BÌA" không bị nhầm với "BIA". */
 const SENSITIVE_ITEM_PATTERN=/(?<![\p{L}\p{N}])(RƯỢU|BIA|WHISKY|WHISKEY|WINE|VODKA|CHAMPAGNE|THUỐC LÁ|CIGAR|KARAOKE|MASSAGE)(?![\p{L}\p{N}])/u;
 /** Khoản chi SOP không bao phủ → không tự duyệt (ngoài phạm vi quy định), dù số liệu hợp lệ. */
-export const SCOPE_NOT_COVERED_DEFAULT=['TÀI TRỢ','TỪ THIỆN','ỦNG HỘ','QUYÊN GÓP','TIỀN PHẠT','NỘP PHẠT','PHẠT VI PHẠM','PHẠT CHẬM NỘP','QUÀ BIẾU','CHI PHÍ CÁ NHÂN','MUA VÀNG','VÀNG MIẾNG','NGOẠI TỆ','CỔ PHIẾU','TRÁI PHIẾU'];
+// So khớp nguyên từ: "PHẠT" bắt mọi khoản phạt (tiền phạt, phí phạt chậm thanh toán…) mà không nhầm với "PHÁT".
+export const SCOPE_NOT_COVERED_DEFAULT=['TÀI TRỢ','TỪ THIỆN','ỦNG HỘ','QUYÊN GÓP','PHẠT','BỒI THƯỜNG','QUÀ BIẾU','CHI PHÍ CÁ NHÂN','MUA VÀNG','VÀNG MIẾNG','NGOẠI TỆ','CỔ PHIẾU','TRÁI PHIẾU'];
 const AMOUNT_TOLERANCE=10;
 const isWordChar=(c:string|undefined)=>c!==undefined && /[\p{L}\p{N}]/u.test(c);
 /** Tìm nguyên cụm từ (không khớp giữa từ khác). */
+/**
+ * Dữ kiện tiền chưa chắc: ảnh mờ, hoặc tổng in trên hóa đơn và (tiền hàng + thuế) là hai giá trị khác nhau nằm hai phía
+ * một ngưỡng quyết định (hạn mức KTT, ngưỡng tiền mặt). Khi đó không được kết luận "vượt quyền"/"vi phạm" — hỏi số đúng trước.
+ */
+export function unverifiedAmountFacts(inv:Pick<InvoiceInput,'isImageBlurry'|'totalAmount'|'preTaxAmount'|'taxAmount'>,thresholds:number[]):string[] {
+  if(inv.isImageBlurry)return ['preTaxAmount','taxAmount','totalAmount'];
+  const printed=Math.abs(inv.totalAmount),computed=Math.abs(inv.preTaxAmount+inv.taxAmount);
+  if(Math.abs(printed-computed)<=AMOUNT_TOLERANCE)return [];
+  const low=Math.min(printed,computed),high=Math.max(printed,computed);
+  return thresholds.some(t=>low<t && high>=t)?['totalAmount']:[];
+}
 function containsWord(text:string,word:string):boolean {
   for(let i=text.indexOf(word);i>=0;i=text.indexOf(word,i+1))if(!isWordChar(text[i-1]) && !isWordChar(text[i+word.length]))return true;
   return false;
@@ -1017,7 +1029,7 @@ function evaluateInvoiceLocallyInternal(
       if (concrete.options) finding.options = concrete.options;
     }
   }
-  const ordered = orderFindings(activeFindings);
+  const ordered = orderFindings(activeFindings, unverifiedAmountFacts(inv, [kttApprovalLimit, nonCashThreshold]));
   const primaryFinding = ordered[0];
   const requiresCFO = isExceedKtt || ordered.some(f => f.requiresCFO || f.kind === 'AUTHORITY');
 
