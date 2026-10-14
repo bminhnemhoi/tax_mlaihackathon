@@ -6,6 +6,7 @@ import { BrandMark } from '@/components/BrandMark';
 import { Dialog,DialogContent,DialogTitle,DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { workspaceRoutes, type WorkspaceView } from '@/lib/workspaceNavigation';
+import { AutomationSwitch } from './AutomationSwitch';
 import type { AppUser, AppRole } from '@/lib/server/auth';
 
 interface WorkspaceShellProps {
@@ -54,8 +55,10 @@ export function WorkspaceShell({children,view,user,demo,counts,onRoleChange,onLo
         <Button size="icon" variant="ghost" className="md:hidden" aria-label="Mở điều hướng" aria-expanded={mobileOpen} onClick={()=>setMobileOpen(true)}><Menu className="h-5 w-5"/></Button>
         <p className="min-w-0 truncate text-sm text-muted-foreground"><Link href="/workspace/inbox" className="hover:text-foreground">Workspace</Link><span className="mx-2" aria-hidden="true">/</span><span className="text-foreground">{detail?'Hồ sơ':workspaceRoutes[view].label}</span></p>
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <AutomationSwitch canControl={user.role!=='ACCOUNTANT'} />
           <span className="workspace-scope" title={demo?'Dữ liệu demo tách riêng':'Dữ liệu nội bộ'}>{demo?'Demo':'Nội bộ'}</span>
-          <label className="sr-only" htmlFor="workspace-role">Vai trò trải nghiệm MVP</label><select id="workspace-role" className="workspace-role" value={user.role} disabled={changing} onChange={async event=>{const role=event.target.value;if(role!=='ACCOUNTANT'&&role!=='CHIEF_ACCOUNTANT'&&role!=='CFO')return;setChanging(true);try{await onRoleChange(role);}finally{setChanging(false);}}}>{Object.entries(roleNames).map(([role,name])=><option key={role} value={role}>{name}</option>)}</select>
+          {/* Vai trò mô phỏng chỉ đổi được trong demo riêng; workspace nội bộ hiện vai trò của tài khoản đăng nhập. */}
+          {demo?<><label className="sr-only" htmlFor="workspace-role">Vai trò mô phỏng trong demo</label><select id="workspace-role" className="workspace-role" value={user.role} disabled={changing} onChange={async event=>{const role=event.target.value;if(role!=='ACCOUNTANT'&&role!=='CHIEF_ACCOUNTANT'&&role!=='CFO')return;setChanging(true);try{await onRoleChange(role);}finally{setChanging(false);}}}>{Object.entries(roleNames).map(([role,name])=><option key={role} value={role}>{name}</option>)}</select></>:<span className="workspace-role">{roleNames[user.role]}</span>}
           <details className="workspace-account" onKeyDown={event=>{if(event.key==='Escape'){event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}><summary aria-label="Tùy chọn tài khoản"><MoreHorizontal className="h-4 w-4"/></summary><div className="workspace-account-menu"><p className="px-3 py-2 text-xs text-muted-foreground">{user.displayName}</p>{demo&&<button type="button" disabled={resetting} onClick={()=>void onReset()} className="text-rose-700">{resetting?'Đang xóa…':'Xóa dữ liệu demo'}</button>}<button type="button" onClick={()=>{if(!dirty||window.confirm('Bản nháp tiếp nhận chưa lưu. Đăng xuất?'))onLogout();}}><LogOut className="h-4 w-4"/>Đăng xuất</button></div></details>
         </div>
       </header>

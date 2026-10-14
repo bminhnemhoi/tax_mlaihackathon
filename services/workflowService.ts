@@ -13,6 +13,7 @@ import {buildHandoff,checkHandoff,describeRuleEvidence} from './handoffService';
 import { fieldLabels } from '@/lib/workflowPresentation';
 import { recordConfirmedSupplierAlias } from './taxLookupService';
 import { runningCommit } from '@/lib/server/buildInfo';
+import { isAutomationPaused } from './automationControl';
 import { POLICY_CONTRACT_VERSION } from '@/data/policyContract';
 import { z } from 'zod';
 
@@ -255,14 +256,17 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
       if(current.revision!==revision || current.status!=='EVALUATING' || current.evaluation_attempt_id!==attemptId) throw new WorkflowError('Hồ sơ đã dừng hoặc thay đổi; kết quả AI không được ghi nhận.');
       const before=snapshot(current);
       if(current.tax_hold) throw new WorkflowError('Cần giải phóng giữ thuế trước khi ghi kết quả.');
-      const status=decision.status==='ROUTINE' ? 'APPROVED' : decision.requiresCFO ? 'WAITING_CFO' : 'WAITING_CHIEF_ACCOUNTANT';
+      // Công tắc dừng toàn hệ thống: ca thường quy không được tự duyệt, chờ Kế toán trưởng duyệt tay.
+      const held=decision.status==='ROUTINE' && isAutomationPaused();
+      const autoApprove=decision.status==='ROUTINE' && !held;
+      const status=autoApprove ? 'APPROVED' : decision.status==='ESCALATED' && decision.requiresCFO ? 'WAITING_CFO' : 'WAITING_CHIEF_ACCOUNTANT';
       db.prepare('INSERT INTO evaluations (id,invoice_id,decision_json,policy_version,legal_version,created_at) VALUES (?,?,?,?,?,?)').run(evaluationId,id,JSON.stringify(decision),policy.version,decision.applicableRegulations?.join(',') || null,jsonNow());
-      db.prepare('UPDATE invoices SET status=?,approved_deductible_tax=?,updated_at=?,evaluation_deadline=NULL WHERE id=?').run(status,decision.status==='ROUTINE' ? decision.approvedTaxAmount : 0,jsonNow(),id);
+      db.prepare('UPDATE invoices SET status=?,approved_deductible_tax=?,updated_at=?,evaluation_deadline=NULL WHERE id=?').run(status,autoApprove && decision.status==='ROUTINE' ? decision.approvedTaxAmount : 0,jsonNow(),id);
       const row=readRecord(id);syncVoucher(row);recomputeMacro();
-      recordAction(row,null,decision.status==='ROUTINE'?'ROUTINE_AUTO_APPROVED':'INVOICE_EVALUATED',decision.plainExplanation,before);
+      recordAction(row,null,autoApprove?'ROUTINE_AUTO_APPROVED':held?'ROUTINE_HELD_AUTOMATION_PAUSED':'INVOICE_EVALUATED',held?`Tự động hóa đang dừng toàn hệ thống: ca thường quy chờ Kế toán trưởng duyệt tay. ${decision.plainExplanation}`:decision.plainExplanation,before);
     })();
     const row=readRecord(id);
-    return {...result,decision,workflow:{status:row.status,revision,evaluationId,autoApproved:decision.status==='ROUTINE',externalSync:'MANUAL',internalVoucherId:(db.prepare('SELECT id FROM internal_vouchers WHERE invoice_id=?').get(id) as {id:string}|undefined)?.id || null},policy};
+    return {...result,decision,workflow:{status:row.status,revision,evaluationId,autoApproved:row.status==='APPROVED',externalSync:'MANUAL',internalVoucherId:(db.prepare('SELECT id FROM internal_vouchers WHERE invoice_id=?').get(id) as {id:string}|undefined)?.id || null},policy};
   } catch(error) {
     db.transaction(()=>{const row=readRecord(id);if(row.status==='EVALUATING' && row.revision===revision){const before=snapshot(row);db.prepare("UPDATE invoices SET status='ON_HOLD', updated_at=? WHERE id=?").run(jsonNow(),id);recordAction(row,null,'EVALUATION_FAILED','Không có kết quả chắc chắn; giữ hồ sơ để thử lại.',before);}})();
     throw error;
