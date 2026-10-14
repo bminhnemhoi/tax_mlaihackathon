@@ -22,7 +22,15 @@ npm run dev                          # http://localhost:3000
 
 Bản production: `npm run build && npm start` (cần ~2 GB RAM trống khi build). Kiểm thử khởi động lại sau build: `npm run test:recovery`.
 
-Workspace nội bộ (dùng chung) đăng nhập bằng email/mật khẩu: đặt `TAX_REFEREE_ACCOUNTANT_PASSWORD`, `TAX_REFEREE_KTT_PASSWORD`, `TAX_REFEREE_CFO_PASSWORD` trong env. Giám khảo/khách dùng **demo riêng** (không cần tài khoản).
+Workspace nội bộ (dùng chung) đăng nhập bằng email/mật khẩu: đặt `TAX_REFEREE_ACCOUNTANT_PASSWORD`, `TAX_REFEREE_KTT_PASSWORD`, `TAX_REFEREE_CFO_PASSWORD` trong env rồi khởi động lại (đặt sau lần chạy đầu vẫn có hiệu lực). Giám khảo/khách dùng **demo riêng** (không cần tài khoản).
+
+| Vai trò | Email đăng nhập | Biến mật khẩu |
+|---|---|---|
+| Kế toán viên | `ke-toan@local` | `TAX_REFEREE_ACCOUNTANT_PASSWORD` |
+| Kế toán trưởng | `ktt@local` | `TAX_REFEREE_KTT_PASSWORD` |
+| Giám đốc tài chính | `cfo@local` | `TAX_REFEREE_CFO_PASSWORD` |
+
+Chưa đặt biến trên production thì mật khẩu là chuỗi ngẫu nhiên không đoán được (tài khoản coi như khóa).
 
 ## 3. Kiểm chứng (một lệnh)
 
