@@ -40,6 +40,28 @@ test('có khóa HMAC: tính lại toàn bộ chuỗi hash mà không có khóa v
       assert.equal(tampered.valid, false);
       assert.match(tampered.error || '', /HMAC/);
     });
+    await runIsolated(async () => {
+      for (let i = 0; i < 3; i++) appendAuditEvent({ eventType: 'TEST_EVENT', entityId: `STRIP-${i}`, payload: { i } });
+      const db = getDatabase();
+      db.exec('DROP TRIGGER audit_events_no_update');
+      // Xóa chữ ký của một sự kiện giữa chuỗi (kiểu tấn công "hạ cấp" để né kiểm HMAC).
+      db.prepare("UPDATE audit_events SET event_mac=NULL WHERE entity_id='STRIP-1'").run();
+      const stripped = verifyAuditChain();
+      assert.equal(stripped.valid, false);
+      assert.match(stripped.error || '', /thiếu chữ ký/);
+    });
+    await runIsolated(async () => {
+      for (let i = 0; i < 3; i++) appendAuditEvent({ eventType: 'TEST_EVENT', entityId: `CP-${i}`, payload: { i } });
+      const db = getDatabase();
+      assert.throws(() => db.prepare("INSERT INTO audit_chain_checkpoints (cutoff_rowid, anchor_hash, reason, created_at) VALUES (999, 'x', 'giả', '2026-01-01')").run(), /chỉ được tạo/);
+      db.exec('DROP TRIGGER audit_chain_checkpoints_no_insert');
+      const max = (db.prepare('SELECT MAX(rowid) m FROM audit_events').get() as { m: number }).m;
+      const head = (db.prepare('SELECT event_hash h FROM audit_events WHERE rowid=?').get(max) as { h: string }).h;
+      db.prepare("INSERT INTO audit_chain_checkpoints (cutoff_rowid, anchor_hash, reason, created_at) VALUES (?, ?, 'giả', '2026-01-01')").run(max, head);
+      const forged = verifyAuditChain();
+      assert.equal(forged.valid, false);
+      assert.match(forged.error || '', /mốc giả/);
+    });
   } finally {
     if (saved === undefined) delete process.env.TAX_REFEREE_AUDIT_KEY; else process.env.TAX_REFEREE_AUDIT_KEY = saved;
   }

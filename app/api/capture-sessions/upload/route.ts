@@ -4,7 +4,7 @@ import path from 'node:path';
 import { NextRequest, NextResponse } from 'next/server';
 import { appendAuditEvent } from '@/lib/server/audit';
 import { assertArtifactCapacity, ArtifactQuotaError } from '@/lib/server/artifactQuota';
-import { artifactRoot, getDatabase, jsonNow, withDemoDatabase, withRequestDatabase } from '@/lib/server/db';
+import { artifactRoot, getDatabase, jsonNow, withDemoDatabase, withRequestDatabase, captureRouteDemoId } from '@/lib/server/db';
 import { screenInvoiceImage, imageScreeningMessage } from '@/services/invoiceImagePreflight';
 
 export const dynamic = 'force-dynamic';
@@ -99,8 +99,9 @@ async function handlePOST(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const demoId = request.nextUrl.searchParams.get('demo');
-  if (demoId && !/^[a-f0-9-]{36}$/i.test(demoId)) return NextResponse.json({ error: 'Phiên demo không hợp lệ.' }, { status: 400 });
+  const sessionId = request.nextUrl.searchParams.get('session');
+  if (sessionId && !/^[A-Za-z0-9-]{8,80}$/.test(sessionId)) return NextResponse.json({ error: 'Phiên chụp không hợp lệ.' }, { status: 400 });
+  const demoId = sessionId ? captureRouteDemoId(sessionId) : null;
   if (demoId) return withDemoDatabase(demoId, () => handlePOST(request));
   return withRequestDatabase(request, () => handlePOST(request));
 }

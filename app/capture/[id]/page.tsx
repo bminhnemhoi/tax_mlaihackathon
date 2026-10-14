@@ -9,8 +9,8 @@ export default async function CapturePage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ token?: string; demo?: string }>;
+  searchParams: Promise<{ token?: string }>;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  return <CapturePhonePage sessionId={id} token={query.token || ''} demoId={query.demo || ''} />;
+  return <CapturePhonePage sessionId={id} token={query.token || ''} />;
 }

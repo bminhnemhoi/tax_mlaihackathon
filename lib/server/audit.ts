@@ -40,12 +40,13 @@ function auditKey(): string | null {
   const key = process.env.TAX_REFEREE_AUDIT_KEY || '';
   return key.length >= 32 ? key : null;
 }
-const macOf = (key: string, eventHash: string) => crypto.createHmac('sha256', key).update(eventHash).digest('hex');
+/** HMAC nối chuỗi: ký cả chữ ký trước đó, nên xóa/chèn/bỏ chữ ký giữa chuỗi đều bị phát hiện. */
+const macOf = (key: string, previousMac: string, eventHash: string) => crypto.createHmac('sha256', key).update(`${previousMac}|${eventHash}`).digest('hex');
 
 export function appendAuditEvent(input: AuditEventInput): { id: string; eventHash: string; createdAt: string } {
   const db = getDatabase();
   return db.transaction(() => {
-    const previous = db.prepare('SELECT event_hash FROM audit_events ORDER BY rowid DESC LIMIT 1').get() as { event_hash?: string } | undefined;
+    const previous = db.prepare('SELECT event_hash, event_mac FROM audit_events ORDER BY rowid DESC LIMIT 1').get() as { event_hash?: string; event_mac?: string | null } | undefined;
     const createdAt = jsonNow();
     const id = crypto.randomUUID();
     const payloadJson = JSON.stringify(input.payload);
@@ -65,7 +66,7 @@ export function appendAuditEvent(input: AuditEventInput): { id: string; eventHas
       payload: payloadJson,
       previousHash: previous?.event_hash || null,
       eventHash,
-      eventMac: key ? macOf(key, eventHash) : null,
+      eventMac: key ? macOf(key, previous?.event_mac || '', eventHash) : null,
       createdAt
     });
 
@@ -110,6 +111,11 @@ export function verifyAuditChain(): { valid: boolean; checked: number; legacy: b
   `).all(checkpoint?.cutoff_rowid || 0) as Array<Record<string, unknown>>;
   const key = auditKey();
   let previous = checkpoint?.anchor_hash || '', macVerified = 0;
+  // Mốc chỉ hợp lệ khi được tạo trước lúc bắt đầu ký: mốc bao trùm sự kiện đã ký là mốc giả để bỏ qua phần chuỗi.
+  if (checkpoint?.cutoff_rowid && (db.prepare('SELECT COUNT(*) n FROM audit_events WHERE rowid <= ? AND event_mac IS NOT NULL').get(checkpoint.cutoff_rowid) as { n: number }).n > 0)
+    return { valid: false, checked: 0, legacy: true, keyed: Boolean(key), macVerified: 0, error: 'Điểm mốc audit bao trùm sự kiện đã ký: mốc giả.' };
+  let previousMac = checkpoint?.cutoff_rowid ? ((db.prepare('SELECT event_mac FROM audit_events WHERE rowid <= ? ORDER BY rowid DESC LIMIT 1').get(checkpoint.cutoff_rowid) as { event_mac?: string | null } | undefined)?.event_mac || '') : '';
+  let signingStarted = false;
   for (const row of rows) {
     const expected = crypto.createHash('sha256')
       .update([previous, row.eventType, row.entityId, row.actorId || '', row.payload, row.createdAt].join('|'))
@@ -117,10 +123,13 @@ export function verifyAuditChain(): { valid: boolean; checked: number; legacy: b
     if (row.previousHash !== (previous || null) || row.eventHash !== expected) {
       return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), keyed: Boolean(key), macVerified, error: 'Chuỗi hash audit không hợp lệ' };
     }
+    if (row.eventMac) signingStarted = true;
+    else if (signingStarted) return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), keyed: Boolean(key), macVerified, error: 'Sự kiện thiếu chữ ký HMAC sau khi đã bật khóa: chữ ký bị xóa' };
     if (key && row.eventMac) {
-      if (row.eventMac !== macOf(key, String(row.eventHash))) return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), keyed: true, macVerified, error: 'Chữ ký HMAC audit không khớp: chuỗi đã bị tính lại hoặc sửa' };
+      if (row.eventMac !== macOf(key, previousMac, String(row.eventHash))) return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), keyed: true, macVerified, error: 'Chữ ký HMAC audit không khớp: chuỗi đã bị tính lại hoặc sửa' };
       macVerified++;
     }
+    previousMac = String(row.eventMac || '');
     previous = String(row.eventHash);
   }
   const warnings = [checkpoint ? 'Các event trước checkpoint là audit legacy và chưa được xác minh lại.' : '',

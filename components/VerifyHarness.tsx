@@ -37,7 +37,10 @@ export function VerifyHarness(_props:{onSelectEscalatedCase?:(id:string)=>void;s
  const changeTab=(next:string):void=>{setTab(next);const query=new URLSearchParams(params.toString());query.set('tab',next);router.replace(pathname+'?'+query.toString(),{scroll:false});};
  const [mode,setMode]=useState('judge');const [busy,setBusy]=useState(false);const [summary,setSummary]=useState<Summary|null>(null);const [results,setResults]=useState<Item[]>([]);
  const [custom,setCustom]=useState(JSON.stringify(judgeExamples[0].invoice,null,2));const [outcome,setOutcome]=useState<SandboxOutcome|null>(null);
- async function run():Promise<void>{setBusy(true);try{const r=await fetch(`/api/verify?mode=${mode}`,{cache:'no-store'});const data=await r.json();if(!r.ok)throw new Error(data.error);setSummary(data.summary);setResults(data.results);changeTab('results');}catch(e){toast.error(e instanceof Error?e.message:'Lỗi kiểm thử');}finally{setBusy(false);}}
+ async function run():Promise<void>{setBusy(true);try{let r=await fetch(`/api/verify?mode=${mode}`,{cache:'no-store'});
+  // Bộ 15/60 ca cần phiên: tự mở phiên demo riêng rồi chạy lại, giám khảo không phải đăng nhập.
+  if(r.status===401){await fetch('/api/demo/session',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});r=await fetch(`/api/verify?mode=${mode}`,{cache:'no-store'});}
+  const data=await r.json();if(!r.ok)throw new Error(data.error);setSummary(data.summary);setResults(data.results);changeTab('results');}catch(e){toast.error(e instanceof Error?e.message:'Lỗi kiểm thử');}finally{setBusy(false);}}
  async function sandbox():Promise<void>{setBusy(true);try{const r=await fetch('/api/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sampleType:'CUSTOM',customInvoice:JSON.parse(custom)})});const d=await r.json();if(!r.ok)throw new Error(d.error);setOutcome(d);}catch(e){toast.error(e instanceof Error?e.message:'Dữ liệu không hợp lệ');}finally{setBusy(false);}}
  function downloadCsv():void{
    if(!summary)return;

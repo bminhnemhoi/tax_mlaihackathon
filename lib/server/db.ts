@@ -370,6 +370,14 @@ function applyMigrations(db: Database.Database): void {
     record.run(20, now());
   }
 
+  // 21: điểm mốc audit cũng chỉ ghi một lần (không thể chèn mốc giả để bỏ qua phần chuỗi đã ký).
+  if (!applied.has(21)) {
+    db.exec(`CREATE TRIGGER IF NOT EXISTS audit_chain_checkpoints_no_insert BEFORE INSERT ON audit_chain_checkpoints BEGIN SELECT RAISE(ABORT, 'Điểm mốc audit chỉ được tạo khi nâng cấp dữ liệu cũ'); END;
+      CREATE TRIGGER IF NOT EXISTS audit_chain_checkpoints_no_update BEFORE UPDATE ON audit_chain_checkpoints BEGIN SELECT RAISE(ABORT, 'Điểm mốc audit chỉ được ghi một lần'); END;
+      CREATE TRIGGER IF NOT EXISTS audit_chain_checkpoints_no_delete BEFORE DELETE ON audit_chain_checkpoints BEGIN SELECT RAISE(ABORT, 'Điểm mốc audit chỉ được ghi một lần'); END;`);
+    record.run(21, now());
+  }
+
 }
 
 function initializeDatabase(db: Database.Database): void {
@@ -665,6 +673,11 @@ function initializeDatabase(db: Database.Database): void {
 export function getDatabase(): Database.Database {
   const scoped = databaseContext.getStore();
   if (scoped) return scoped.db;
+  return getInternalDatabase();
+}
+
+/** Database nội bộ (không phải phiên demo), kể cả khi đang chạy trong ngữ cảnh demo. Dùng cho bảng định tuyến dùng chung. */
+export function getInternalDatabase(): Database.Database {
   if (!database) {
     fs.mkdirSync(dataDirectory, { recursive: true });
     if (databasePath !== ':memory:') fs.mkdirSync(path.dirname(path.resolve(databasePath)), { recursive: true });
@@ -672,6 +685,23 @@ export function getDatabase(): Database.Database {
     initializeDatabase(database);
   }
   return database;
+}
+
+/**
+ * Phiên chụp bằng điện thoại thuộc demo nào: lưu ở database nội bộ để mã QR không phải chứa mã phiên demo
+ * (mã phiên demo là bí mật tương đương cookie đăng nhập).
+ */
+export function recordCaptureRoute(captureId: string, demoId: string, expiresAt: string): void {
+  const db = getInternalDatabase();
+  db.exec('CREATE TABLE IF NOT EXISTS capture_routes (capture_id TEXT PRIMARY KEY, demo_id TEXT NOT NULL, expires_at TEXT NOT NULL)');
+  db.prepare('DELETE FROM capture_routes WHERE expires_at <= ?').run(now());
+  db.prepare('INSERT OR REPLACE INTO capture_routes (capture_id, demo_id, expires_at) VALUES (?, ?, ?)').run(captureId, demoId, expiresAt);
+}
+export function captureRouteDemoId(captureId: string): string | null {
+  const db = getInternalDatabase();
+  db.exec('CREATE TABLE IF NOT EXISTS capture_routes (capture_id TEXT PRIMARY KEY, demo_id TEXT NOT NULL, expires_at TEXT NOT NULL)');
+  const row = db.prepare('SELECT demo_id FROM capture_routes WHERE capture_id = ? AND expires_at > ?').get(captureId, now()) as { demo_id: string } | undefined;
+  return row?.demo_id ?? null;
 }
 
 export function getActivePolicy(): PolicyBundle {
@@ -706,7 +736,7 @@ export function jsonNow(): string {
 
 
 const databaseContext = new AsyncLocalStorage<{ db: Database.Database; sandbox: boolean; id: string }>();
-const demoDatabases = new Map<string, { db: Database.Database; touched: number }>();
+const demoDatabases = new Map<string, { db: Database.Database; touched: number; inflight: number }>();
 export function isSandbox(): boolean { return databaseContext.getStore()?.sandbox === true; }
 export function artifactRoot(): string { return path.join(dataDirectory, 'artifacts', databaseContext.getStore()?.id || 'internal'); }
 export function withIsolatedDatabase<T>(fn: () => T): T {
@@ -723,20 +753,25 @@ export async function withDemoDatabase<T>(id: string, fn: () => Promise<T>): Pro
   let entry = demoDatabases.get(id);
   if (!entry) {
     const cutoff = Date.now() - 8 * 60 * 60 * 1000;
-    for (const [key, old] of demoDatabases) if (old.touched < cutoff) { old.db.close(); demoDatabases.delete(key); }
+    for (const [key, old] of demoDatabases) if (old.touched < cutoff && old.inflight === 0) { old.db.close(); demoDatabases.delete(key); }
     // Không bao giờ từ chối giám khảo: khi đầy, đóng kết nối ít dùng nhất (file SQLite vẫn còn trên đĩa, mở lại được).
     const capacity = Math.max(10, Number(process.env.TAX_REFEREE_DEMO_CACHE || 200));
     while (demoDatabases.size >= capacity) {
+      // Chỉ đóng kết nối không có yêu cầu đang chạy; nếu tất cả đang bận thì tạm vượt trần thay vì đóng nhầm.
       let oldestKey = '', oldestTouched = Infinity;
-      for (const [key, old] of demoDatabases) if (old.touched < oldestTouched) { oldestKey = key; oldestTouched = old.touched; }
+      for (const [key, old] of demoDatabases) if (old.inflight === 0 && old.touched < oldestTouched) { oldestKey = key; oldestTouched = old.touched; }
+      if (!oldestKey) break;
       demoDatabases.get(oldestKey)?.db.close(); demoDatabases.delete(oldestKey);
     }
     const demoDirectory=path.join(dataDirectory,'demo');fs.mkdirSync(demoDirectory,{recursive:true});
     const db = new Database(path.join(demoDirectory,`${id}.sqlite`)); initializeDatabase(db);
-    entry = { db, touched: Date.now() }; demoDatabases.set(id, entry);
+    entry = { db, touched: Date.now(), inflight: 0 }; demoDatabases.set(id, entry);
   }
   entry.touched = Date.now();
-  return databaseContext.run({ db: entry.db, sandbox: true, id }, fn);
+  const current = entry;
+  current.inflight++;
+  try { return await databaseContext.run({ db: current.db, sandbox: true, id }, fn); }
+  finally { current.inflight--; current.touched = Date.now(); }
 }
 export async function withRequestDatabase<T>(request: { cookies?: { get(name: string): { value: string } | undefined } }, fn: () => Promise<T>): Promise<T> {
   const id = request.cookies?.get('tax_referee_demo')?.value;

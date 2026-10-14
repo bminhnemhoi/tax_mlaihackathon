@@ -6,12 +6,12 @@ import { toast } from 'sonner';
 import { PhoneInvoicePreview } from '@/components/PhoneInvoicePreview';
 import { BrandMark } from '@/components/BrandMark';
 
-interface CapturePhonePageProps { sessionId: string; token: string; demoId: string }
+interface CapturePhonePageProps { sessionId: string; token: string }
 
 const MAX_BYTES = 15 * 1024 * 1024;
 const supported = ['image/jpeg', 'image/png', 'image/webp'];
 
-export function CapturePhonePage({ sessionId, token, demoId }: CapturePhonePageProps) {
+export function CapturePhonePage({ sessionId, token }: CapturePhonePageProps) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -47,7 +47,7 @@ export function CapturePhonePage({ sessionId, token, demoId }: CapturePhonePageP
       const form = new FormData();
       form.append('token', token);
       form.append('file', file, file.name || 'hoa-don.jpg');
-      const suffix = demoId ? `?demo=${encodeURIComponent(demoId)}` : '';
+      const suffix = `?session=${encodeURIComponent(sessionId)}`;
       const request = fetch(`/api/capture-sessions/upload${suffix}`, { method: 'POST', body: form, cache: 'no-store' })
         .then(async (response) => ({ response, body: await response.json() }))
         .catch((error: unknown) => ({ error }));

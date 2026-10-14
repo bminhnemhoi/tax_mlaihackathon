@@ -3,7 +3,7 @@ import dgram from 'node:dgram';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRequestUser } from '@/lib/server/auth';
 import { appendAuditEvent } from '@/lib/server/audit';
-import { getDatabase, isSandbox, jsonNow, withRequestDatabase } from '@/lib/server/db';
+import { getDatabase, isSandbox, jsonNow, withRequestDatabase, recordCaptureRoute } from '@/lib/server/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -80,8 +80,9 @@ async function handlePOST(request: NextRequest) {
     }
     const captureUrl = new URL(`/capture/${id}`, publicOrigin);
     captureUrl.searchParams.set('token', token);
+    // Không đưa mã phiên demo vào QR/URL (ai thấy mã là chiếm được demo); máy chủ tự định tuyến theo mã phiên chụp.
     const demoId = request.cookies.get('tax_referee_demo')?.value;
-    if (isSandbox() && demoId) captureUrl.searchParams.set('demo', demoId);
+    if (isSandbox() && demoId && /^[a-f0-9-]{36}$/i.test(demoId)) recordCaptureRoute(id, demoId, expiresAt);
 
     return NextResponse.json({ id, captureUrl: captureUrl.toString(), expiresAt, status: 'WAITING' }, {
       status: 201,

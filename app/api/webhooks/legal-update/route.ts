@@ -1,10 +1,17 @@
 import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { processIncomingLegalUpdate } from '@/services/legal/legalUpdateService';
+import crypto from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
 
-const EXPECTED_SECRET = process.env.LEGAL_WEBHOOK_SECRET || 'tax-referee-webhook-secret-2026';
+/** Khóa chỉ lấy từ biến môi trường (≥ 24 ký tự); không có khóa thì webhook tắt, không dùng khóa mặc định trong mã. */
+function secretMatches(candidate: string): boolean {
+  const expected = process.env.LEGAL_WEBHOOK_SECRET || '';
+  if (expected.length < 24 || !candidate) return false;
+  const a = Buffer.from(candidate), b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 /**
  * Webhook tiếp nhận thông báo văn bản pháp luật thuế mới theo thời gian thực (Push Event).
@@ -16,7 +23,10 @@ async function handlePOST(req: NextRequest) {
     const secretHeader = req.headers.get('x-webhook-secret') || '';
     const bearer = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : '';
 
-    if (secretHeader !== EXPECTED_SECRET && bearer !== EXPECTED_SECRET) {
+    if ((process.env.LEGAL_WEBHOOK_SECRET || '').length < 24) {
+      return NextResponse.json({ error: 'Webhook chưa được cấu hình (thiếu LEGAL_WEBHOOK_SECRET).' }, { status: 503 });
+    }
+    if (!secretMatches(secretHeader) && !secretMatches(bearer)) {
       return NextResponse.json(
         { error: 'Xác thực Webhook không hợp lệ (Unauthorized)' },
         { status: 401 }
