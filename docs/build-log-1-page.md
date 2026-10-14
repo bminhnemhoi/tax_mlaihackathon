@@ -1,13 +1,33 @@
-# Build log — Tax Referee / Đề A
+# Build log — Tax Referee (Đề A · The Escalation Referee)
 
-**Ngày:** 10/10/2026. **Live:** https://limegreen-salamander-517622.hostingersite.com. **Phạm vi:** Next.js/SQLite, UI xử lý ngoại lệ, policy/QGen, hậu kiểm, vận hành Hostinger.
+**Đội:** Fprinciples · **Thời gian:** Sprint 1 (19–22/09) và Sprint 2 (28/09–15/10/2026) · **Live:** https://limegreen-salamander-517622.hostingersite.com
 
-**Thay đổi:** form sửa dữ liệu và xác nhận nguồn theo từng trường; audit dễ đọc với actor/reason/input/effect/policy snapshot; quyền undo từ server; SLA tuyệt đối không quay vòng. Backend lưu evidence theo giá trị, loại xác nhận khi sửa, lease/fence cho evaluation quá hạn. SOP/rule registry phản ánh logic đã triển khai; gate publish/rollback kiểm tra phân loại theo fixture thay vì chỉ schema. QGen không thay quyết định/explanation và bị chặn khi sai ngữ cảnh/options/số tiền/người nhận. Hiệu chỉnh ngưỡng kiểm tra candidate trong savepoint; retry feedback không tăng mẫu. Verify thêm run ID/hash/export/SOP; runner độc lập chống trùng và ghi ERROR riêng. Quota chứng từ và script preview/dọn demo offline.
+## 1. Công cụ AI đã dùng và cách dùng
+| Công cụ | Dùng để làm gì |
+|---|---|
+| **ChatGPT, Claude** (chat) | Brainstorm bài toán, đọc đề, phác SOP và luồng nghiệp vụ kế toán (ghi chú nháp trong `brainstorming/`, không phải bằng chứng) |
+| **OpenAI Codex** (cấp trong Sprint 2), **Claude Code** | Viết và refactor mã Next.js/TypeScript, test, tài liệu; mỗi thay đổi được đội đọc lại, chạy test rồi mới commit |
+| **Gemini 2.5 Flash Vision** (qua ShopAIKey) | Thành phần **trong sản phẩm**: đọc ảnh/PDF scan hóa đơn. Không tham gia phân loại hay quyết định thuế |
+| Claude Code (14–15/10) | Rà soát như giám khảo, sửa lỗ hổng phân quyền, bảng phân loại 3 kiểu dừng, câu hỏi một câu, bộ test chuẩn + CI |
 
-**AI hỗ trợ:** đọc mã, sửa service/API/UI, tạo fixture tổng hợp, kiểm thử và tài liệu. Không tạo nhãn nghiệp vụ, lời chứng người dùng hoặc số liệu tiết kiệm giả.
+## 2. AI giúp nhanh ở đâu
+- Dựng khung Next.js + SQLite + workflow có revision/audit trong Sprint 1; sinh fixture tổng hợp và nhiều kịch bản test.
+- Rà soát mã diện rộng: tìm được các lỗi đội bỏ sót (ai cũng chuyển được thành CFO, ca không khớp quy tắc nào bị tự duyệt, thuế suất 8% cho cước di động lọt qua, test phụ thuộc file bị gitignore nên clone sạch luôn fail).
+- Viết lại câu hỏi chuyển tiếp thành template có số liệu: đo được trên 11 ca diễn tập, câu hỏi cụ thể tăng từ 1/10 lên 8/8.
 
-**Kiểm tra:** typecheck và production build đạt; Verify 4/4, 5/5, 15/15; 20 workflow, 2 AI fallback, 4 review, 39 QA mock, 16 kiểm tra cải tiến. Standalone restart, phục hồi evaluation hết hạn/retry và offline snapshot/restore đạt. Các tập Verify có ca trùng, không phải holdout độc lập.
+## 3. AI gây tốn thời gian / rủi ro ở đâu
+- **Commit khổng lồ:** để AI sửa nhiều thứ một lượt tạo ra commit 216 file (+28.859 dòng), khó review, khó chứng minh quá trình. Từ 14/10 đội chuyển sang commit nhỏ theo từng hạng mục.
+- **Nội dung bịa:** một bản đánh giá do AI viết khi brainstorm chứa 3 "người dùng thật" có tên và trích dẫn **không có thật**. Đội đã gỡ, ghi đính chính công khai (`brainstorming/opus-evaluation.md` §7) và quy định: không đưa nội dung AI sinh vào bằng chứng.
+- **Claim sai:** kịch bản video/RUNBOOK cũ có "0% bỏ sót", "Merkle", điều luật đã hết hiệu lực, tự chấm "10/10 điểm". Đã xóa; mọi số liệu phải có lệnh tái lập.
+- **Quá phạm vi:** AI dễ đề xuất thêm module (ngân hàng, ERP, đối soát TCT, crawler luật…) làm loãng Đề A. Các module này được gom vào nhóm "Mở rộng · beta (một phần giả lập)".
+- Môi trường: build trên Hostinger bị EAGAIN, phải đóng gói local; máy phát triển thiếu RAM làm build/test có lúc bị OOM.
 
-**Triển khai:** fix native install bằng ghim better-sqlite3 12.11.1; build host bị EAGAIN nên dùng bundle local + dependency Linux. Passenger một instance, env/SQLite/chứng từ ngoài release, Python user-level. HTTPS health, ba vai trò, demo isolation, pause/stale409/undo, Verify và XML/PDF/ảnh tổng hợp live đạt. SQLite backup đọc lại integrity ok. Ảnh tổng hợp một lần mất khoảng 7,8s; không claim OCR dưới 2s.
+## 4. Tính năng lớn nhất đã cắt và lý do
+**Tích hợp thật với ERP/ngân hàng/Cổng thuế (tự hạch toán, tự đối soát sao kê, tự nộp tờ khai).** Lý do: không có môi trường và dữ liệu thật để
+kiểm chứng trong thời gian thi; làm giả sẽ vi phạm nguyên tắc "không khẳng định điều chưa chứng minh". Đội dồn thời gian vào lõi Đề A:
+quyết định đúng lúc dừng, câu hỏi một câu, audit/dừng/hoàn tác. Các màn hình liên quan chỉ giữ ở mức xuất payload/demo và ghi rõ.
+Cũng đã cắt **chữ ký số trên hồ sơ giải trình PDF** (cần chứng thư số thật).
 
-**Còn cần:** nhãn độc lập do nghiệp vụ khóa; chấm mù câu hỏi; ba người dùng, đo trước/sau, feedback và retest; hoàn thiện số liệu slide/video ≤3 phút. Worker Docker đã đóng gói nhưng chưa được nghiệm thu trên môi trường Docker thực. Adapter ERP/TCT/ngân hàng chỉ là phạm vi demo/xuất payload.
+## 5. Kiểm chứng
+`npm test`: 15/15 bộ (unit node:test + 14 bộ hồi quy, mỗi bộ trên database tạm); CI GitHub Actions trên Ubuntu + Windows; Verify 9 ca có dấu thời gian;
+11 ca diễn tập giám khảo trước/sau: `docs/evidence/before-after-judge-rehearsal-2026-10-14.md`. Dữ liệu là tổng hợp; đánh giá với người dùng thật đang thực hiện.
