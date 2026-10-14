@@ -57,12 +57,16 @@ async function main() {
   assert.equal((await internalLogin(request('/api/auth/login', '', { role: 'ADMIN' }))).status, 400);
   assert.equal((await changeRole(request('/api/auth/switch', '', { role: 'CFO' }))).status, 401);
   console.log('PASS Cờ vận hành bật đăng nhập vai trò nội bộ nhưng vẫn cấm đổi vai trò; từ chối role sai/phiên thiếu');
-  const demoId = '12345678-1234-4234-8234-123456789abc';
+  // Mã demo tự đặt không được dùng lại (không tạo database theo cookie bất kỳ): máy chủ cấp mã mới.
+  const forgedDemoId = '12345678-1234-4234-8234-123456789abc';
+  let demoId = forgedDemoId;
   const demoRequest = (path: string, token: string, body?: unknown) => new NextRequest(`http://localhost${path}`, {
     method: 'POST', headers: { cookie: `tax_referee_session=${token}; tax_referee_demo=${demoId}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {})
   });
   const opened = await openDemo(demoRequest('/api/demo/session', '', {}));
   assert.equal(opened.status, 200);
+  demoId = opened.cookies.get('tax_referee_demo')!.value;
+  assert.notEqual(demoId, forgedDemoId, 'Không dùng lại mã demo do client tự đặt');
   const demoUser = (await opened.json()).user;
   assert.equal(demoUser.role, 'ACCOUNTANT', 'Demo mặc định vào vai Kế toán viên');
   const demoToken = opened.cookies.get('tax_referee_session')!.value;

@@ -773,7 +773,16 @@ export async function withDemoDatabase<T>(id: string, fn: () => Promise<T>): Pro
   try { return await databaseContext.run({ db: current.db, sandbox: true, id }, fn); }
   finally { current.inflight--; current.touched = Date.now(); }
 }
+/** Phiên demo đã được tạo qua /api/demo/session (đang mở hoặc còn file trên đĩa). */
+export function demoExists(id: string): boolean {
+  return /^[a-f0-9-]{36}$/.test(id) && (demoDatabases.has(id) || fs.existsSync(path.join(dataDirectory, 'demo', `${id}.sqlite`)));
+}
+export function demoCount(): number {
+  const dir = path.join(dataDirectory, 'demo');
+  return fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith('.sqlite')).length : 0;
+}
 export async function withRequestDatabase<T>(request: { cookies?: { get(name: string): { value: string } | undefined } }, fn: () => Promise<T>): Promise<T> {
   const id = request.cookies?.get('tax_referee_demo')?.value;
-  return id && /^[a-f0-9-]{36}$/.test(id) ? withDemoDatabase(id, fn) : fn();
+  // Cookie tự đặt (UUID bất kỳ) không được tạo database mới: chỉ phiên do /api/demo/session tạo mới được mở.
+  return id && demoExists(id) ? withDemoDatabase(id, fn) : fn();
 }

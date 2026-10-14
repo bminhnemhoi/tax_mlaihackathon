@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { isSandbox, withDemoDatabase, withRequestDatabase } from '@/lib/server/db';
+import { demoCount, demoExists, isSandbox, withDemoDatabase, withRequestDatabase } from '@/lib/server/db';
 import { AppRole, getRequestUser, switchRole } from '@/lib/server/auth';
 import { allowRate, clientIp } from '@/lib/server/rateLimit';
 import { seedDemoCases } from '@/services/demoSeed';
@@ -20,11 +20,13 @@ export async function POST(req: NextRequest) {
     }
 
     const previous = req.cookies.get('tax_referee_demo')?.value;
-    const reuse = previous && /^[a-f0-9-]{36}$/.test(previous);
+    const reuse = Boolean(previous && demoExists(previous));
     // Mỗi phiên demo mới là một tệp SQLite trên đĩa: giới hạn theo IP để không bị tạo vô hạn.
     if (!reuse && process.env.NODE_ENV !== 'test' && !allowRate(`demo:${clientIp(req.headers)}`, Number(process.env.TAX_REFEREE_DEMO_PER_HOUR || 30), 60 * 60 * 1000))
       return NextResponse.json({ error: 'Đã tạo quá nhiều phiên demo từ địa chỉ này. Hãy dùng lại phiên hiện có hoặc thử lại sau.' }, { status: 429 });
-    const id = reuse ? previous : crypto.randomUUID();
+    if (!reuse && demoCount() >= Number(process.env.TAX_REFEREE_DEMO_MAX || 2000))
+      return NextResponse.json({ error: 'Máy chủ demo đã đủ số phiên. Hãy thử lại sau.' }, { status: 503 });
+    const id = reuse && previous ? previous : crypto.randomUUID();
     return await withDemoDatabase(id, async () => {
       // Mặc định vào vai Kế toán viên (người nhập liệu) để ca chuyển tiếp được KTT/CFO — một tài khoản khác — duyệt.
       const role: AppRole = DEMO_ROLES.includes(body.role) ? body.role : 'ACCOUNTANT';

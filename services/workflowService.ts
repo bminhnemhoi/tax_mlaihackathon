@@ -399,9 +399,12 @@ export async function answerHandoff(id: string, user: AppUser, raw: unknown) {
   throw new WorkflowError('Câu trả lời không tạo thay đổi nào.',400);
 }
 
+const WORKFLOW_ACTIONS=['PAUSE','RESUME','TAX_HOLD','RELEASE_TAX_HOLD','UNDO','RESOLVE','OVERRIDE'] as const;
 export function applyWorkflowAction(id: string, user: AppUser, input: {action:string;reason:string;evaluationId?:string|null;revision:number;optionId?:string;targetStatus?:string;resolvedFindingIds?:string[]}) {
   if(user.role==='ACCOUNTANT') throw new WorkflowError('Cần Kế toán trưởng hoặc CFO.',403);
   if(input.reason.trim().length<8) throw new WorkflowError('Ghi lý do ít nhất 8 ký tự.',400);
+  // Tên sự kiện audit không do client đặt: chỉ nhận các thao tác đã biết (không giả được "Tự xử lý thường quy" hay "Hoàn tác").
+  if(!WORKFLOW_ACTIONS.includes(input.action as typeof WORKFLOW_ACTIONS[number])) throw new WorkflowError('Thao tác không hợp lệ.',400);
   const db=getDatabase();
   return db.transaction(()=>{
     const row=readRecord(id); assertCurrent(row,input.evaluationId,input.revision);const before=snapshot(row);
@@ -411,8 +414,9 @@ export function applyWorkflowAction(id: string, user: AppUser, input: {action:st
       db.prepare("UPDATE invoices SET paused_from=status,status='PAUSED',approved_deductible_tax=0 WHERE id=?").run(id);
     } else if(input.action==='RESUME') {
       if(row.status!=='PAUSED') throw new WorkflowError('Hồ sơ chưa dừng.');
-      // Resume never revives a discarded/in-flight AI result or stale approval.
-      db.prepare("UPDATE invoices SET status='ON_HOLD',paused_from=NULL,approved_deductible_tax=0 WHERE id=?").run(id);
+      // Resume never revives a discarded/in-flight AI result or stale approval; a case that was only waiting for an answer goes back to waiting.
+      const restore=['WAITING_CHIEF_ACCOUNTANT','WAITING_CFO','FORWARDED'].includes(row.paused_from || '') && row.decision_json ? row.paused_from : 'ON_HOLD';
+      db.prepare("UPDATE invoices SET status=?,paused_from=NULL,approved_deductible_tax=0 WHERE id=?").run(restore,id);
     } else if(input.action==='TAX_HOLD') {
       db.prepare("UPDATE invoices SET tax_hold=1,status='ON_HOLD',approved_deductible_tax=0 WHERE id=?").run(id);
     } else if(input.action==='RELEASE_TAX_HOLD') {
@@ -441,6 +445,11 @@ export function applyWorkflowAction(id: string, user: AppUser, input: {action:st
         eventType='HUMAN_RESOLUTION_RECORDED';
       }
       if(!target || !['APPROVED','ON_HOLD','REJECTED','FORWARDED'].includes(target)) throw new WorkflowError('Trạng thái không hợp lệ.',400);
+      // Ca cần CFO: Kế toán trưởng chỉ được giữ hồ sơ/chuyển CFO, không được tự duyệt hay từ chối thay CFO.
+      if(input.action==='OVERRIDE' && ['APPROVED','REJECTED'].includes(target) && user.role!=='CFO' && row.decision_json){
+        const d=JSON.parse(row.decision_json);
+        if(d.status==='ESCALATED' && (d.requiresCFO || row.status==='FORWARDED')) throw new WorkflowError('Hồ sơ cần CFO quyết định.',403);
+      }
       if(target==='APPROVED') {const block=approvalBlock(row,user);if(block) throw new WorkflowError(block,403);const d=JSON.parse(row.decision_json!);if(d.status==='ESCALATED' && d.findings?.some((f:{ruleId:string})=>!input.resolvedFindingIds?.includes(f.ruleId)))throw new WorkflowError('Cần xác nhận giải quyết từng phát hiện còn mở trước khi duyệt.',400);}
       const invoice=JSON.parse(row.payload_json);
       db.prepare('UPDATE invoices SET status=?,approved_deductible_tax=? WHERE id=?').run(target,target==='APPROVED'?invoice.taxAmount:0,id);
