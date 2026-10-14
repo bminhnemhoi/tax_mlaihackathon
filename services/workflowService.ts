@@ -12,6 +12,8 @@ import {fieldAsk,type FieldAsk} from './questionBuilder';
 import {buildHandoff,checkHandoff,describeRuleEvidence} from './handoffService';
 import { fieldLabels } from '@/lib/workflowPresentation';
 import { recordConfirmedSupplierAlias } from './taxLookupService';
+import { runningCommit } from '@/lib/server/buildInfo';
+import { POLICY_CONTRACT_VERSION } from '@/data/policyContract';
 import { z } from 'zod';
 
 export class WorkflowError extends Error { constructor(message: string, public status = 409) { super(message); } }
@@ -101,7 +103,8 @@ export function recordAction(row: WorkflowRecord, user: AppUser | null, eventTyp
   const policy = after.evaluation_policy_json ? JSON.parse(after.evaluation_policy_json) : getActivePolicy();
   const payload = { evaluationId: after.evaluation_id, revision: after.revision, policyVersion:policy.version, policyHash:policy.contentHash || hashPayload(policy), actorRole:user?.role || 'SYSTEM_REFEREE', actorName:user?.displayName || 'Hệ thống',
     invoice: JSON.parse(after.payload_json), review:JSON.parse(after.source_review_json), decision:after.decision_json?JSON.parse(after.decision_json):null, before, after:snapshot(after),
-    previousStatus:before.status, targetStatus:after.status, previousApprovedDeductibleTax:before.approvedTax, approvedDeductibleTax:after.approved_deductible_tax, reason, ...extra };
+    previousStatus:before.status, targetStatus:after.status, previousApprovedDeductibleTax:before.approvedTax, approvedDeductibleTax:after.approved_deductible_tax, reason,
+    inputHash:after.content_hash, contractVersion:POLICY_CONTRACT_VERSION, commit:runningCommit() || null, ...extra };
   const event = appendAuditEvent({eventType,entityId:row.id,actorId:user?.id,payload});
   appendImmutableAudit({eventType,entityId:row.id,userId:user?.id || 'system',userRole:user?.role || 'SYSTEM_REFEREE',action:eventType,rationale:reason,payload:{...payload,auditEventId:event.id}});
   return event;

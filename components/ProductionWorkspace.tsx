@@ -723,6 +723,12 @@ export function ProductionWorkspace({
                   entries={auditEntries}
                   onViewDossier={(entry) => setSelectedAuditEntry(entry)}
                   onOverride={async (entry, targetStatus, reason) => {
+                    const target = items.find(i => i.id === entry.invoiceRecordId);
+                    if (targetStatus === 'APPROVED' && target && ['WAITING_CHIEF_ACCOUNTANT', 'WAITING_CFO', 'FORWARDED'].includes(target.status)) {
+                      showToast('Ca chuyển tiếp: mở hồ sơ để xác nhận từng phát hiện rồi mới duyệt.', 'info');
+                      router.push(`/workspace/invoices/${encodeURIComponent(target.id)}`);
+                      return;
+                    }
                     try {
                       const response = await fetch(`/api/invoices/${encodeURIComponent(entry.invoiceRecordId || '')}/audit-action`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
