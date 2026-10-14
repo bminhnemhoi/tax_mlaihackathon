@@ -45,7 +45,8 @@ function supplierIdentityReview(identity: Awaited<ReturnType<typeof lookupOffici
   const hasConflict = identity?.status === 'CONFLICT';
   const note = identity?.message || 'MST in trên hóa đơn chưa khớp nhà cung cấp.';
   return {
-    uncertainFields: [] as string[],
+    // MST mâu thuẫn với danh tính đã xác minh không được coi là dữ liệu chắc chắn: workflow phải hỏi lại.
+    uncertainFields: hasConflict ? ['supplierTaxCode'] : [] as string[],
     conflicts: hasConflict ? [note] : [],
     fieldWarnings: {} as Record<string, string>,
     fieldEvidence: hasConflict ? { supplierTaxCode: {
@@ -385,6 +386,13 @@ async function handlePOST(req: NextRequest) {
       if (invoice[key] === undefined || invoice[key] === null || invoice[key] === '') {
         if (!uncertainFields.includes(key)) uncertainFields.push(key);
         fieldWarnings[key] = 'Chưa đọc được từ chứng từ gốc; cần bổ sung và xác minh.';
+      }
+    }
+    // AI chưa chắc tài liệu là hóa đơn nhưng vẫn trả dữ liệu: không trường nào được coi là đã xác minh.
+    if (documentType === 'UNCERTAIN') {
+      for (const key of requiredSourceFields) {
+        if (!uncertainFields.includes(key)) uncertainFields.push(key);
+        fieldWarnings[key] ??= 'AI chưa chắc tài liệu là hóa đơn; cần xác minh trường này với chứng từ gốc.';
       }
     }
     const absentFields = requiredSourceFields.filter((key) => invoice[key] === undefined || invoice[key] === null || invoice[key] === '');

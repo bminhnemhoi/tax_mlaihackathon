@@ -118,10 +118,11 @@ Trả về duy nhất JSON theo cấu trúc:
     "preTaxAmount": 0,
     "taxRate": 0,
     "taxAmount": 0,
-    "paymentMethod": "CASH hoặc BANK_TRANSFER nếu nhận diện được"
+    "paymentMethod": "CASH hoặc BANK_TRANSFER nếu nhận diện được",
+    "isImageBlurry": false
   }
 }
-Quy tắc: giữ nguyên dấu tiếng Việt; tiền là số nguyên VNĐ; chỉ trích xuất điều thực sự nhìn thấy. Nếu ảnh không phải hóa đơn, đặt documentType là NOT_INVOICE và invoice là object rỗng. Nếu không chắc ảnh là hóa đơn, đặt UNCERTAIN. ${fileName ? `Tên file: ${JSON.stringify(fileName)}.` : ''}`;
+Quy tắc: giữ nguyên dấu tiếng Việt; tiền là số nguyên VNĐ; chỉ trích xuất điều thực sự nhìn thấy. Đặt isImageBlurry là true nếu tổng tiền, tiền thuế, MST hoặc số hóa đơn bị mờ, lóa, che khuất hoặc không đọc được chắc chắn; không đoán con số. Nếu ảnh không phải hóa đơn, đặt documentType là NOT_INVOICE và invoice là object rỗng. Nếu không chắc ảnh là hóa đơn, đặt UNCERTAIN. ${fileName ? `Tên file: ${JSON.stringify(fileName)}.` : ''}`;
 
   const url = new URL(`${BASE_URL}/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`);
   url.searchParams.set('key', apiKey);
@@ -220,6 +221,8 @@ Hãy trả về duy nhất chuỗi JSON hợp lệ theo đúng cấu trúc đã 
     const parsed = extractCleanJson(rawContent);
 
     const validActions = [
+      'REQUEST_INFORMATION',
+      'CONFIRM_CORRECTED_DATA',
       'ACCEPT_WITH_DOCS',
       'REJECT_TAX_DEDUCTION',
       'FORWARD_TO_CFO',
