@@ -113,19 +113,19 @@ export type InvoiceLineItem = z.infer<typeof InvoiceLineItemSchema>;
 
 // 3. Schema Hóa đơn Đầu vào (Invoice Input)
 export const InvoiceInputSchema = z.object({
-  id: z.string().trim().min(1),
-  invoiceNumber: z.string().trim().min(1),
+  id: z.string().trim().min(1).max(200),
+  invoiceNumber: z.string().trim().min(1).max(100),
   invoiceDate: IsoDateSchema,         // Định dạng: YYYY-MM-DD
   supplierTaxCode: z.string().trim().regex(TAX_CODE_FORMAT_REGEX, 'MST phải có 10, 12 hoặc 13 chữ số'),
-  supplierName: z.string().trim().min(2),
-  supplierAddress: z.string().trim().optional(),
+  supplierName: z.string().trim().min(2).max(500),
+  supplierAddress: z.string().trim().max(1000).optional(),
   buyerTaxCode: z.string().trim().regex(TAX_CODE_FORMAT_REGEX, 'MST người mua phải có 10, 12 hoặc 13 chữ số').optional(),
   buyerName: z.string().trim().optional(),
   invoiceSeries: z.string().trim().optional(),         // Ký hiệu HĐ theo TT 78 (VD: 1C26TBB)
   invoiceTemplate: z.string().trim().optional(),       // Mẫu số HĐ (VD: 1/001)
   taxAuthorityCode: z.string().trim().optional(),      // Mã Cơ quan thuế (MCCQT 34 ký tự)
   signingDate: IsoDateSchema.optional(),               // Ngày ký số điện tử của bên bán
-  itemName: z.string().trim().min(1),
+  itemName: z.string().trim().min(1).max(5000),
   preTaxAmount: AmountSchema,
   taxRate: z.union([z.literal(0), z.literal(5), z.literal(8), z.literal(10)]),
   taxAmount: AmountSchema,
@@ -142,7 +142,7 @@ export const InvoiceInputSchema = z.object({
   isStaffReimbursed: z.boolean().optional(),        // Nhân viên thanh toán trước và hoàn ứng theo quy chế?
   sourceArtifactId: z.string().trim().min(1).optional(),
   sourceHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  items: z.array(InvoiceLineItemSchema).optional()  // Danh mục chi tiết các dòng hàng (IMP-08)
+  items: z.array(InvoiceLineItemSchema).max(1000).optional()  // Danh mục chi tiết các dòng hàng (IMP-08)
 });
 export type InvoiceInput = z.infer<typeof InvoiceInputSchema>;
 
