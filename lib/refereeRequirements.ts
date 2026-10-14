@@ -17,7 +17,7 @@ export function requiredDecisionFields(invoice:Partial<InvoiceInput>,config?:Par
   // Hình thức thanh toán chỉ quyết định kết quả khi tổng (gộp cùng NCC trong ngày) đạt ngưỡng không dùng tiền mặt;
   // dưới ngưỡng, hỏi thêm chỉ tạo chuyển tiếp thừa.
   if(needsPaymentEvidence)required.add('paymentMethod');
-  if(needsPaymentEvidence && (invoice.paymentMethod==='BANK_TRANSFER' || invoice.isStaffReimbursed===true))required.add('hasBankSlip');
+  if(needsPaymentEvidence && invoice.paymentMethod==='BANK_TRANSFER')required.add('hasBankSlip');
   // Trạng thái MST bên bán bắt buộc từ ngưỡng trọng yếu (mặc định 20 triệu); dưới ngưỡng, trạng thái đóng/tạm ngừng
   // đã biết (nhập tay hoặc danh bạ NCC) vẫn luôn được kiểm tra.
   if(Math.abs(invoice.totalAmount || 0)>=(config?.sellerStatusMaterialityVnd ?? 20_000_000))required.add('sellerStatus');

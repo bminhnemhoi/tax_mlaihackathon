@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withRequestDatabase } from '@/lib/server/db';
 import { getRequestUser } from '@/lib/server/auth';
 import { automationState, setAutomationPaused } from '@/services/automationControl';
+import { releaseHeldRoutineCases } from '@/services/workflowService';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,10 @@ async function handlePOST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   if (typeof body.paused !== 'boolean') return NextResponse.json({ error: 'Thiếu trạng thái dừng/bật' }, { status: 400 });
   try {
-    return NextResponse.json(setAutomationPaused(body.paused, user, String(body.reason || '')));
+    const state = setAutomationPaused(body.paused, user, String(body.reason || ''));
+    // Bật lại: hoàn tất các ca thường quy đã bị giữ trong lúc dừng (mỗi ca một sự kiện audit).
+    const released = state.paused ? 0 : releaseHeldRoutineCases(user);
+    return NextResponse.json({ ...state, released });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể cập nhật' }, { status: user.role === 'ACCOUNTANT' ? 403 : 400 });
   }

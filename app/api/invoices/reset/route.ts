@@ -5,6 +5,7 @@ import { requireRequestUser } from '@/lib/server/auth';
 import { getDatabase, jsonNow } from '@/lib/server/db';
 import { MACRO_DEFAULTS } from '@/lib/constants';
 import { appendAuditEvent } from '@/lib/server/audit';
+import { automationState } from '@/services/automationControl';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,8 +43,11 @@ async function handlePOST(request: NextRequest) {
     });
 
     resetTx();
+    // Demo sạch thì tự động hóa chạy lại bình thường (công tắc dừng không còn treo từ phiên trước).
+    const wasPaused = automationState().paused;
+    db.exec("DELETE FROM system_controls WHERE key='AUTO_APPROVE'");
     // Nhật ký audit được giữ nguyên; bản thân thao tác reset cũng là một sự kiện có người thực hiện.
-    appendAuditEvent({ eventType: 'SANDBOX_RESET', entityId: 'sandbox', actorId: user.id, payload: { role: user.role, deletedInvoices: invoiceCount, deletedArtifacts: artifacts.length } });
+    appendAuditEvent({ eventType: 'SANDBOX_RESET', entityId: 'sandbox', actorId: user.id, payload: { role: user.role, deletedInvoices: invoiceCount, deletedArtifacts: artifacts.length, automationReset: wasPaused ? 'PAUSED→RUNNING' : 'RUNNING' } });
 
     for (const artifact of artifacts) {
       if (fs.existsSync(artifact.storage_path)) {

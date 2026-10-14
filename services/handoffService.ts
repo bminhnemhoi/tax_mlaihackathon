@@ -19,11 +19,11 @@ export function buildHandoff(invoice:InvoiceInput,decision:EscalatedDecision,con
   const facts=factFields.map(field=>({field,label:labels[field]||field,value:missing.has(field)?'Chưa có dữ liệu':value((invoice as unknown as Record<string,unknown>)[field],field),source:unknown.has(field)?'Chưa xác minh':'Dữ liệu hồ sơ'}));
   // Mỗi phát hiện (và mỗi dữ kiện chưa xác minh) thành một ý đánh số có hai đáp án; người xử lý trả lời một lần.
   const items:Array<Omit<QuestionItem,'n'>>=issues.flatMap(issue=>issue.ruleId==='RULE_SOURCE_REVIEW' && context.fieldAsks?.length
-    ? context.fieldAsks.map(ask=>({ruleIds:['RULE_SOURCE_REVIEW'],riskGroup:'UNCERTAIN_INFO' as const,text:ask.ask,answers:ask.answers}))
-    : [issueItem(issue)]);
-  const composed=composeQuestion(invoice,role,items,Math.max(0,invoice.taxAmount));
+    ? context.fieldAsks.map(ask=>({ruleIds:['RULE_SOURCE_REVIEW'],riskGroup:'UNCERTAIN_INFO' as const,text:ask.ask,answers:ask.answers,effects:ask.effects}))
+    : [issueItem(issue,invoice)]);
+  const composed=composeQuestion(invoice,role,items,Math.max(0,invoice.taxAmount),missing);
   const question=composed.question;
-  const handoff:RefereeHandoff={requiredRole:decision.requiresCFO?'CFO':'CHIEF_ACCOUNTANT',invoiceNumber:invoice.invoiceNumber,primaryRuleId:primary.ruleId,question,facts,options:decision.options,openIssues:issues,
+  const handoff:RefereeHandoff={requiredRole:decision.requiresCFO?'CFO':'CHIEF_ACCOUNTANT',invoiceNumber:missing.has('invoiceNumber')?'(chưa có số)':invoice.invoiceNumber,primaryRuleId:primary.ruleId,question,facts,options:decision.options,openIssues:issues,
     evidenceRefs:[{kind:'POLICY',ref:decision.sopVersion||'TAX-SOP-2026',description:primary.legalBasis},
       ...(invoice.sourceArtifactId?[{kind:'ARTIFACT' as const,ref:invoice.sourceArtifactId,description:'Chứng từ nguồn đã tiếp nhận'}]:[]),
       ...(context.confirmations||[]).map(c=>({kind:'CONFIRMATION' as const,ref:c.field,description:c.evidence}))],
@@ -44,7 +44,8 @@ export function checkHandoff(decision:RefereeDecision):{valid:boolean;errors:str
     if(!h.questionSpec.items.every(item=>item.answers.every(answer=>h.question.includes(answer))))errors.push('Thiếu đáp án trong câu hỏi');
     if(h.questionSpec.items.some(item=>item.text.length>700))errors.push('Ý hỏi quá dài');
   } else if(!decision.options.every(o=>h.question.includes(o.label)))errors.push('Thiếu phương án trong câu hỏi');
-  if(/(?:false|true|undefined|NaN|null)|UNKNOWN/.test(h.question))errors.push('Câu hỏi lộ giá trị kỹ thuật');
+  // Chỉ bắt giá trị kỹ thuật bị in ra như dữ liệu (không bắt nhầm chữ "true" trong tên hàng như "TH true MILK").
+  if(/(?:là|ghi|đọc được|=)\s*(?:undefined|null|NaN|true|false|UNKNOWN)\b|\bundefined\b|\bNaN\b/.test(h.question))errors.push('Câu hỏi lộ giá trị kỹ thuật');
   if(!h.evidenceRefs.some(r=>r.kind==='POLICY') || !h.policyRef.clause)errors.push('Thiếu căn cứ');
   if((decision.findings || []).some(f=>!h.openIssues.some(i=>i.ruleId===f.ruleId)))errors.push('Bỏ sót phát hiện');
   return {valid:errors.length===0,errors};

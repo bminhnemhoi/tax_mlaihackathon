@@ -2,6 +2,7 @@
 import WorkflowAuditHistory from '@/components/WorkflowAuditHistory';
 import WorkflowControls from '@/components/WorkflowControls';
 import {HandoffContext} from '@/components/HandoffContext';
+import {HandoffAnswerPanel} from '@/components/HandoffAnswerPanel';
 
 import {caseDeadline, riskGroupLabels} from '@/lib/workflowPresentation';
 
@@ -501,7 +502,11 @@ export function ProductionWorkspace({
                 <details className="mt-2 text-xs text-emerald-900"><summary className="cursor-pointer font-medium">Chi tiết đánh giá</summary><p className="mt-2 leading-relaxed">{decision.plainExplanation}</p></details>
               </div>
             </div>
-            <p className="text-sm font-semibold">{selected.status==='APPROVED'?'Đã tự xử lý và tạo chứng từ nội bộ.':'Hồ sơ đã bị can thiệp; xem trạng thái hiện hành trước khi xuất chứng từ.'}</p>
+            <p className="text-sm font-semibold">{selected.status==='APPROVED'?'Đã tự xử lý và tạo chứng từ nội bộ.':selected.status==='WAITING_CHIEF_ACCOUNTANT'?'Tự động hóa đang dừng: ca thường quy chờ Kế toán trưởng duyệt tay.':'Hồ sơ đã bị can thiệp; xem trạng thái hiện hành trước khi xuất chứng từ.'}</p>
+            {selected.status==='WAITING_CHIEF_ACCOUNTANT' && <div className="grid gap-2">
+              <label htmlFor="manual-approve-reason" className="text-xs">Lý do duyệt tay (ít nhất 8 ký tự)<textarea id="manual-approve-reason" value={actionReason} onChange={e=>setActionReason(e.target.value)} rows={2} className="mt-1 w-full rounded border p-2 text-sm" /></label>
+              <Button type="button" disabled={resolving || actionReason.trim().length<8 || !selected.allowedActions?.approve} onClick={async()=>{setResolving(true);try{const response=await fetch(`/api/invoices/${encodeURIComponent(selected.id)}/audit-action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'OVERRIDE',targetStatus:'APPROVED',reason:actionReason,revision:selected.revision,evaluationId:selected.evaluationId})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Không thể duyệt');setActionReason('');showToast('Đã duyệt tay và ghi nhật ký.','success');await loadWorkspace();}catch(err){showToast(err instanceof Error?err.message:'Không thể duyệt','error');}finally{setResolving(false);}}}>{selected.allowedActions?.approve?'Duyệt tay':(selected.allowedActions?.blockedReason||'Cần Kế toán trưởng hoặc CFO')}</Button>
+            </div>}
             <p className="text-xs">Cập nhật: {new Date(selected.updatedAt).toLocaleString('vi-VN')} · Chứng từ: {selected.internalVoucherId || 'Không có chứng từ có hiệu lực'}</p>
           </div>
         )}
@@ -516,7 +521,7 @@ export function ProductionWorkspace({
                   {riskGroupLabels[decision.riskGroup]}
                 </span>
               </div>
-              <h3 className="text-sm font-medium text-foreground leading-6">
+              <h3 className="whitespace-pre-line text-sm font-medium text-foreground leading-6">
                 {decision.actionableQuestion}
               </h3>
               <p className="text-xs font-numeric font-medium text-slate-700 pt-1 flex items-center gap-1.5">
@@ -524,6 +529,11 @@ export function ProductionWorkspace({
                 <span className="font-semibold text-slate-900 bg-white/80 px-2 py-0.5 rounded border border-amber-200/80">{decision.sopClause}</span>
               </p>
             </div>
+
+            <HandoffAnswerPanel invoiceId={selected.id} decision={decision} revision={selected.revision} evaluationId={selected.evaluationId}
+              canAnswer={user.role!=='ACCOUNTANT' && (!(decision.requiresCFO || selected.status==='FORWARDED') || user.role==='CFO') && ['WAITING_CHIEF_ACCOUNTANT','WAITING_CFO','FORWARDED'].includes(selected.status)}
+              blockedHint={user.role==='ACCOUNTANT'?'Kế toán viên không trả lời câu hỏi chuyển tiếp. Trong demo, đổi vai trò ở góc trên.':(decision.requiresCFO && user.role!=='CFO')?'Ca này cần CFO. Trong demo, đổi vai trò sang CFO ở góc trên.':'Hồ sơ không còn chờ trả lời.'}
+              onDone={loadWorkspace} />
 
             {/* Danh sách toàn bộ vi phạm (IMP-P0: Multi-finding Engine) */}
             <HandoffContext decision={decision} showIssues={false} />
@@ -573,6 +583,7 @@ export function ProductionWorkspace({
               </label>
             )}
 
+            <details className="rounded-xl border border-slate-200 p-3"><summary className="cursor-pointer text-xs font-medium text-slate-700">Thao tác thủ công (nâng cao): chọn phương án A/B của phát hiện chính, xác nhận từng phát hiện</summary><div className="mt-3 space-y-3">
             <label htmlFor="workflow-reason" className="block text-sm">Lý do / bằng chứng (ít nhất 8 ký tự)<textarea id="workflow-reason" value={actionReason} onChange={e=>setActionReason(e.target.value)} className="mt-1 w-full rounded border p-2" /></label>
             {saveAsPrecedent && <div className="grid gap-2"><label>Mục đích được phép<input value={precedentPurpose} onChange={e=>setPrecedentPurpose(e.target.value)} className="w-full border p-2" /></label><label>Trần tiền CFO cho phép<input type="number" min="1" value={precedentMaximum} onChange={e=>setPrecedentMaximum(e.target.value)} className="w-full border p-2" /></label></div>}
             {decision.findings?.map(f=><label key={f.ruleId} className="flex gap-2 text-sm"><input type="checkbox" checked={confirmedFindings.includes(f.ruleId)} onChange={e=>setConfirmedFindings(prev=>e.target.checked?[...prev,f.ruleId]:prev.filter(id=>id!==f.ruleId))} />Đã xử lý: {f.flaggedReason}</label>)}
@@ -595,6 +606,8 @@ export function ProductionWorkspace({
                 </button>
               ))}
             </div>
+
+            </div></details>
 
             <details className="rounded-xl border border-slate-200 p-3 text-xs"><summary className="cursor-pointer font-medium text-slate-700">Giữ thuế tạm thời{provisionalHoldIds.has(selected.id) ? ' · Đang giữ' : ''}</summary>
             {/* Tách thuế tạm tính */}
@@ -724,7 +737,7 @@ export function ProductionWorkspace({
                   onViewDossier={(entry) => setSelectedAuditEntry(entry)}
                   onOverride={async (entry, targetStatus, reason) => {
                     const target = items.find(i => i.id === entry.invoiceRecordId);
-                    if (targetStatus === 'APPROVED' && target && ['WAITING_CHIEF_ACCOUNTANT', 'WAITING_CFO', 'FORWARDED'].includes(target.status)) {
+                    if (targetStatus === 'APPROVED' && target?.decision?.status === 'ESCALATED' && ['WAITING_CHIEF_ACCOUNTANT', 'WAITING_CFO', 'FORWARDED'].includes(target.status)) {
                       showToast('Ca chuyển tiếp: mở hồ sơ để xác nhận từng phát hiện rồi mới duyệt.', 'info');
                       router.push(`/workspace/invoices/${encodeURIComponent(target.id)}`);
                       return;

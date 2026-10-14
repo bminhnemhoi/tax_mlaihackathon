@@ -225,7 +225,8 @@ export function checkSameDayMultipleInvoicesRule(
   // Nếu tổng các hóa đơn trong ngày >= 5.000.000 VNĐ
   if (dailyTotal >= threshold) {
     // Kiểm tra xem có hóa đơn nào thanh toán tiền mặt hoặc chưa có chứng từ ngân hàng không
-    const violatingInvoices = sameDayInvoices.filter(inv => inv.paymentMethod === 'CASH' && !(inv.isStaffReimbursed && inv.hasBankSlip===true));
+    // Nhân viên trả tiền mặt cho bên bán vẫn là thanh toán tiền mặt (cùng quy tắc với hóa đơn đơn lẻ), kể cả khi được hoàn ứng qua ngân hàng.
+    const violatingInvoices = sameDayInvoices.filter(inv => inv.paymentMethod === 'CASH');
     if (violatingInvoices.length > 0) {
       return {
         isViolation: true,

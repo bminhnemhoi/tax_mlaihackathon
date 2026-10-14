@@ -13,7 +13,14 @@ import {groupOf,orderFindings,riskGroupsOf} from '@/lib/riskTaxonomy';
 import {fieldLabels} from '@/lib/workflowPresentation';
 
 /** Hàng hóa/dịch vụ không được giảm thuế 8% (NQ 204/2025/QH15): viễn thông, công nghệ thông tin… */
-const VAT8_EXCLUDED_PATTERN=/CƯỚC INTERNET|INTERNET|CƯỚC DI ĐỘNG|DI ĐỘNG|ĐIỆN THOẠI|CÁP QUANG|(?<![\p{L}\p{N}])[45]G(?![\p{L}\p{N}])|CÔNG NGHỆ THÔNG TIN|PHẦN MỀM|MÁY TÍNH|LAPTOP/u;
+const VAT8_EXCLUDED_PHRASES=['CƯỚC INTERNET','INTERNET','CÁP QUANG','CƯỚC DI ĐỘNG','THUÊ BAO DI ĐỘNG','ĐIỆN THOẠI DI ĐỘNG','CƯỚC ĐIỆN THOẠI','ĐIỆN THOẠI','4G','5G','CÔNG NGHỆ THÔNG TIN','PHẦN MỀM','MÁY TÍNH','LAPTOP'];
+/** Cụm từ chứa từ khóa loại trừ nhưng là hàng hóa thông thường (VD "mũ bảo hiểm" không phải dịch vụ bảo hiểm). */
+const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HIỂM','GĂNG TAY BẢO HIỂM'];
+/** So khớp nguyên cụm từ (không khớp giữa từ) với danh mục cấu hình + cụm từ viễn thông/CNTT. */
+function isVat8Excluded(textUpper:string,categories:string[]):boolean {
+  const text=VAT8_NOT_EXCLUDED.reduce((acc,phrase)=>acc.split(phrase).join(' '),textUpper);
+  return [...categories,...VAT8_EXCLUDED_PHRASES].some(phrase=>containsWord(text,phrase));
+}
 /** Chi phí nhạy cảm: so khớp nguyên từ để "BAVIA" hay "BÌA" không bị nhầm với "BIA". */
 const SENSITIVE_ITEM_PATTERN=/(?<![\p{L}\p{N}])(RƯỢU|BIA|WHISKY|WHISKEY|WINE|VODKA|CHAMPAGNE|THUỐC LÁ|CIGAR|KARAOKE|MASSAGE)(?![\p{L}\p{N}])/u;
 /** Khoản chi SOP không bao phủ → không tự duyệt (ngoài phạm vi quy định), dù số liệu hợp lệ. */
@@ -88,7 +95,7 @@ export function validateLineItems(
   for (const item of items) {
     sumAmount += item.amount;
     sumTax += item.taxAmount;
-    const nameUpper = item.itemName.toLocaleUpperCase('vi-VN');
+    const nameUpper = item.itemName.normalize('NFC').toLocaleUpperCase('vi-VN');
 
     // 1. Kiểm tra tính toán số học từng dòng (dung sai làm tròn 1.000đ)
     const expectedAmount = item.quantity * item.unitPrice - (item.discountAmount || 0);
@@ -106,7 +113,7 @@ export function validateLineItems(
 
     // 2. Rà soát danh mục loại trừ thuế suất 8% (Nghị quyết 204/2025/QH15)
     if (item.taxRate === 8) {
-      const isExcluded = excluded.some(cat => nameUpper.includes(cat)) || VAT8_EXCLUDED_PATTERN.test(nameUpper);
+      const isExcluded = isVat8Excluded(nameUpper, excluded);
       if (isExcluded) {
         warnings.push(`Dòng ${item.lineNumber} [${item.itemName}]: Mặt hàng thuộc danh mục loại trừ nhưng đang áp thuế suất ưu đãi 8% thay vì 10% (NQ 204/2025/QH15).`);
         flaggedCount++;
@@ -297,8 +304,8 @@ function evaluateInvoiceLocallyInternal(
         },
         {
           id: 'B',
-          label: 'Tạm dừng xử lý',
-          actionDescription: 'Không đưa hóa đơn vào đề xuất khấu trừ cho đến khi có bằng chứng hợp lệ.',
+          label: 'Không đủ căn cứ — không khấu trừ hóa đơn này',
+          actionDescription: 'Không đưa hóa đơn vào đề xuất khấu trừ; lưu lý do.',
           resultingAction: 'REJECT_TAX_DEDUCTION'
         }
       ],
@@ -648,8 +655,8 @@ function evaluateInvoiceLocallyInternal(
     'VIỄN THÔNG', 'TÀI CHÍNH', 'NGÂN HÀNG', 'CHỨNG KHOÁN', 'BẢO HIỂM',
     'BẤT ĐỘNG SẢN', 'KIM LOẠI', 'KHAI KHOÁNG', 'HÓA CHẤT', 'TIÊU THỤ ĐẶC BIỆT'
   ]).map((value) => value.trim().toLocaleUpperCase('vi-VN')).filter(Boolean);
-  const normalizedItemName = inv.itemName.toLocaleUpperCase('vi-VN');
-  const isExcludedItem = excludedCategories.some((category) => normalizedItemName.includes(category)) || VAT8_EXCLUDED_PATTERN.test(normalizedItemName);
+  const normalizedItemName = inv.itemName.normalize('NFC').toLocaleUpperCase('vi-VN');
+  const isExcludedItem = isVat8Excluded(normalizedItemName, excludedCategories);
   if ((isExcludedItem && inv.taxRate === 8) || lineItemResult.hasExcludedVat8Item) {
     const flagMsg = lineItemResult.hasExcludedVat8Item
       ? 'Dòng hàng có thuế suất 8% trong danh mục loại trừ đang cấu hình; cần đối chiếu ngành hàng và nguồn quy định'
@@ -684,8 +691,8 @@ function evaluateInvoiceLocallyInternal(
   }
 
   // 13. INTERNAL_POLICY: Quy chế nội bộ & Chi phí nhạy cảm (Rượu bia tiếp khách, viết lại theo P0-2/P0-3)
-  const SENSITIVE_ALCOHOL_REGEX = /(?:^|\s|[.,;_\-/])(rượu|bia|whisky|whiskey|wine|vodka|champagne|karaoke|massage)(?:$|\s|[.,;_\-/])/i;
-  const isAlcohol = SENSITIVE_ALCOHOL_REGEX.test(inv.itemName) || lineItemResult.hasSensitiveItem;
+  // Cùng một mẫu nguyên từ cho tên hàng và dòng hàng (gồm thuốc lá; ngoặc/dấu câu không làm lọt từ khóa).
+  const isAlcohol = SENSITIVE_ITEM_PATTERN.test(normalizedItemName) || lineItemResult.hasSensitiveItem;
   if (isAlcohol) {
     evaluatedFindings.push({
       ruleId: 'INTERNAL_POLICY_GUEST_ENTERTAINMENT',
@@ -1081,7 +1088,12 @@ export function evaluateInvoiceLocally(
 ): RefereeDecision {
   const regInfo = getApplicableRegulations(inv.invoiceDate);
   const applicableDecreeCodes = regInfo.applicableRegulations.map((d) => d.code);
-  const decision = evaluateInvoiceLocallyInternal(structuredClone(inv), customConfig, macroState, contextInvoices);
+  // Chuẩn hóa Unicode (NFC): chữ Việt gõ dạng tổ hợp (NFD) vẫn khớp từ khóa quy tắc.
+  const normalized = structuredClone(inv);
+  normalized.itemName = normalized.itemName.normalize('NFC');
+  normalized.supplierName = normalized.supplierName.normalize('NFC');
+  normalized.items = normalized.items?.map(line => ({ ...line, itemName: line.itemName.normalize('NFC') }));
+  const decision = evaluateInvoiceLocallyInternal(normalized, customConfig, macroState, contextInvoices);
   const decorated={
     ...decision,
     applicableRegulations: applicableDecreeCodes,
@@ -1109,7 +1121,6 @@ function getDataQualityIssue(inv: InvoiceInput,config?:Partial<SystemPolicyConfi
   if (Math.abs(inv.taxAmount - expectedTax) > AMOUNT_TOLERANCE || Math.abs(inv.totalAmount - expectedTotal) > AMOUNT_TOLERANCE) {
     return 'Các số tiền trên hóa đơn không nhất quán với tiền trước thuế và thuế suất; cần xác nhận lại chứng từ gốc.';
   }
-  if (inv.isImageBlurry) return 'Ảnh hóa đơn bị mờ, chưa thể xác nhận chính xác dữ liệu thực tế.';
   if(inv.totalAmount<0 && !inv.isAdjustment)return 'Giá trị âm chưa được xác định là hóa đơn điều chỉnh.';
   const missing=missingBusinessFacts(inv,config,dailyTotal);
   if(missing.length)return `Thiếu dữ kiện cần cho quy tắc: ${missing.map(field=>fieldLabels[field] || field).join(', ')}. Cần bổ sung nguồn xác minh.`;

@@ -316,6 +316,16 @@ export const RoutineDecisionSchema = z.object({
 });
 export type RoutineDecision = z.infer<typeof RoutineDecisionSchema>;
 
+// Hệ quả máy đọc được của một đáp án A/B trong câu hỏi chuyển tiếp (services/questionBuilder.ts).
+export const AnswerEffectSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('SET_FIELDS'), values: z.record(z.union([z.string(), z.number(), z.boolean()])), confirm: z.array(z.string()).optional() }),
+  z.object({ kind: z.literal('CONFIRM_FIELDS'), fields: z.array(z.string()) }),
+  z.object({ kind: z.literal('NEED_VALUE'), field: z.string() }),
+  z.object({ kind: z.literal('RESOLVE'), ruleId: z.string(), resultingAction: z.string() }),
+  z.object({ kind: z.literal('REQUEST_INFO') }),
+  z.object({ kind: z.literal('REJECT') })
+]);
+
 export const HandoffSchema = z.object({
   requiredRole: z.enum(['CHIEF_ACCOUNTANT','CFO']),
   invoiceNumber:z.string(), primaryRuleId:z.string(), question:z.string(),
@@ -329,7 +339,7 @@ export const HandoffSchema = z.object({
   // Câu hỏi có cấu trúc: mỗi ý một nhóm rủi ro và hai đáp án; trả lời một lần kiểu "1A, 2B".
   questionSpec:z.object({
     recipientRole:z.enum(['CHIEF_ACCOUNTANT','CFO']), taxAtStakeVnd:z.number(), replyHint:z.string(),
-    items:z.array(z.object({n:z.number().int().positive(),ruleIds:z.array(z.string()),riskGroup:RiskGroupEnum,text:z.string(),answers:z.tuple([z.string(),z.string()])}))
+    items:z.array(z.object({n:z.number().int().positive(),ruleIds:z.array(z.string()),riskGroup:RiskGroupEnum,text:z.string(),answers:z.tuple([z.string(),z.string()]),effects:z.tuple([AnswerEffectSchema,AnswerEffectSchema]).optional()}))
   }).optional(),
 });
 export type RefereeHandoff = z.infer<typeof HandoffSchema>;
