@@ -39,13 +39,16 @@ test('trả lời 1 câu: UPS 12.100.000₫ thiếu hình thức thanh toán —
   });
 });
 
-test('trả lời B (tiền mặt) cho ca ≥ 5 triệu → đánh giá lại thành Ngoài quy định, có câu hỏi mới', async () => {
+test('trả lời B (tiền mặt) cho ca ≥ 5 triệu → kết thúc bằng từ chối khấu trừ như đáp án đã nêu, không hỏi lại', async () => {
   await inSandbox(async () => {
     await evaluateWorkflow({ ...base, id: 'UPS-CASH', invoiceNumber: 'UPS-CASH', itemName: 'Bộ lưu điện UPS', preTaxAmount: 11_000_000, taxRate: 10, taxAmount: 1_100_000, totalAmount: 12_100_000 }, accountant, { forceLocalOnly: true });
     const result = await answer('UPS-CASH', chief, { '1': 'B' });
-    assert.equal(result.outcome, 'RE_EVALUATED_ESCALATED');
-    const decision = JSON.parse(readRecord('UPS-CASH').decision_json!);
-    assert.equal(decision.riskGroup, 'OUT_OF_POLICY');
+    assert.equal(result.outcome, 'REJECTED');
+    const record = readRecord('UPS-CASH');
+    assert.equal(record.status, 'REJECTED');
+    // Dữ kiện "tiền mặt" vẫn được ghi lại và đánh giá lại trước khi từ chối (vi phạm điều kiện thanh toán không dùng tiền mặt).
+    assert.equal(JSON.parse(record.payload_json).paymentMethod, 'CASH');
+    assert.equal(JSON.parse(record.decision_json!).riskGroup, 'OUT_OF_POLICY');
   });
 });
 
