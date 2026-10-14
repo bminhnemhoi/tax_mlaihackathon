@@ -68,7 +68,7 @@ export const AuditTrailTable: React.FC<AuditTrailTableProps> = ({
 
         {/* Quick Filter Tabs using shadcn Tabs */}
         <Tabs value={filter} onValueChange={(val) => setFilter(val as typeof filter)}>
-          <TabsList className="bg-slate-100/90 border border-slate-200/80 h-9 p-0.5 rounded-lg gap-1">
+          <TabsList className="bg-slate-100/90 border border-slate-200/80 h-auto min-h-9 flex-wrap p-0.5 rounded-lg gap-1">
             <TabsTrigger
               value="ALL"
               className="text-xs px-2.5 py-1 font-semibold text-slate-600 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-none inline-flex items-center gap-1.5"

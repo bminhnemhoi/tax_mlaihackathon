@@ -49,15 +49,15 @@ export default function HomePage():ReactElement {
       <p className="rounded-xl border border-lime-300 bg-lime-50 px-4 py-3 text-sm leading-6 text-foreground" data-testid="judge-instruction">
         <strong>Giám khảo:</strong> bấm <strong>①</strong> để chạy 9 ca kiểm chứng có dấu thời gian, sau đó <strong>②</strong> để tự nhập hóa đơn mới. Không cần tài khoản.
       </p>
-      {signedIn&&<Link href="/workspace/inbox" data-testid="continue-workspace" className={cn(buttonVariants({variant:'secondary'}),'h-12 w-full justify-between gap-2')}>
+      {signedIn&&<Link href="/workspace/inbox" data-testid="continue-workspace" className={cn(buttonVariants({variant:'secondary'}),'h-auto min-h-12 w-full justify-between gap-2 whitespace-normal py-2 text-left')}>
         <span>Tiếp tục vào workspace · {signedIn.displayName} ({ROLE_LABELS[signedIn.role]?.split(' (')[0] || signedIn.role})</span><ArrowRight className="h-4 w-4"/>
       </Link>}
       <div className="grid gap-3">
-        <Link href="/verify" className={cn(buttonVariants({size:'lg'}),'h-14 justify-between gap-2 text-base')}>
+        <Link href="/verify" className={cn(buttonVariants({size:'lg'}),'h-auto min-h-14 justify-between gap-2 whitespace-normal py-3 text-left text-base')}>
           <span className="flex items-center gap-2"><FlaskConical className="h-5 w-5"/>① Chạy Verify (90 giây)</span><ArrowRight className="h-4 w-4"/>
         </Link>
         <form className="space-y-3 rounded-2xl border bg-card p-4" onSubmit={(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();void enter('/api/demo/session',{role});}}>
-          <Button type="submit" size="lg" variant="outline" disabled={busy} className="h-14 w-full justify-between gap-2 text-base">
+          <Button type="submit" size="lg" variant="outline" disabled={busy} className="h-auto min-h-14 w-full justify-between gap-2 whitespace-normal py-3 text-left text-base">
             <span className="flex items-center gap-2"><Inbox className="h-5 w-5"/>{busy?'Đang mở…':'② Mở hộp chuyển tiếp — demo riêng'}</span><ArrowRight className="h-4 w-4"/>
           </Button>
           <label htmlFor="demo-role" className="block text-xs font-medium text-muted-foreground">Vào với vai trò mô phỏng (đổi được trong workspace)</label>
