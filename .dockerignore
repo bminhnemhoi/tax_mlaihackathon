@@ -5,6 +5,8 @@ data/runtime
 data/uploads
 .env*
 env.local
+*.local
+env_*
 !.env.example
 brainstorming
 backups

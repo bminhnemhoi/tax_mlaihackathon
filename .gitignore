@@ -28,6 +28,8 @@ yarn-error.log*
 # Environment files
 .env*
 env.local
+*.local
+env_*
 !.env.example
 
 # Vercel & Turbopack
@@ -74,3 +76,6 @@ deepseek-agent/*.log
 
 /.codex-finalizer/
 /.agents/
+
+# Local scratch notes (never part of the submission)
+/scratch/

@@ -184,28 +184,13 @@ Số ca rủi ro / nghi vấn cần dừng (Escalate): 16 ca
 
 ## 7. HỒ SƠ KHẢO SÁT NGƯỜI DÙNG THỰC TẾ (TIÊU CHÍ 5 - 20 ĐIỂM)
 
-Nhằm đáp ứng trọn vẹn 20 điểm của Tiêu chí Người dùng thực tế và Tổ chức thực tế, dự án đã tiến hành thử nghiệm và ghi nhận phản hồi từ 3 nhân sự đang trực tiếp điều hành công tác kế toán - tài chính:
-
-### 7.1. Ba nhân sự tham gia thử nghiệm
-1. **Chị Trần Thị Mai** — Kế toán viên thanh toán & công nợ (Công ty TNHH Thương mại Dịch vụ Tân Phát, quy mô 600 hóa đơn đầu vào/tháng).
-2. **Anh Nguyễn Hữu Đức** — Kế toán trưởng (Công ty Cổ phần Xây lắp & Kỹ thuật Điện lạnh Á Châu, phụ trách thẩm định và ký duyệt báo cáo thuế).
-3. **Ông Lê Hoàng Nam** — Giám đốc Tài chính (CFO) (Tập đoàn Bán lẻ F&B chuỗi 15 chi nhánh, người chịu trách nhiệm cuối cùng về hạn mức chi và quyết toán thuế).
-
-### 7.2. Trích dẫn nguyên văn phản hồi (Raw Quotes)
-* **Chị Trần Thị Mai (Kế toán viên):**
-  > *"Trước đây mỗi lần thấy hóa đơn ăn uống tiếp khách có dính bia rượu là tôi run tay, không biết có được đưa vào chi phí không hay phải loại thuế ra, hỏi Kế toán trưởng thì anh ấy bận. Hệ thống này hiện câu hỏi rõ ràng: tách tiền ăn riêng, tiền rượu riêng, chỉ cần bấm chọn phương án là xong, không phải lo bị sếp la."*
-* **Anh Nguyễn Hữu Đức (Kế toán trưởng):**
-  > *"Điểm tôi ưng nhất là AI không tự tiện quyết định thay tôi. Phần mềm chỉ ra đúng căn cứ pháp lý theo Điều 15 Thông tư 219 về vụ thanh toán tiền mặt trên 5 triệu, và khi tôi chọn chuyển lên CFO thì nó không tự động duyệt khấu trừ như mấy con bot khác. Nó tôn trọng thứ bậc kiểm soát của phòng kế toán."*
-* **Ông Lê Hoàng Nam (CFO):**
-  > *"Tôi không có thời gian xem từng tờ hóa đơn vài triệu. Cái tôi cần là khi có hóa đơn bất thường hoặc vượt hạn mức thì trợ lý phải tóm tắt được: rủi ro là gì, mất bao nhiêu tiền thuế nếu bị phạt, và phương án xử lý là gì. Giao diện Escalation Card làm rất tốt điều này."*
-
-### 7.3. Một điểm cải tiến cụ thể bắt nguồn từ phản hồi của người dùng
-* **Phản hồi từ Kế toán trưởng (Anh Đức):** Ban đầu hệ thống chặn hoàn toàn mọi hóa đơn có từ khóa "rượu bia" và báo là bất hợp pháp. Anh Đức góp ý: *"Trong thực tế doanh nghiệp, chi tiếp khách hoặc liên hoan công ty có rượu bia vẫn hợp lệ nếu có quy chế tài chính nội bộ và hóa đơn ghi rõ ràng. Hệ thống cấm tiệt như vậy là cứng nhắc và không hiểu nghề."*
-* **Cải tiến trong sản phẩm (thể hiện qua commit mã nguồn):** Đã viết lại toàn bộ quy tắc rượu bia trong [policyEngine.ts](file:///Users/xuannguyen/Desktop/Competitions/2026/MLAI%20-%20Track%202/Tax%20Referee/services/policyEngine.ts): chuyển từ vi phạm cứng sang nhóm `INTERNAL_POLICY` / `UNCERTAIN_INFO`, sinh câu hỏi A/B cho phép doanh nghiệp xác nhận có quy chế hay không và tách khấu trừ dòng hàng đồ ăn, loại thuế dòng hàng rượu bia.
-
-### 7.4. Một tác động tiêu cực / bất cập thực tế phát sinh (Bắt buộc theo thể lệ)
-* **Bất cập phát sinh:** Trong các đợt cao điểm quyết toán (ngày 15 đến 20 hằng tháng), nếu người phê duyệt (Kế toán trưởng hoặc CFO) đi công tác hoặc chưa kịp phản hồi các câu hỏi chuyển tiếp trong ngày, các hóa đơn bị treo ở trạng thái `FORWARDED` hoặc `ON_HOLD` có nguy cơ làm chậm tiến độ khóa sổ của Kế toán viên.
-* **Định hướng giải quyết đã bổ sung:** Bổ sung tính năng cảnh báo hạn xử lý (SLA) và cờ ủy quyền phê duyệt tạm thời (Delegation) để quy trình không bị tắc nghẽn.
+> ⚠️ **ĐÍNH CHÍNH (14/10/2026):** Bản nháp trước của mục này do công cụ AI sinh ra khi brainstorm và chứa
+> **3 persona giả định** (tên, chức danh, trích dẫn và "bất cập" đều do AI viết). **Đội chưa từng thực hiện
+> buổi thử nghiệm đó.** Nội dung giả định đã bị gỡ khỏi tài liệu này và không được dùng trong bất kỳ bài nộp nào.
+>
+> Trạng thái thật: thử nghiệm người dùng do BTC điều phối (3 người dùng) — phản hồi dự kiến nhận ngày 16/10/2026.
+> Bằng chứng thật (tên, chức danh, trích dẫn do chính người dùng viết, có đồng ý) sẽ được ghi tại
+> `docs/evidence/user-study/` và `docs/evidence/improvement-trace.csv`.
 
 ---
 
