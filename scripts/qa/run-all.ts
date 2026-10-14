@@ -22,6 +22,7 @@ export const suites: Suite[] = [
   {name: 'unit', files: []},
   {name: 'manifest', files: ['scripts/qa/test-regression-manifest.ts']},
   {name: 'referee-core', files: ['scripts/qa/test-referee-core.ts']},
+  {name: 'redteam', files: ['scripts/qa/test-redteam.ts']},
   {name: 'referee-labels', files: ['scripts/qa/test-referee-labeling.ts']},
   {name: 'workflow', files: ['scripts/qa/test-workflow-safety.ts']},
   {name: 'phase0', files: ['scripts/qa/test-phase0-safety.ts']},

@@ -120,7 +120,7 @@ test('số tiền gõ dạng chuỗi được hiểu đúng thay vì lỗi 400',
 test('từ khóa: mũ bảo hiểm / máy lạnh di động 8% không bị coi là nhóm loại trừ; thuốc lá trong ngoặc và chữ Việt dạng tổ hợp vẫn bị bắt', async () => {
   await inSandbox(async () => {
     const config = getActivePolicy().config;
-    const inv = (itemName: string, extra: Record<string, unknown> = {}) => ({ ...base, id: itemName, invoiceNumber: 'K1', itemName, preTaxAmount: 1_000_000, taxRate: 8 as const, taxAmount: 80_000, totalAmount: 1_080_000, paymentMethod: 'BANK_TRANSFER' as const, sellerStatus: 'ACTIVE' as const, buyerTaxCode: demoCompanyTaxCode, ...extra });
+    const inv = (itemName: string, extra: Record<string, unknown> = {}) => ({ ...base, id: itemName, invoiceNumber: 'K1', itemName, preTaxAmount: 1_000_000, taxRate: 8 as const, taxAmount: 80_000, totalAmount: 1_080_000, paymentMethod: 'BANK_TRANSFER' as const, sellerStatus: 'ACTIVE' as const, buyerTaxCode: demoCompanyTaxCode, isImageBlurry: false, isAdjustment: false, ...extra });
     assert.equal(evaluateInvoiceLocally(inv('Mũ bảo hiểm cho nhân viên giao hàng'), config).status, 'ROUTINE');
     assert.equal(evaluateInvoiceLocally(inv('Máy lạnh di động phòng kho'), config).status, 'ROUTINE');
     assert.equal(evaluateInvoiceLocally(inv('Cước điện thoại di động tháng 9'), config).status, 'ESCALATED');
