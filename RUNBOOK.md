@@ -46,8 +46,8 @@ CI (GitHub Actions, Ubuntu + Windows) chạy cùng các lệnh trên khi đẩy 
 
 | Thời gian | Thao tác | Kỳ vọng |
 |---|---|---|
-| 0:00–1:00 | Mở trang chủ → đọc dòng hướng dẫn → bấm **"Mở hộp chuyển tiếp — demo riêng"** | Vào workspace với database riêng cho phiên, không cần tài khoản |
-| 1:00–3:00 | Bấm **"Chạy Verify"** (trang `/verify`) | Bảng PASS/FAIL có dấu thời gian từng ca: 4 ca chung + 5 ca Đề A (3 tự xử lý, 2 chuyển tiếp) |
+| 0:00–2:00 | Bấm **"Chạy Verify"** (trang `/verify`) | Bảng PASS/FAIL có dấu thời gian từng ca: 4 ca chung + 5 ca Đề A (3 tự xử lý, 2 chuyển tiếp) |
+| 2:00–3:00 | Mở trang chủ → đọc dòng hướng dẫn → bấm **"Mở hộp chuyển tiếp — demo riêng"** | Vào workspace với database riêng cho phiên, không cần tài khoản |
 | 3:00–5:00 | Nhập 2 hóa đơn mới (form "Nhập ca mới" hoặc tải XML/PDF/ảnh) | Ca thường quy → tự duyệt; ca nghi vấn → chuyển tiếp với câu hỏi cụ thể, không đoán |
 | 5:00–6:30 | Mở ca chuyển tiếp → đọc câu hỏi → đổi vai trò KTT/CFO → trả lời | Quyết định được ghi lại, thuế chỉ được duyệt sau khi người có thẩm quyền xác nhận |
 | 6:30–7:30 | Tab **Nhật ký** → chọn hồ sơ → xem từng sự kiện → **Dừng** / **Hoàn tác** | Thấy ai làm, lúc nào, dữ liệu đầu vào (inputHash, snapshot), quy tắc và lý do; hoàn tác tạo sự kiện mới, không xóa lịch sử |

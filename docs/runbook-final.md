@@ -1,5 +1,8 @@
 # Runbook Chung kết Đề A
 
+> 📌 **Ảnh chụp lịch sử** — số liệu và tên quy tắc trong file này có thể đã cũ. Số liệu hiện hành: [README](../README.md), trang `/verify`, `/sop` và `docs/evidence/`.
+
+
 ## Clone sạch và kiểm tra
 
 Yêu cầu: Node 22, npm; Python 3 + PyMuPDF + Pillow cho PDF/ảnh. Chạy từ thư mục repo:

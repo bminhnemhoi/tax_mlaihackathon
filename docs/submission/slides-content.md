@@ -52,19 +52,20 @@ Nhập tay         ──►  3. Phân 3 nhóm dừng + câu hỏi một câu   
 | Ca xử lý đúng (trạng thái + nhóm dừng) | 3/11 | **11/11** |
 | Ca thường quy bị chuyển tiếp thừa | 3/3 | **0/3** |
 | Ca chuyển tiếp sai nhóm | 4/8 | **0/8** |
-| Câu hỏi có số tiền cụ thể, không bắt mở lại chứng từ | 1/10 | **8/8** |
+| Câu hỏi đạt kiểm tra tự động (có số tiền ₫, không bắt mở lại chứng từ)* | 1/10 | **8/8** |
 
 *Phương pháp:* cùng 11 ca, cùng script, hai phiên bản mã nguồn (commit `33522a0` và bản hiện tại), mỗi ca một database tạm, không gọi AI.
 *Giới hạn ghi rõ trên slide:* ca do đội viết → tập phát triển, **không phải đánh giá độc lập**. Nguồn: `docs/evidence/before-after-judge-rehearsal-2026-10-14.md`.
 
-Thêm: Verify 9 ca (4 chung + 5 Đề A) PASS 9/9 (chạy lại trên live sau khi deploy, lưu JSON có timestamp); 60 ca phát triển tổng hợp 60/60; 72 ca "đánh lừa" do agent viết từ SOP (không đọc mã engine) 66/72 → 72/72, nay là bộ hồi quy; `npm test` 16/16 bộ, CI Ubuntu + Windows khi đẩy mã và khi mở PR.
-*Giới hạn:* ca red team do AI viết, không thay cho người dùng thật hay đánh giá độc lập.
+Thêm: Verify 9 ca (4 chung + 5 Đề A) PASS 9/9 (chạy lại trên live sau khi deploy, lưu JSON có timestamp); 60 ca phát triển tổng hợp 60/60; 72 ca "đánh lừa" do agent viết từ SOP (không đọc `policyEngine.ts`; có đọc SOP và module ngưỡng) 66/72 → 72/72, nay là bộ hồi quy; `npm test` 16/16 bộ, CI Ubuntu + Windows khi đẩy mã và khi mở PR.
+*Giới hạn:* ca red team do AI viết và gán nhãn theo SOP, chưa được người nghiệp vụ duyệt; không thay cho người dùng thật hay đánh giá độc lập.
+\* Mẫu số khác nhau: bản cũ chuyển tiếp 10 ca (gồm 3 ca thường quy bị hỏi thừa), bản mới 8 ca. Phần A là **chất lượng engine trên tập phát triển**; tác động lên người dùng ở phần B (pilot 3 người, 16/10).
 
 **B. Đo với người dùng thật — [CẬP NHẬT 16/10]**
 
 | Chỉ số | Trước (cách làm hiện tại, người dùng tự báo) | Với Tax Referee |
 |---|---|---|
-| Thời gian kiểm 1 hóa đơn thường quy | [__ phút] | [__ giây, đo trên 5 ca] |
+| Thời gian kiểm 1 hóa đơn thường quy | [__ phút, người dùng tự ước tính] | [__ giây, người dùng tự ước tính trên 5 ca] |
 | Tỉ lệ hóa đơn phải hỏi người khác | [__ %] | [__ /5 ca bị chuyển tiếp] |
 | Câu hỏi trả lời được ngay trong một lần (thang 1–5) | — | [điểm TB câu 4] |
 | Đồng thuận người–máy trên 5 ca | — | [__/15 quyết định] |

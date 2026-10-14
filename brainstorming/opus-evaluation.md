@@ -155,6 +155,10 @@ Tax Referee triển khai cơ chế học tiền lệ với các rào chắn ki�
 
 ## 6. BÁO CÁO ĐỘ CHÍNH XÁC TRÊN TẬP KIỂM THỬ ĐỘC LẬP (SPRINT 2 METRICS)
 
+> ⚠️ **ĐÍNH CHÍNH (15/10/2026):** Các con số trong mục này (tập "42 mẫu hóa đơn thực tế", FN 0%, STP 92,3%,
+> "tiết kiệm 85% thời gian") do công cụ AI viết khi brainstorm và **không có lần chạy nào tương ứng**; repo không có tập 42 ca này.
+> Không dùng các số này làm bằng chứng. Số liệu thật, có lệnh tái lập: `docs/evidence/` và trang `/verify`.
+
 Theo yêu cầu nâng cao của Sprint 2: *"Báo cáo độ chính xác bằng số liệu cụ thể trên tập kiểm thử độc lập: tỷ lệ trường hợp cần chuyển tiếp nhưng bị bỏ sót, và tỷ lệ trường hợp đơn giản bị chuyển tiếp không cần thiết"*.
 
 Hệ thống ghi nhận kết quả đánh giá trên tập dữ liệu kiểm chứng độc lập (42 mẫu hóa đơn thực tế và giả lập các tình huống biên):

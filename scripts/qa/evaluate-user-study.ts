@@ -103,7 +103,8 @@ async function main() {
   // Trích dẫn nguyên văn
   const labels: Record<string, string> = { q7: 'Câu hỏi chung chung/thừa/sai', q10: 'Không đồng ý với hệ thống', q11: 'Việc mới phát sinh', q15: 'Khó hiểu nhất', q17: 'Muốn gặp trực tiếp khi', q18: 'Một thay đổi muốn sửa ngay', q19: 'Lý do chưa dám dùng thật', q20: 'Nhận xét khác' };
   lines.push('## Trích dẫn nguyên văn (theo phạm vi đồng ý)', '');
-  for (const p of participants) for (const [key, text] of Object.entries(p.quotes || {})) if (text?.trim()) lines.push(`- **${labels[key] || key}** — "${text.trim()}" — ${who(p)}`);
+  // Người chọn "Không" đồng ý trích dẫn: không in nguyên văn (chỉ dùng tổng hợp số liệu).
+  for (const p of participants) if (p.consent !== 'NONE') for (const [key, text] of Object.entries(p.quotes || {})) if (text?.trim()) lines.push(`- **${labels[key] || key}** — "${text.trim()}" — ${who(p)}`);
   lines.push('', `_Sinh bởi scripts/qa/evaluate-user-study.ts từ ${file}; hệ thống chạy tất định trên commit hiện tại._`);
   console.log(lines.join('\n'));
 }

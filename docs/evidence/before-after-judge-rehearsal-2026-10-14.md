@@ -42,5 +42,16 @@ Chi tiết từng ca:
 Ví dụ câu hỏi E1: **trước**: "…cần xác minh Thanh toán: chưa có dữ liệu… A: Xác minh dữ liệu từ chứng từ gốc; hoặc B: Yêu cầu bổ sung chứng từ";
 **sau**: "Hóa đơn 12.100.000₫ được thanh toán bằng hình thức nào? A: Chuyển khoản qua ngân hàng (có UNC); hoặc B: Tiền mặt → không được khấu trừ 1.100.000₫ VAT?"
 
-Tái lập: tạo worktree ở commit `33522a0`, rồi `npx tsx scripts/qa/compare-rehearsal.ts <đường dẫn repo>` cho từng phiên bản (đặt `TAX_REFEREE_DATA_DIR` là thư mục tạm).
+Tái lập (phải chạy với thư mục làm việc là phiên bản cần đo, vì alias `@/` lấy theo tsconfig của thư mục hiện tại — chạy từ gốc repo mới sẽ nạp lẫn mã mới và ra 6/11 thay vì 3/11):
+
+```sh
+git worktree add ../before 33522a0
+cp scripts/qa/compare-rehearsal.ts ../before/
+cd ../before && npm ci
+TAX_REFEREE_DATA_DIR=$(mktemp -d) npx tsx compare-rehearsal.ts .      # bản 13/10 → 3/11
+cd - && TAX_REFEREE_DATA_DIR=$(mktemp -d) npx tsx scripts/qa/compare-rehearsal.ts .   # bản hiện tại → 11/11
+```
+
+Chỉ số "câu hỏi cụ thể" là kiểm tra tự động: câu hỏi có số tiền ₫ và không chứa "chứng từ gốc / xem danh sách / xem xét lại".
+Mẫu số khác nhau giữa hai bản (bản cũ hỏi 10 ca, gồm 3 ca thường quy bị hỏi thừa; bản mới hỏi 8 ca).
 Kiểm thử tự động tương ứng: `tests/unit/judgeRehearsal.test.ts`.

@@ -20,6 +20,7 @@ Thời lượng dự kiến: **15–20 phút/người**, làm online, không c�
 | Vai trò trong quy trình duyệt (nhập liệu / kiểm soát / phê duyệt) | |
 | Đồng ý cho đội **trích dẫn nguyên văn** câu trả lời kèm **họ tên và chức danh** trong slide và repo công khai? | ☐ Đồng ý ☐ Chỉ trích dẫn chức danh, không nêu tên ☐ Không đồng ý |
 
+> Họ tên, chức danh và đơn vị luôn được cung cấp cho BTC và giám khảo để xác minh người dùng thật (theo thể lệ); lựa chọn ở dòng trên chỉ áp dụng cho việc **công bố** trên slide và repo công khai. Người chọn "Không" sẽ không bị trích nguyên văn.
 > Dữ liệu thử nghiệm là hóa đơn **tổng hợp** (không phải dữ liệu thật của doanh nghiệp nào).
 > Đội không thu thập dữ liệu cá nhân ngoài các mục trên.
 

@@ -6,7 +6,8 @@ Phần lớn được soạn cùng công cụ AI (ChatGPT, Claude, Codex, Gemini
 - Mọi tên người, chức danh, công ty, trích dẫn "người dùng" xuất hiện trong các file này là **persona giả định**
   dùng để thiết kế luồng, **không phải người dùng thật** và không được dùng làm bằng chứng thử nghiệm.
 - Các con số (FN/FP, STP, điểm số tự chấm…) trong file nháp là số liệu tại thời điểm viết hoặc dự kiến,
-  có thể đã lỗi thời. Số liệu chính thức nằm trong `docs/evidence/` và trang `/verify`.
+  có thể đã lỗi thời. Riêng "42 mẫu hóa đơn thực tế, FN 0%, STP 92,3%, tiết kiệm 85%" (opus-evaluation.md §6,
+  plan-refactor-challenge-a.md, specification.md) do AI viết, **không có lần chạy tương ứng**. Số liệu chính thức nằm trong `docs/evidence/` và trang `/verify`.
 - Bằng chứng người dùng thật (tên, chức danh, trích dẫn do chính người dùng viết, có đồng ý) chỉ được ghi tại
   `docs/evidence/user-study/` và `docs/evidence/improvement-trace.csv`.
 

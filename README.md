@@ -22,12 +22,23 @@ Mọi quyết định có nhật ký kiểm toán, dừng và hoàn tác đượ
 2. Tab **Thử dữ liệu mới**: sửa JSON hoặc bấm ca mẫu (bỏ trống trường chưa biết). Hệ thống chỉ hỏi những dữ kiện **thực sự làm thay đổi kết quả**.
 3. Trang chủ → **② Mở hộp chuyển tiếp — demo riêng** (database riêng cho phiên, có sẵn 4 ca mẫu: 1 tự xử lý + 1 ca cho mỗi kiểu dừng) → mở một ca → đổi vai trò KTT/CFO → trả lời ngay trên hồ sơ (VD "1A, 2A") → tab **Nhật ký** → **Dừng / Hoàn tác**.
 
+### 4 trường hợp kiểm thử chung
+
+| Ca | Dữ liệu đầu vào | Hành vi kỳ vọng | Cách chạy |
+|---|---|---|---|
+| C-01 | Phí chuyển phát nhanh tài liệu 2.200.000₫, chuyển khoản | Tự xử lý (thường quy), tạo chứng từ nội bộ | `/verify` → Chạy Verify, hoặc `npm test` |
+| C-02 | Tài trợ giải chạy từ thiện 16.500.000₫ | Chuyển tiếp · Ngoài quy định (KTT quyết định) | như trên |
+| C-03 | Hóa đơn từ ảnh mờ | Chuyển tiếp · Chưa rõ thông tin (không kết luận trên số tiền chưa chắc) | như trên |
+| C-04 | MST người mua khác MST doanh nghiệp (0102030405) | Chuyển tiếp · Ngoài quy định (không đủ điều kiện khấu trừ) | như trên |
+
+Dữ liệu: `data/verification/challengeCases.ts`. 5 ca Đề A (3 tự xử lý, 2 chuyển tiếp) chạy cùng nút Verify.
+
 ## Ba kiểu dừng và câu hỏi "trả lời trong một câu"
 
 | Kiểu dừng | Khi nào | Ví dụ câu hỏi hệ thống tạo |
 |---|---|---|
 | **Chưa rõ thông tin** | Thiếu/mờ/mâu thuẫn dữ kiện làm thay đổi kết quả | *Tổng thanh toán in trên hóa đơn 480.000₫ lệch tiền hàng + thuế = 495.000₫. A: 495.000₫ — sửa và đánh giá lại; hoặc B: 480.000₫ như in — yêu cầu NCC điều chỉnh?* |
-| **Ngoài quy định** | Vi phạm điều kiện khấu trừ, hoặc khoản chi SOP không bao phủ | *“Tiếp khách đối tác - rượu vang” (3.300.000₫) nằm ngoài nhóm chi được tự duyệt. A: Tiếp khách theo quy chế — duyệt, khấu trừ 300.000₫; hoặc B: Chi cá nhân — loại 300.000₫ VAT?* |
+| **Ngoài quy định** | Vi phạm điều kiện khấu trừ, hoặc khoản chi thuộc danh mục ngoài phạm vi tự duyệt (tài trợ, phạt, quà biếu/tặng, chi cá nhân…) | *“Tiếp khách đối tác - rượu vang” (3.300.000₫) nằm ngoài nhóm chi được tự duyệt. A: Tiếp khách theo quy chế — duyệt, khấu trừ 300.000₫; hoặc B: Chi cá nhân — loại 300.000₫ VAT?* |
 | **Vượt thẩm quyền** | Từ 200 triệu (hạn mức KTT) hoặc lô hàng làm hệ số K vào vùng đỏ | *Tổng thanh toán 330.000.000₫ ≥ hạn mức tự duyệt của KTT 200.000.000₫. A: CFO phê duyệt chi, khấu trừ 30.000.000₫; hoặc B: Tạm dừng để thẩm tra hợp đồng?* |
 
 - Ca có nhiều vấn đề được gộp thành **các ý đánh số trong một câu hỏi**; người xử lý trả lời một lần (VD "1A, 2A").
@@ -91,11 +102,12 @@ CI (GitHub Actions, Ubuntu + Windows): typecheck, lint, test, build khi đẩy m
 ## Bằng chứng và giới hạn (trung thực)
 
 - **Người dùng thực tế:** đang thử nghiệm với 3 người dùng do BTC điều phối (bộ câu hỏi: [docs/submission/proposal-user-questions.md](docs/submission/proposal-user-questions.md)). Chưa có kết quả tại thời điểm khóa repo; kết quả và cải tiến từ phản hồi sẽ được ghi ở `docs/evidence/` kèm commit riêng.
-- **Độ chính xác:** các bộ Verify và 60 ca phát triển là dữ liệu tổng hợp đội tự gán nhãn; 72 ca red team do agent AI viết từ SOP mà không đọc mã engine (`data/verification/redteam/cases.json`, 72/72). Tất cả **chưa phải đánh giá độc lập**. Công cụ khóa nhãn và chấm độc lập đã có (`npm run labels:lock`, `npm run evaluate:independent`).
+- **Độ chính xác:** các bộ Verify và 60 ca phát triển là dữ liệu tổng hợp đội tự gán nhãn; 72 ca red team do agent AI viết từ SOP (không đọc `services/policyEngine.ts`, có đọc SOP và module ngưỡng `lib/refereeRequirements.ts`; nhãn do AI gán, chưa được người nghiệp vụ duyệt) (`data/verification/redteam/cases.json`, 72/72). Tất cả **chưa phải đánh giá độc lập**. Công cụ khóa nhãn và chấm độc lập đã có (`npm run labels:lock`, `npm run evaluate:independent`).
 - **Pháp lý:** quy tắc mô tả SOP nội bộ; điều khoản luật được dẫn nguồn nhưng diễn giải cần kế toán xác nhận.
-- **Đã biết:** khoản chi không thuộc danh mục rủi ro nào vẫn có thể tự duyệt (VD chi cá nhân đặt tên lạ); dữ liệu ảnh gửi qua dịch vụ AI bên thứ ba; SQLite một instance; đăng nhập nội bộ là MVP.
+- **Đã biết:** "ngoài phạm vi" được nhận diện bằng danh sách từ khóa, nên chi cá nhân ghi tên khác vẫn có thể tự duyệt (VD "tiệc cưới người thân giám đốc" — giữ nguyên làm ca bẫy U2 cho buổi thử 16/10 đã công bố trong Proposal); hóa đơn tách nhỏ cùng nhà cung cấp cùng ngày chưa được cộng dồn khi xét hạn mức CFO; ngày lập tương lai gần chưa bị chặn (chỉ chặn khi quá 6 tháng); dữ liệu ảnh gửi qua dịch vụ AI bên thứ ba; SQLite một instance; đăng nhập nội bộ là MVP.
 
 Các thư mục `brainstorming/` là ghi chú nháp do AI hỗ trợ soạn, **không phải bằng chứng** (xem [brainstorming/README.md](brainstorming/README.md)).
+Lịch sử commit trước 14/10 có bản nháp AI chứa 3 persona giả định kèm trích dẫn **không có thật** và một bảng số liệu "tập độc lập 42 ca" không có lần chạy tương ứng; đội đã gỡ/đính chính công khai ở commit `3ace396` và trong `brainstorming/opus-evaluation.md` (§6, §7). Không viết lại lịch sử git để giữ minh bạch.
 
 ## Cấu trúc mã nguồn
 

@@ -13,8 +13,8 @@
 ## 2. AI giúp nhanh ở đâu
 - Dựng khung Next.js + SQLite + workflow có revision/audit trong Sprint 1; sinh fixture tổng hợp và nhiều kịch bản test.
 - Rà soát mã diện rộng: tìm được các lỗi đội bỏ sót (ai cũng chuyển được thành CFO, ca không khớp quy tắc nào bị tự duyệt, thuế suất 8% cho cước di động lọt qua, test phụ thuộc file bị gitignore nên clone sạch luôn fail).
-- Viết lại câu hỏi chuyển tiếp thành template có số liệu: đo được trên 11 ca diễn tập, câu hỏi cụ thể tăng từ 1/10 lên 8/8.
-- Red team bằng agent: 72 ca bẫy viết từ SOP (agent không đọc mã engine) lúc đầu đúng 66/72, lộ lỗi "phạt" bị bỏ sót và kết luận vượt quyền khi số tiền chưa chắc; sau khi sửa đạt 72/72 và trở thành bộ hồi quy trong `npm test`.
+- Viết lại câu hỏi chuyển tiếp thành template có số liệu: trên 11 ca diễn tập, câu hỏi đạt kiểm tra tự động (có số tiền ₫, không bắt mở lại chứng từ) tăng từ 1/10 lên 8/8.
+- Red team bằng agent: 72 ca bẫy viết từ SOP (agent không đọc `policyEngine.ts`, có đọc SOP và module ngưỡng; nhãn do AI gán) lúc đầu đúng 66/72 (tái lập bằng cách chạy 72 ca trên commit `acde15f`), lộ lỗi "phạt" bị bỏ sót và kết luận vượt quyền khi số tiền chưa chắc; sau khi sửa đạt 72/72 và trở thành bộ hồi quy trong `npm test`.
 
 ## 3. AI gây tốn thời gian / rủi ro ở đâu
 - **Commit khổng lồ:** để AI sửa nhiều thứ một lượt tạo ra commit 216 file (+28.859 dòng), khó review, khó chứng minh quá trình. Từ 14/10 đội chuyển sang commit nhỏ theo từng hạng mục.

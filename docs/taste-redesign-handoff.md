@@ -1,5 +1,8 @@
 # Bàn giao redesign Tax Referee
 
+> 📌 **Ảnh chụp lịch sử** — số liệu và tên quy tắc trong file này có thể đã cũ. Số liệu hiện hành: [README](../README.md), trang `/verify`, `/sop` và `docs/evidence/`.
+
+
 Ngày 13/10/2026. Triển khai và kiểm tra trên local; chưa deploy Hostinger. Giữ dữ liệu và thay đổi có sẵn. Base Git: `e0118601c12af43cd83ec0c550afad3852436f10`; working tree chưa commit. Production build: `FIvniG-36irscxZzz0snT`.
 
 ## Kết quả triển khai
