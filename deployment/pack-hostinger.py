@@ -1,5 +1,5 @@
 """Package the tested local build without machine-specific native modules or secrets."""
-import argparse,tarfile
+import argparse,io,subprocess,tarfile
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('output',type=Path);a=p.parse_args()
 root=Path(__file__).resolve().parent.parent
@@ -13,6 +13,10 @@ with tarfile.open(a.output,'w:gz') as archive:
    if any(x in {'node_modules','uploads','__pycache__'} or x.startswith('.env') for x in rel.parts) or f.name=='env.local':continue
    if folder.name=='data' and rel.parts[0]=='runtime' or 'data/runtime/' in rel.as_posix():continue
    archive.add(f,arcname=str(Path(arcroot)/rel))
+ # Commit của bản đóng gói: /api/health và Verify hiển thị để chứng minh live URL chạy đúng mã nguồn công khai.
+ commit=subprocess.run(['git','rev-parse','HEAD'],cwd=root,capture_output=True,text=True,check=True).stdout.strip().encode()
+ for arcname in ['.git-commit','.next/standalone/.git-commit']:
+  info=tarfile.TarInfo(arcname);info.size=len(commit);archive.addfile(info,io.BytesIO(commit))
  add_tree(build,'.next/standalone')
  add_tree(root/'.next/static','.next/standalone/.next/static')
  if (root/'public').exists():add_tree(root/'public','.next/standalone/public')

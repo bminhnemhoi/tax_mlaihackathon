@@ -79,3 +79,6 @@ deepseek-agent/*.log
 
 # Local scratch notes (never part of the submission)
 /scratch/
+
+# Commit stamp written by deployment/pack-hostinger.py
+/.git-commit
