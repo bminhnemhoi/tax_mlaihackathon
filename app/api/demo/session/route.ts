@@ -1,7 +1,9 @@
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { isSandbox, withDemoDatabase, withRequestDatabase } from '@/lib/server/db';
-import { getRequestUser, switchRole } from '@/lib/server/auth';
+import { AppRole, getRequestUser, switchRole } from '@/lib/server/auth';
+
+const DEMO_ROLES: AppRole[] = ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'];
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +20,9 @@ export async function POST(req: NextRequest) {
     const previous = req.cookies.get('tax_referee_demo')?.value;
     const id = previous && /^[a-f0-9-]{36}$/.test(previous) ? previous : crypto.randomUUID();
     return await withDemoDatabase(id, async () => {
-      const session = switchRole('CHIEF_ACCOUNTANT');
+      // Mặc định vào vai Kế toán viên (người nhập liệu) để ca chuyển tiếp được KTT/CFO — một tài khoản khác — duyệt.
+      const role: AppRole = DEMO_ROLES.includes(body.role) ? body.role : 'ACCOUNTANT';
+      const session = switchRole(role);
       if (!session) throw new Error('Không thể mở demo.');
       const res = NextResponse.json({ user: session.user, demo: true });
       const opts = { httpOnly: true, sameSite: 'lax' as const, secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 8 * 60 * 60 };

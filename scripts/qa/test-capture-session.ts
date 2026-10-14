@@ -48,7 +48,7 @@ async function main() {
 
   try {
     await start();
-    const login = await fetch(`${origin}/api/auth/login`, {
+    const login = await fetch(`${origin}/api/demo/session`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'ACCOUNTANT' })
     });
     assert.equal(login.status, 200);

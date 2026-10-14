@@ -34,24 +34,44 @@ async function checkSession(demo: boolean) {
 async function main() {
   // Run with TAX_REFEREE_DB_PATH=:memory: so the internal-session check cannot touch user data.
   assert.equal(process.env.TAX_REFEREE_DB_PATH, ':memory:');
-  for (const role of ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO']) {
-    const req = new NextRequest('http://localhost/api/auth/login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', cookie: 'tax_referee_demo=12345678-1234-1234-1234-123456789abc' },
-      body: JSON.stringify({ role })
-    });
-    const response = await internalLogin(req);
-    assert.equal(response.status, 200);
-    assert.equal((await response.json()).user.role, role);
-    const token = response.cookies.get('tax_referee_session')!.value;
-    assert.equal(getUserFromToken(token)?.role, role, 'Role login must create an internal session despite a demo cookie');
-    assert.equal(response.cookies.get('tax_referee_demo')?.value, '');
-    const switched = await changeRole(request('/api/auth/switch', token, { role: 'CFO' }));
-    assert.equal(switched.status, 200);
-    assert.equal((await switched.json()).user.role, 'CFO');
-  }
+  const roleLogin = (role: string) => internalLogin(new NextRequest('http://localhost/api/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', cookie: 'tax_referee_demo=12345678-1234-1234-1234-123456789abc' },
+    body: JSON.stringify({ role })
+  }));
+  // Mặc định: workspace nội bộ không cho chọn vai trò không mật khẩu (nếu không ai cũng thành CFO và tự duyệt).
+  delete process.env.TAX_REFEREE_ALLOW_INTERNAL_ROLE_LOGIN;
+  for (const role of ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO']) assert.equal((await roleLogin(role)).status, 403);
+  console.log('PASS Workspace nội bộ từ chối đăng nhập chỉ bằng vai trò');
+  process.env.TAX_REFEREE_ALLOW_INTERNAL_ROLE_LOGIN = '1';
+  try {
+    for (const role of ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO']) {
+      const response = await roleLogin(role);
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).user.role, role);
+      const token = response.cookies.get('tax_referee_session')!.value;
+      assert.equal(getUserFromToken(token)?.role, role, 'Role login must create an internal session despite a demo cookie');
+      assert.equal(response.cookies.get('tax_referee_demo')?.value, '');
+      assert.equal((await changeRole(request('/api/auth/switch', token, { role: 'CFO' }))).status, 403, 'Không được đổi vai trò trên workspace nội bộ');
+    }
+  } finally { delete process.env.TAX_REFEREE_ALLOW_INTERNAL_ROLE_LOGIN; }
   assert.equal((await internalLogin(request('/api/auth/login', '', { role: 'ADMIN' }))).status, 400);
   assert.equal((await changeRole(request('/api/auth/switch', '', { role: 'CFO' }))).status, 401);
-  console.log('PASS MVP: ba vai trò đăng nhập nội bộ, tách demo, đổi vai trò và từ chối role sai/phiên thiếu');
+  console.log('PASS Cờ vận hành bật đăng nhập vai trò nội bộ nhưng vẫn cấm đổi vai trò; từ chối role sai/phiên thiếu');
+  const demoId = '12345678-1234-4234-8234-123456789abc';
+  const demoRequest = (path: string, token: string, body?: unknown) => new NextRequest(`http://localhost${path}`, {
+    method: 'POST', headers: { cookie: `tax_referee_session=${token}; tax_referee_demo=${demoId}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {})
+  });
+  const opened = await openDemo(demoRequest('/api/demo/session', '', {}));
+  assert.equal(opened.status, 200);
+  const demoUser = (await opened.json()).user;
+  assert.equal(demoUser.role, 'ACCOUNTANT', 'Demo mặc định vào vai Kế toán viên');
+  const demoToken = opened.cookies.get('tax_referee_session')!.value;
+  const promoted = await changeRole(demoRequest('/api/auth/switch', demoToken, { role: 'CFO' }));
+  assert.equal(promoted.status, 200);
+  assert.equal((await promoted.json()).user.role, 'CFO');
+  const asCfo = await openDemo(demoRequest('/api/demo/session', '', { role: 'CFO' }));
+  assert.equal((await asCfo.json()).user.role, 'CFO');
+  console.log('PASS Demo riêng: mặc định Kế toán viên, chọn/đổi vai trò mô phỏng trong database của phiên');
   await checkSession(false);
   await runIsolated(async () => {
     await checkSession(true);

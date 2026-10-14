@@ -713,7 +713,13 @@ export async function withDemoDatabase<T>(id: string, fn: () => Promise<T>): Pro
   if (!entry) {
     const cutoff = Date.now() - 8 * 60 * 60 * 1000;
     for (const [key, old] of demoDatabases) if (old.touched < cutoff) { old.db.close(); demoDatabases.delete(key); }
-    if (demoDatabases.size >= 40) throw new Error('Demo đang đầy; vui lòng thử lại sau.');
+    // Không bao giờ từ chối giám khảo: khi đầy, đóng kết nối ít dùng nhất (file SQLite vẫn còn trên đĩa, mở lại được).
+    const capacity = Math.max(10, Number(process.env.TAX_REFEREE_DEMO_CACHE || 200));
+    while (demoDatabases.size >= capacity) {
+      let oldestKey = '', oldestTouched = Infinity;
+      for (const [key, old] of demoDatabases) if (old.touched < oldestTouched) { oldestKey = key; oldestTouched = old.touched; }
+      demoDatabases.get(oldestKey)?.db.close(); demoDatabases.delete(oldestKey);
+    }
     const demoDirectory=path.join(dataDirectory,'demo');fs.mkdirSync(demoDirectory,{recursive:true});
     const db = new Database(path.join(demoDirectory,`${id}.sqlite`)); initializeDatabase(db);
     entry = { db, touched: Date.now() }; demoDatabases.set(id, entry);
