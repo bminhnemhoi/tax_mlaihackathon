@@ -13,19 +13,21 @@ import {groupOf,orderFindings,riskGroupsOf} from '@/lib/riskTaxonomy';
 import {fieldLabels} from '@/lib/workflowPresentation';
 
 /** Hàng hóa/dịch vụ không được giảm thuế 8% (NQ 204/2025/QH15): viễn thông, công nghệ thông tin… */
-const VAT8_EXCLUDED_PHRASES=['CƯỚC INTERNET','INTERNET','CÁP QUANG','CƯỚC DI ĐỘNG','THUÊ BAO DI ĐỘNG','ĐIỆN THOẠI DI ĐỘNG','CƯỚC ĐIỆN THOẠI','ĐIỆN THOẠI','4G','5G','CÔNG NGHỆ THÔNG TIN','PHẦN MỀM','MÁY TÍNH','LAPTOP'];
+const VAT8_EXCLUDED_PHRASES=['CƯỚC INTERNET','INTERNET','CÁP QUANG','CƯỚC DI ĐỘNG','THUÊ BAO DI ĐỘNG','ĐIỆN THOẠI DI ĐỘNG','CƯỚC ĐIỆN THOẠI','ĐIỆN THOẠI','4G','5G','CÔNG NGHỆ THÔNG TIN','PHẦN MỀM','MÁY TÍNH','LAPTOP','THÉP','SẮT THÉP','ỐNG ĐỒNG','DÂY ĐỒNG','ĐỒNG THAU','NHÔM','INOX','XĂNG','XĂNG DẦU','DẦU DIESEL','DẦU DO','DẦU MAZUT','NHIÊN LIỆU','BIA','RƯỢU','THUỐC LÁ','Ô TÔ','THAN ĐÁ','QUẶNG'];
 /** Cụm từ chứa từ khóa loại trừ nhưng là hàng hóa thông thường (VD "mũ bảo hiểm" không phải dịch vụ bảo hiểm). */
 const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HIỂM','GĂNG TAY BẢO HIỂM'];
 /** So khớp nguyên cụm từ (không khớp giữa từ) với danh mục cấu hình + cụm từ viễn thông/CNTT. */
 function isVat8Excluded(textUpper:string,categories:string[]):boolean {
   const text=VAT8_NOT_EXCLUDED.reduce((acc,phrase)=>acc.split(phrase).join(' '),textUpper);
-  return [...categories,...VAT8_EXCLUDED_PHRASES].some(phrase=>containsWord(text,phrase));
+  return [...categories,...VAT8_EXCLUDED_PHRASES].some(phrase=>matchesKeyword(text,phrase));
 }
-/** Chi phí nhạy cảm: so khớp nguyên từ để "BAVIA" hay "BÌA" không bị nhầm với "BIA". */
-const SENSITIVE_ITEM_PATTERN=/(?<![\p{L}\p{N}])(RƯỢU|BIA|WHISKY|WHISKEY|WINE|VODKA|CHAMPAGNE|THUỐC LÁ|CIGAR|KARAOKE|MASSAGE)(?![\p{L}\p{N}])/u;
+/** Chi tiếp khách/đồ uống có cồn/giải trí (SOP: cần làm rõ mục đích). So khớp nguyên từ để "BAVIA" hay "BÌA" không bị nhầm với "BIA". */
+const SENSITIVE_ITEMS=['RƯỢU','BIA','WHISKY','WHISKEY','WINE','VODKA','CHAMPAGNE','BEER','LIQUOR','COCKTAIL','SOJU','SAKE','THUỐC LÁ','CIGAR','KARAOKE','MASSAGE','NHẬU','TIẾP KHÁCH'];
+const isSensitiveText=(textUpper:string)=>SENSITIVE_ITEMS.some(k=>matchesKeyword(textUpper,k));
 /** Khoản chi SOP không bao phủ → không tự duyệt (ngoài phạm vi quy định), dù số liệu hợp lệ. */
 // So khớp nguyên từ: "PHẠT" bắt mọi khoản phạt (tiền phạt, phí phạt chậm thanh toán…) mà không nhầm với "PHÁT".
-export const SCOPE_NOT_COVERED_DEFAULT=['TÀI TRỢ','TỪ THIỆN','ỦNG HỘ','QUYÊN GÓP','PHẠT','BỒI THƯỜNG','QUÀ BIẾU','CHI PHÍ CÁ NHÂN','MUA VÀNG','VÀNG MIẾNG','NGOẠI TỆ','CỔ PHIẾU','TRÁI PHIẾU'];
+// Không thêm "tiệc cưới/người thân" trước buổi thử 16/10: ca U2 là ca bẫy đã công bố trong Proposal để đo mức tin máy quá mức.
+export const SCOPE_NOT_COVERED_DEFAULT=['TÀI TRỢ','TỪ THIỆN','ỦNG HỘ','QUYÊN GÓP','PHẠT','TIỀN PHẠT','PHÍ PHẠT','NỘP PHẠT','PHẠT CHẬM','PHẠT VI PHẠM','BỒI THƯỜNG','QUÀ BIẾU','BIẾU','QUÀ TẶNG','QUÀ TẾT','GIỎ QUÀ','HỘP QUÀ','QUÀ SINH NHẬT','CHI PHÍ CÁ NHÂN','CHI CÁ NHÂN','MỤC ĐÍCH CÁ NHÂN','SỬ DỤNG CÁ NHÂN','MỸ PHẨM','DU LỊCH GIA ĐÌNH','CHO GIA ĐÌNH','GIA ĐÌNH GIÁM ĐỐC','HỌC PHÍ','ĐỒ CHƠI','MUA VÀNG','VÀNG MIẾNG','NGOẠI TỆ','CỔ PHIẾU','TRÁI PHIẾU','CHARITY','DONATION','SPONSORSHIP','SPONSOR','GIFT','GIFTS','PENALTY'];
 const AMOUNT_TOLERANCE=10;
 const isWordChar=(c:string|undefined)=>c!==undefined && /[\p{L}\p{N}]/u.test(c);
 /** Tìm nguyên cụm từ (không khớp giữa từ khác). */
@@ -43,6 +45,19 @@ export function unverifiedAmountFacts(inv:Pick<InvoiceInput,'isImageBlurry'|'tot
 function containsWord(text:string,word:string):boolean {
   for(let i=text.indexOf(word);i>=0;i=text.indexOf(word,i+1))if(!isWordChar(text[i-1]) && !isWordChar(text[i+word.length]))return true;
   return false;
+}
+const stripMarks=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/Đ/g,'D').replace(/đ/g,'d').normalize('NFC');
+/**
+ * Khớp nguyên cụm từ. Người dùng gõ không dấu ("tiep khach ruou") thì so thêm dạng bỏ dấu của từ khóa;
+ * văn bản có dấu vẫn so chính xác để "BÌA" không bị nhầm thành "BIA".
+ */
+// Từ mà bỏ dấu sẽ trùng từ thông dụng khác (PHẠT/phát, BIẾU/biểu): chỉ khớp khi có dấu; dạng không dấu dùng cụm rõ nghĩa (TIỀN PHẠT…).
+const AMBIGUOUS_WITHOUT_MARKS=new Set(['PHẠT','BIẾU']);
+export function matchesKeyword(textUpper:string,keyword:string):boolean {
+  if(containsWord(textUpper,keyword))return true;
+  if(AMBIGUOUS_WITHOUT_MARKS.has(keyword))return false;
+  const plain=stripMarks(textUpper);
+  return plain===textUpper.normalize('NFC') && containsWord(plain,stripMarks(keyword));
 }
 
 // 0. IMP-08: Hàm Đối soát Chi tiết Dòng hàng & Đa Thuế suất (Line-item Validation Engine)
@@ -124,7 +139,7 @@ export function validateLineItems(
     }
 
     // 3. Phát hiện chi phí nhạy cảm không phục vụ SXKD
-    const isSensitive = SENSITIVE_ITEM_PATTERN.test(nameUpper);
+    const isSensitive = isSensitiveText(nameUpper);
     if (isSensitive) {
       warnings.push(`Dòng ${item.lineNumber} [${item.itemName}]: Chi phí nhạy cảm (rượu/bia/thuốc lá/giải trí) - cần kèm quy chế tiếp khách.`);
       flaggedCount++;
@@ -692,7 +707,7 @@ function evaluateInvoiceLocallyInternal(
 
   // 13. INTERNAL_POLICY: Quy chế nội bộ & Chi phí nhạy cảm (Rượu bia tiếp khách, viết lại theo P0-2/P0-3)
   // Cùng một mẫu nguyên từ cho tên hàng và dòng hàng (gồm thuốc lá; ngoặc/dấu câu không làm lọt từ khóa).
-  const isAlcohol = SENSITIVE_ITEM_PATTERN.test(normalizedItemName) || lineItemResult.hasSensitiveItem;
+  const isAlcohol = isSensitiveText(normalizedItemName) || lineItemResult.hasSensitiveItem;
   if (isAlcohol) {
     evaluatedFindings.push({
       ruleId: 'INTERNAL_POLICY_GUEST_ENTERTAINMENT',
@@ -725,7 +740,9 @@ function evaluateInvoiceLocallyInternal(
   // 13b. SCOPE: Khoản chi SOP không bao phủ (tài trợ, từ thiện, tiền phạt, quà biếu, chi cá nhân, tài sản tài chính)
   const scopeKeywords=(config?.scopeNotCoveredCategories ?? SCOPE_NOT_COVERED_DEFAULT).map(k=>k.trim().toLocaleUpperCase('vi-VN')).filter(Boolean);
   const scopeTexts=[inv.itemName,...(inv.items||[]).map(i=>i.itemName)].map(t=>t.toLocaleUpperCase('vi-VN'));
-  const scopeHit=scopeKeywords.find(k=>scopeTexts.some(t=>containsWord(t,k)));
+  // Hóa đơn 0 đồng (VD hàng khuyến mại bên bán tặng) không có tiền/thuế nào cần quyết định: không chuyển tiếp vì từ khóa.
+  const nothingAtStake=Math.abs(inv.totalAmount)===0 && Math.abs(inv.taxAmount)===0;
+  const scopeHit=nothingAtStake ? undefined : scopeKeywords.find(k=>scopeTexts.some(t=>matchesKeyword(t,k)));
   if (scopeHit) {
     evaluatedFindings.push({
       ruleId: 'RULE_SCOPE_NOT_COVERED', kind: 'INTERNAL_POLICY', severity: 'HIGH', riskGroup: 'OUT_OF_POLICY',
