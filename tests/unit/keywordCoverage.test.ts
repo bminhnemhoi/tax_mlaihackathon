@@ -8,6 +8,7 @@ import { getActivePolicy, getDatabase, runIsolated } from '../../lib/server/db';
 import { evaluateWorkflow } from '../../services/workflowService';
 import { userStudyCases } from '../../data/verification/userStudyCases';
 import type { RefereeDecision } from '../../lib/schemas';
+import { checkHandoff } from '../../services/handoffService';
 
 const COMPANY = '0102030405';
 const accountant = { id: 'kw-accountant', role: 'ACCOUNTANT' as const, email: 'kw@test', displayName: 'Kiểm thử từ khóa' };
@@ -53,4 +54,12 @@ test('ca bẫy U2 của buổi thử người dùng 16/10 giữ nguyên thiết 
   assert.equal(u2.designedAs.trap, true);
   const d = await runIsolated(async () => (await evaluateWorkflow({ id: 'U2', ...u2.invoice }, accountant, { forceLocalOnly: true })).decision as RefereeDecision);
   assert.equal(d.status, 'ROUTINE');
+});
+
+test('ngày lập muộn hơn hôm nay quá 6 tháng (nhập sai năm) không được tự duyệt; câu hỏi hợp lệ', async () => {
+  const future = new Date(Date.now() + 400 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const d = await judge('Giấy in A4', { invoiceDate: future });
+  assert.equal(d.status, 'ESCALATED');
+  assert.equal(d.status === 'ESCALATED' && d.riskGroup, 'UNCERTAIN_INFO');
+  assert.deepEqual(checkHandoff(d).errors, []);
 });

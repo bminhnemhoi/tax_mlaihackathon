@@ -5,7 +5,7 @@ async function main(){
  const session=async()=>{const r=await fetch(origin+'/api/demo/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'CHIEF_ACCOUNTANT'})});assert.equal(r.status,200);return r.headers.getSetCookie().map(s=>s.split(';')[0]).join('; ');};
  const cookie=await session();const other=await session();
  const call=async(path:string,body?:unknown,auth=cookie)=>{const r=await fetch(origin+path,{method:body===undefined?'GET':'POST',headers:{cookie:auth,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});return {code:r.status,data:await r.json()};};
- const inv={...challengeCases[0].invoice,id:'API-'+Date.now(),invoiceNumber:'API-'+Date.now(),buyerTaxCode:'0100109106'};
+ const inv={...challengeCases[0].invoice,id:'API-'+Date.now(),invoiceNumber:'API-'+Date.now(),buyerTaxCode:'0102030405'};
  const evaluated=await call('/api/evaluate',{invoice:inv,forceLocalOnly:true});assert.equal(evaluated.code,200);assert.equal(evaluated.data.workflow.status,'APPROVED');
  const runtime=await call('/api/runtime');assert.equal(runtime.code,200);assert.equal(runtime.data.demo,true);assert.ok(runtime.data.policy.version);
  for(const path of ['/api/notifications','/api/invoices/duplicates'])assert.equal((await call(path)).code,200);

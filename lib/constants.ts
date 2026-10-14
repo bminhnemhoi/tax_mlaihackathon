@@ -75,7 +75,7 @@ export const DEFAULT_POLICY_CONFIG = {
   vatReductionRate: 8,
   vatStandardRate: 10,
   allowStaffReimbursement: true,
-  companyTaxCode: '0100109106',
+  companyTaxCode: '0102030405', // trùng demoCompanyTaxCode của Verify: cùng hóa đơn cho cùng kết quả ở Verify và workspace
   companyName: 'Công ty Cổ phần Thương mại & Công nghệ Fprinciples',
   strictBuyerTaxCodeCheck: false,
   strictSeriesYearCheck: true,

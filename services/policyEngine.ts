@@ -1133,6 +1133,8 @@ export function sameDayPurchaseTotal(inv:Partial<InvoiceInput>,context?:InvoiceI
 function getDataQualityIssue(inv: InvoiceInput,config?:Partial<SystemPolicyConfig>,dailyTotal=0): string | null {
   const date = new Date(`${inv.invoiceDate}T00:00:00Z`);
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== inv.invoiceDate) return 'Ngày hóa đơn không hợp lệ hoặc không thể đối chiếu văn bản có hiệu lực.';
+  // Ngày lập muộn hơn hôm nay quá 6 tháng gần như chắc chắn là nhập sai năm: không tự duyệt trên ngày đó.
+  if (date.getTime() - Date.now() > 183 * 24 * 60 * 60 * 1000) return `Ngày lập ${inv.invoiceDate} muộn hơn hôm nay hơn 6 tháng — có thể nhập sai năm; cần xác nhận ngày trên chứng từ.`;
   const expectedTax = Math.round(inv.preTaxAmount * inv.taxRate / 100);
   const expectedTotal = inv.preTaxAmount + inv.taxAmount;
   if (Math.abs(inv.taxAmount - expectedTax) > AMOUNT_TOLERANCE || Math.abs(inv.totalAmount - expectedTotal) > AMOUNT_TOLERANCE) {

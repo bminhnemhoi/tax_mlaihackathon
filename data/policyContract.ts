@@ -81,6 +81,7 @@ export function implementedPolicyRules(config: SystemPolicyConfig): PolicyRule[]
 export function executablePolicySummary(config: SystemPolicyConfig): string {
   const money = (n: number) => new Intl.NumberFormat('vi-VN').format(n) + ' ₫';
   return `Quy trình kiểm tra và chuyển tiếp hóa đơn\n\n` +
+    `Doanh nghiệp áp dụng: ${config.companyName || 'chưa cấu hình'} · MST người mua hợp lệ trên hóa đơn: ${config.companyTaxCode || 'chưa cấu hình'}.\n` +
     `Đầu vào: XML, PDF, ảnh hoặc nhập tay; số hóa đơn, ngày, MST/tên bên bán, nội dung và các số tiền cần được xác minh.\n` +
     `Chứng từ thanh toán chỉ bắt buộc khi quy tắc thanh toán áp dụng; thiếu chứng từ không có nghĩa đã thanh toán tiền mặt. Bảng kê riêng cần cho dịch vụ tổng hợp/tư vấn/tiếp khách không có chi tiết dòng hàng. Phương thức thanh toán chỉ cần khi tổng tiền (cộng các hóa đơn cùng bên bán trong ngày) từ ${money(config.nonCashThreshold)}; trạng thái hoạt động bên bán chỉ cần khi tổng tiền từ ${money(config.sellerStatusMaterialityVnd ?? 20_000_000)} hoặc nguồn tra cứu báo rủi ro. Dưới các ngưỡng này hệ thống không hỏi, để tránh chuyển tiếp thừa.\n` +
     `Thường quy: đầy đủ dữ liệu, không còn phát hiện và dưới trần ${money(config.kttApprovalLimit)} → tự duyệt, tạo chứng từ nội bộ và audit. ERP chỉ xuất payload.\n` +
