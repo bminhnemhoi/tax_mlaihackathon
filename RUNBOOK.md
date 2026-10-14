@@ -40,7 +40,7 @@ npm run typecheck
 npm run lint
 ```
 
-CI (GitHub Actions, Ubuntu + Windows) chạy cùng các lệnh trên cho mỗi push/PR: `.github/workflows/ci.yml`.
+CI (GitHub Actions, Ubuntu + Windows) chạy cùng các lệnh trên khi đẩy mã lên `main`/`feat/**` và khi mở PR: `.github/workflows/ci.yml`.
 
 ## 4. Đường đi của giám khảo (8 phút)
 

@@ -71,11 +71,11 @@ SQLite (WAL, bền qua khởi động lại) · audit nối chuỗi SHA-256 (ai,
 npm ci
 cp .env.example .env.local        # key AI chỉ cần cho đọc ảnh; Verify và test không cần
 npm run dev                       # http://localhost:3000
-npm test                          # unit (node:test) + 14 bộ hồi quy, mỗi bộ chạy trên DB tạm riêng
+npm test                          # unit (node:test) + 15 bộ hồi quy (kể cả 72 ca red team), mỗi bộ chạy trên DB tạm riêng
 npm run typecheck && npm run lint
 ```
 
-CI (GitHub Actions, Ubuntu + Windows): typecheck, lint, test, build cho mỗi push/PR. Chi tiết: [RUNBOOK.md](RUNBOOK.md).
+CI (GitHub Actions, Ubuntu + Windows): typecheck, lint, test, build khi đẩy mã lên `main`/`feat/**` và khi mở PR. Chi tiết: [RUNBOOK.md](RUNBOOK.md).
 
 ## Phản hồi Sprint 1 → đã xử lý
 
@@ -91,7 +91,7 @@ CI (GitHub Actions, Ubuntu + Windows): typecheck, lint, test, build cho mỗi pu
 ## Bằng chứng và giới hạn (trung thực)
 
 - **Người dùng thực tế:** đang thử nghiệm với 3 người dùng do BTC điều phối (bộ câu hỏi: [docs/submission/proposal-user-questions.md](docs/submission/proposal-user-questions.md)). Chưa có kết quả tại thời điểm khóa repo; kết quả và cải tiến từ phản hồi sẽ được ghi ở `docs/evidence/` kèm commit riêng.
-- **Độ chính xác:** các bộ Verify và 60 ca phát triển là dữ liệu tổng hợp đội tự gán nhãn; **chưa phải đánh giá độc lập**. Công cụ khóa nhãn và chấm độc lập đã có (`npm run labels:lock`, `npm run evaluate:independent`).
+- **Độ chính xác:** các bộ Verify và 60 ca phát triển là dữ liệu tổng hợp đội tự gán nhãn; 72 ca red team do agent AI viết từ SOP mà không đọc mã engine (`data/verification/redteam/cases.json`, 72/72). Tất cả **chưa phải đánh giá độc lập**. Công cụ khóa nhãn và chấm độc lập đã có (`npm run labels:lock`, `npm run evaluate:independent`).
 - **Pháp lý:** quy tắc mô tả SOP nội bộ; điều khoản luật được dẫn nguồn nhưng diễn giải cần kế toán xác nhận.
 - **Đã biết:** khoản chi không thuộc danh mục rủi ro nào vẫn có thể tự duyệt (VD chi cá nhân đặt tên lạ); dữ liệu ảnh gửi qua dịch vụ AI bên thứ ba; SQLite một instance; đăng nhập nội bộ là MVP.
 

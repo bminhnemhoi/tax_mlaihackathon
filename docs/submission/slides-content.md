@@ -57,7 +57,8 @@ Nhập tay         ──►  3. Phân 3 nhóm dừng + câu hỏi một câu   
 *Phương pháp:* cùng 11 ca, cùng script, hai phiên bản mã nguồn (commit `33522a0` và bản hiện tại), mỗi ca một database tạm, không gọi AI.
 *Giới hạn ghi rõ trên slide:* ca do đội viết → tập phát triển, **không phải đánh giá độc lập**. Nguồn: `docs/evidence/before-after-judge-rehearsal-2026-10-14.md`.
 
-Thêm: Verify 9 ca (4 chung + 5 Đề A) PASS 9/9 (chạy lại trên live sau khi deploy, lưu JSON có timestamp); 60 ca phát triển tổng hợp 60/60; `npm test` 15/15 bộ, CI Ubuntu + Windows.
+Thêm: Verify 9 ca (4 chung + 5 Đề A) PASS 9/9 (chạy lại trên live sau khi deploy, lưu JSON có timestamp); 60 ca phát triển tổng hợp 60/60; 72 ca "đánh lừa" do agent viết từ SOP (không đọc mã engine) 66/72 → 72/72, nay là bộ hồi quy; `npm test` 16/16 bộ, CI Ubuntu + Windows khi đẩy mã và khi mở PR.
+*Giới hạn:* ca red team do AI viết, không thay cho người dùng thật hay đánh giá độc lập.
 
 **B. Đo với người dùng thật — [CẬP NHẬT 16/10]**
 
