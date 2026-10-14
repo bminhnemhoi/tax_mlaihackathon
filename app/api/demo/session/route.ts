@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isSandbox, withDemoDatabase, withRequestDatabase } from '@/lib/server/db';
 import { AppRole, getRequestUser, switchRole } from '@/lib/server/auth';
 import { allowRate, clientIp } from '@/lib/server/rateLimit';
+import { seedDemoCases } from '@/services/demoSeed';
 
 const DEMO_ROLES: AppRole[] = ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'];
 
@@ -29,6 +30,8 @@ export async function POST(req: NextRequest) {
       const role: AppRole = DEMO_ROLES.includes(body.role) ? body.role : 'ACCOUNTANT';
       const session = switchRole(role);
       if (!session) throw new Error('Không thể mở demo.');
+      // Phiên mới: nạp sẵn 4 ca mẫu (1 tự xử lý + 3 kiểu dừng) để hộp chuyển tiếp không trống.
+      if (!reuse) await seedDemoCases();
       const res = NextResponse.json({ user: session.user, demo: true });
       const opts = { httpOnly: true, sameSite: 'lax' as const, secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 8 * 60 * 60 };
       res.cookies.set('tax_referee_demo', id, opts);

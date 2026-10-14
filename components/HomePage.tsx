@@ -21,10 +21,12 @@ export default function HomePage():ReactElement {
   const [role,setRole]=useState<AppRole>('ACCOUNTANT');
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
+  const [signedIn,setSignedIn]=useState<{displayName:string;role:AppRole}|null>(null);
   useEffect(()=>{
     const controller=new AbortController();
     fetch('/api/auth/me',{signal:controller.signal,cache:'no-store'}).then(async response=>{
-      if(response.ok){router.replace('/workspace/inbox');return;}
+      // Đã có phiên: không tự chuyển trang (giám khảo vẫn thấy nút Verify), chỉ hiện nút quay lại workspace.
+      if(response.ok){const data=await response.json();if(data.user)setSignedIn({displayName:data.user.displayName,role:data.user.role});return;}
       if(response.status!==401)throw new Error('Không thể kết nối máy chủ.');
       if(new URLSearchParams(window.location.search).get('expired'))toast.info('Phiên đã kết thúc. Hãy mở lại demo.');
     }).catch(()=>{if(!controller.signal.aborted)toast.error('Không thể kết nối máy chủ.');}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
@@ -47,6 +49,9 @@ export default function HomePage():ReactElement {
       <p className="rounded-xl border border-lime-300 bg-lime-50 px-4 py-3 text-sm leading-6 text-foreground" data-testid="judge-instruction">
         <strong>Giám khảo:</strong> bấm <strong>①</strong> để chạy 9 ca kiểm chứng có dấu thời gian, sau đó <strong>②</strong> để tự nhập hóa đơn mới. Không cần tài khoản.
       </p>
+      {signedIn&&<Link href="/workspace/inbox" data-testid="continue-workspace" className={cn(buttonVariants({variant:'secondary'}),'h-12 w-full justify-between gap-2')}>
+        <span>Tiếp tục vào workspace · {signedIn.displayName} ({ROLE_LABELS[signedIn.role]?.split(' (')[0] || signedIn.role})</span><ArrowRight className="h-4 w-4"/>
+      </Link>}
       <div className="grid gap-3">
         <Link href="/verify" className={cn(buttonVariants({size:'lg'}),'h-14 justify-between gap-2 text-base')}>
           <span className="flex items-center gap-2"><FlaskConical className="h-5 w-5"/>① Chạy Verify (90 giây)</span><ArrowRight className="h-4 w-4"/>

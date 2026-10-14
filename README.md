@@ -20,7 +20,7 @@ Mọi quyết định có nhật ký kiểm toán, dừng và hoàn tác đượ
 
 1. Mở Live URL → bấm **① Chạy Verify** → **Chạy Verify**. Bảng in 4 ca chung + 5 ca Đề A (3 tự xử lý, 2 chuyển tiếp), PASS/FAIL và thời điểm chạy từng ca.
 2. Tab **Thử dữ liệu mới**: sửa JSON hoặc bấm ca mẫu (bỏ trống trường chưa biết). Hệ thống chỉ hỏi những dữ kiện **thực sự làm thay đổi kết quả**.
-3. Trang chủ → **② Mở hộp chuyển tiếp — demo riêng** (database riêng cho phiên) → mở một ca → đổi vai trò KTT/CFO để trả lời → tab **Nhật ký** → **Dừng / Hoàn tác**.
+3. Trang chủ → **② Mở hộp chuyển tiếp — demo riêng** (database riêng cho phiên, có sẵn 4 ca mẫu: 1 tự xử lý + 1 ca cho mỗi kiểu dừng) → mở một ca → đổi vai trò KTT/CFO → trả lời ngay trên hồ sơ (VD "1A, 2A") → tab **Nhật ký** → **Dừng / Hoàn tác**.
 
 ## Ba kiểu dừng và câu hỏi "trả lời trong một câu"
 

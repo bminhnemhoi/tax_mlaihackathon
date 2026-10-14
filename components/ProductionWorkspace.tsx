@@ -4,7 +4,7 @@ import WorkflowControls from '@/components/WorkflowControls';
 import {HandoffContext} from '@/components/HandoffContext';
 import {HandoffAnswerPanel} from '@/components/HandoffAnswerPanel';
 
-import {caseDeadline, riskGroupLabels} from '@/lib/workflowPresentation';
+import {caseDeadline, eventLabels, riskGroupLabels, workflowStatusLabels} from '@/lib/workflowPresentation';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -180,13 +180,13 @@ export function ProductionWorkspace({
             ? 'ĐÃ GHI ĐÈ BỞI CON NGƯỜI (HUMAN OVERRIDE)'
             : item.latestAudit?.eventType === 'ROUTINE_AUTO_APPROVED'
             ? 'Đã tự duyệt · chứng từ nội bộ'
-            : item.resolution?.action
-            ? item.resolution.action
+            : item.latestAudit?.eventType && eventLabels[item.latestAudit.eventType]
+            ? eventLabels[item.latestAudit.eventType]
             : item.status === 'APPROVED'
             ? 'Đã duyệt khấu trừ'
             : item.status === 'ROUTINE_PROPOSED'
             ? 'Đề xuất tự duyệt'
-            : item.status,
+            : workflowStatusLabels[item.status] || item.status,
           actor: ((item.latestAudit?.payload?.actorRole as any) || (item.resolution?.role as any) || (item.latestAudit?.actorId ? 'UNKNOWN' : 'SYSTEM_REFEREE')),
           plainExplanation: item.decision?.plainExplanation || 'Đã kiểm tra đối chiếu qua bộ quy tắc Tax-SOP-2026',
           canOverride: Boolean(item.allowedActions?.approve || (isOverridden && item.allowedActions?.undo)),
@@ -730,7 +730,7 @@ export function ProductionWorkspace({
             {/* Dossier / Audit Trail View (Tiêu chí 6: 20 Điểm) */}
             {!loading && !error && view === 'dossier' && (
               <div className="space-y-4">
-                <label className="block text-sm">Chọn hồ sơ để xem đầu vào và lịch sử<select className="mt-1 w-full rounded border p-2" value={auditInvoiceId} onChange={e=>setAuditInvoiceId(e.target.value)}><option value="">Chọn hồ sơ</option>{items.map(i=><option key={i.id} value={i.id}>{i.invoiceNumber} · {i.supplierName} · {i.status}</option>)}</select></label>
+                <label className="block text-sm">Chọn hồ sơ để xem đầu vào và lịch sử<select className="mt-1 w-full rounded border p-2" value={auditInvoiceId} onChange={e=>setAuditInvoiceId(e.target.value)}><option value="">Chọn hồ sơ</option><option value="system:auto-approve">Sự kiện hệ thống · công tắc dừng tự động hóa</option>{items.map(i=><option key={i.id} value={i.id}>{i.invoiceNumber} · {i.supplierName} · {workflowStatusLabels[i.status] || i.status}</option>)}</select></label>
                 {auditInvoiceId && <WorkflowAuditHistory key={`${auditInvoiceId}:${items.find(i=>i.id===auditInvoiceId)?.revision}`} invoiceId={auditInvoiceId} />}
                 <AuditTrailTable
                   entries={auditEntries}
