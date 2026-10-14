@@ -83,7 +83,11 @@ export const SystemPolicyConfigSchema = z.object({
   excludedVat8Categories: z.array(z.string()).default([
     'VIỄN THÔNG', 'TÀI CHÍNH', 'NGÂN HÀNG', 'CHỨNG KHOÁN', 'BẢO HIỂM',
     'BẤT ĐỘNG SẢN', 'KIM LOẠI', 'KHAI KHOÁNG', 'HÓA CHẤT', 'TIÊU THỤ ĐẶC BIỆT'
-  ])
+  ]),
+  // Nhóm khoản chi SOP không bao phủ: luôn chuyển người có thẩm quyền (ngoài phạm vi quy định). Mặc định trong policyEngine.
+  scopeNotCoveredCategories: z.array(z.string()).optional(),
+  // Ngưỡng trọng yếu: hóa đơn từ mức này phải biết trạng thái MST bên bán trước khi tự duyệt.
+  sellerStatusMaterialityVnd: z.number().finite().nonnegative().default(20_000_000)
 });
 export type SystemPolicyConfig = z.infer<typeof SystemPolicyConfigSchema>;
 
@@ -322,6 +326,11 @@ export const HandoffSchema = z.object({
   policyRef:z.object({version:z.string(),hash:z.string().optional(),clause:z.string()}),
   questionSource:z.enum(['POLICY_TEMPLATE','AI_GROUNDED']),
   automatedCheck:z.object({valid:z.boolean(),errors:z.array(z.string())}),
+  // Câu hỏi có cấu trúc: mỗi ý một nhóm rủi ro và hai đáp án; trả lời một lần kiểu "1A, 2B".
+  questionSpec:z.object({
+    recipientRole:z.enum(['CHIEF_ACCOUNTANT','CFO']), taxAtStakeVnd:z.number(), replyHint:z.string(),
+    items:z.array(z.object({n:z.number().int().positive(),ruleIds:z.array(z.string()),riskGroup:RiskGroupEnum,text:z.string(),answers:z.tuple([z.string(),z.string()])}))
+  }).optional(),
 });
 export type RefereeHandoff = z.infer<typeof HandoffSchema>;
 
@@ -339,6 +348,7 @@ export type DuplicateInfo = z.infer<typeof DuplicateInfoSchema>;
 export const EscalatedDecisionSchema = z.object({
   status: z.literal('ESCALATED'),
   riskGroup: RiskGroupEnum,
+  riskGroups: z.array(RiskGroupEnum).optional(), // Mọi nhóm còn mở, nhóm đầu là nhóm chính
   invoiceId: z.string(),
   supplierName: z.string(),
   totalAmount: z.number(),
