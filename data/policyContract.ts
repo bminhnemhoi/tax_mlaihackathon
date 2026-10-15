@@ -1,6 +1,6 @@
 import type { PolicyRule, SystemPolicyConfig } from '@/lib/schemas';
 import { groupOf } from '@/lib/riskTaxonomy';
-export const POLICY_CONTRACT_VERSION='referee-contract-2026-10-15';
+export const POLICY_CONTRACT_VERSION='referee-contract-2026-10-16';
 export interface PolicyRuleContract {
   id:string;label:string;clause:string;condition:string;requiredFields:string[];group:'UNCERTAIN_INFO'|'OUT_OF_POLICY'|'EXCEED_AUTHORITY';
   recipient:string;actions:string;testTags:string[];source?:{code:string;url:string;effectiveFrom:string};
@@ -31,6 +31,7 @@ const checks = [
   ['RULE_SCOPE_VAT8_PERIOD', 'Thuế suất 8% ngoài thời gian giảm thuế', 'Điều 1.3', 'Thuế suất 8% trên hóa đơn lập sau 31/12/2026 (hết NQ 204/2025/QH15) hoặc trước 01/02/2022 cần xuất lại 10% hoặc loại phần thuế.'],
   ['RULE_MISSING_MANIFEST', 'Bảng kê chi tiết', 'Điều 2.1', 'Tư vấn, tiếp khách, ăn uống, hội nghị, tổng hợp, dịch vụ/hàng hóa khác chưa có chi tiết dòng hàng: bảng kê thiếu cần xác minh.'],
   ['AUTHORITY_EXCEED_KTT_LIMIT', 'Hạn mức thẩm quyền', 'Điều 3.3', 'Trị tuyệt đối tổng tiền đạt hoặc vượt trần cần CFO.'],
+  ['AUTHORITY_SPLIT_PURCHASE', 'Tách nhỏ hóa đơn', 'Điều 3.3', 'Hóa đơn dưới trần nhưng cộng các hóa đơn mua dương cùng bên bán trong ngày mà mỗi tờ đều dưới trần (không tính hóa đơn bị từ chối, không đếm trùng) đạt trần: cần CFO xác nhận giao dịch độc lập.'],
   ['AUTHORITY_K_FACTOR_RED', 'Lô hàng lớn và cảnh báo K', 'Điều 4.3', 'Mua không phải điều chỉnh có trị tuyệt đối tiền trước thuế ≥ 1 tỷ, K sau mua < .95 hoặc > 1.35 cần CFO. K = doanh số / (tồn đầu + mua đã duyệt + mua mới). Đây là ngưỡng nội bộ.'],
   ['RULE_ADJUSTMENT_NO_ORIGINAL', 'Hóa đơn điều chỉnh', 'Điều 1.4', 'Cần tham chiếu hóa đơn gốc.']
 ] as const;
@@ -43,7 +44,7 @@ const fields:Record<string,string[]>={
   STATUTORY_DECREE_254_CLOSED_SELLER:['sellerStatus','sellerSuspensionDate','invoiceDate'],RULE_SELLER_CLOSED_BEFORE:['sellerStatus','sellerSuspensionDate','invoiceDate'],
   STATUTORY_LAW_48_CASH_PAYMENT:['totalAmount','invoiceDate','paymentMethod','isStaffReimbursed','hasBankSlip'],STATUTORY_SAME_DAY_CASH_5M:['history','supplierTaxCode','invoiceDate','totalAmount','paymentMethod'],
   STATUTORY_RES_204_VAT_8_EXCLUDED:['itemName','items','taxRate'],INTERNAL_POLICY_GUEST_ENTERTAINMENT:['itemName','items','precedent'],RULE_SCOPE_NOT_COVERED:['itemName','items','precedent'],RULE_SCOPE_VAT8_PERIOD:['taxRate','invoiceDate'],RULE_MISSING_MANIFEST:['itemName','items','hasItemManifest'],
-  AUTHORITY_EXCEED_KTT_LIMIT:['totalAmount','kttApprovalLimit'],AUTHORITY_K_FACTOR_RED:['preTaxAmount','macroState','isAdjustment'],RULE_ADJUSTMENT_NO_ORIGINAL:['isAdjustment','originalInvoiceRef'],
+  AUTHORITY_EXCEED_KTT_LIMIT:['totalAmount','kttApprovalLimit'],AUTHORITY_SPLIT_PURCHASE:['history','supplierTaxCode','invoiceDate','totalAmount','kttApprovalLimit'],AUTHORITY_K_FACTOR_RED:['preTaxAmount','macroState','isAdjustment'],RULE_ADJUSTMENT_NO_ORIGINAL:['isAdjustment','originalInvoiceRef'],
 };
 const officialSources={
   payment:{code:'181/2025/NĐ-CP',url:'https://vanban.chinhphu.vn/?docid=214336&pageid=27160',effectiveFrom:'2025-07-01'},

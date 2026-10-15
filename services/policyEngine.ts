@@ -865,6 +865,28 @@ function evaluateInvoiceLocallyInternal(
     }
   }
 
+  // 15b. AUTHORITY: Tách nhỏ hóa đơn — từng hóa đơn dưới hạn mức KTT nhưng cộng các hóa đơn cùng bên bán trong ngày
+  // đạt hạn mức (dấu hiệu "split purchase" để né cấp phê duyệt). CFO xác nhận đây là các giao dịch độc lập.
+  const splitTotal = inv.isAdjustment || Math.abs(inv.totalAmount) >= kttApprovalLimit ? 0 : sameDayPurchaseTotal(inv, contextInvoices, kttApprovalLimit);
+  if (splitTotal >= kttApprovalLimit) {
+    evaluatedFindings.push({
+      ruleId: 'AUTHORITY_SPLIT_PURCHASE',
+      kind: 'AUTHORITY',
+      severity: 'HIGH',
+      riskGroup: 'EXCEED_AUTHORITY',
+      flaggedReason: `Các hóa đơn cùng bên bán trong ngày ${inv.invoiceDate} cộng lại ${splitTotal.toLocaleString('vi-VN')}₫ ≥ hạn mức KTT ${kttApprovalLimit.toLocaleString('vi-VN')}₫ dù từng hóa đơn đều dưới hạn mức`,
+      plainExplanation: 'Từng hóa đơn nhỏ hơn hạn mức tự duyệt của Kế toán trưởng, nhưng cộng các hóa đơn cùng bên bán trong cùng ngày thì vượt hạn mức — dấu hiệu tách nhỏ giao dịch để né cấp phê duyệt. Cần CFO xác nhận đây là các giao dịch độc lập trước khi ghi nhận thuế.',
+      legalBasis: 'Điều 3.3 Quy chế Tax-SOP-2026',
+      sopClause: 'Điều 3.3 Quy chế Tax-SOP-2026',
+      actionableQuestion: `Hóa đơn ${inv.invoiceNumber} cùng các hóa đơn của ${inv.supplierName} ngày ${inv.invoiceDate} cộng lại ${splitTotal.toLocaleString('vi-VN')}₫, vượt hạn mức KTT. CFO xác nhận đây là các giao dịch độc lập?`,
+      options: [
+        { id: 'A', label: 'Giao dịch độc lập — CFO duyệt', actionDescription: 'Có hợp đồng/đơn hàng riêng cho từng hóa đơn; CFO phê duyệt trong thẩm quyền.', resultingAction: 'ACCEPT_WITH_DOCS' },
+        { id: 'B', label: 'Cùng một giao dịch bị tách — giữ hồ sơ', actionDescription: 'Giữ hồ sơ, gộp phê duyệt theo hạn mức CFO trước khi ghi nhận thuế.', resultingAction: 'REQUEST_INFORMATION' }
+      ],
+      requiresCFO: true
+    });
+  }
+
   // 16. DATA_QUALITY: Ảnh mờ
   if (inv.isImageBlurry) {
     evaluatedFindings.push({
@@ -1043,7 +1065,7 @@ function evaluateInvoiceLocallyInternal(
 
   // 3. Còn phát hiện → ESCALATED. Mỗi phát hiện được viết lại thành câu hỏi đóng có số liệu cụ thể và hệ quả ₫;
   // nhóm chính lấy từ bảng phân loại duy nhất (lib/riskTaxonomy), không phụ thuộc thứ tự khai báo quy tắc.
-  const questionContext = { config, nonCashThreshold, kttLimit: kttApprovalLimit, dailyTotal };
+  const questionContext = { config, nonCashThreshold, kttLimit: kttApprovalLimit, dailyTotal, splitTotal };
   for (const finding of activeFindings) {
     finding.riskGroup = groupOf(finding.ruleId, finding.kind);
     const concrete = concreteIssue(finding, inv, questionContext);
@@ -1123,10 +1145,10 @@ export function evaluateInvoiceLocally(
   return buildHandoff(inv,decorated);
 }
 
-export function sameDayPurchaseTotal(inv:Partial<InvoiceInput>,context?:InvoiceInput[]):number {
+export function sameDayPurchaseTotal(inv:Partial<InvoiceInput>,context?:InvoiceInput[],maxEach=Infinity):number {
   const rows=context || (getDatabase().prepare("SELECT payload_json FROM invoices WHERE supplier_tax_code=? AND invoice_date=? AND id!=? AND status!='REJECTED'").all(inv.supplierTaxCode || '',inv.invoiceDate || '',inv.id || '') as {payload_json:string}[]).map(r=>JSON.parse(r.payload_json) as InvoiceInput);
   const distinct=new Map<string,Partial<InvoiceInput>>();
-  for(const invoice of [inv,...rows])if(invoice.supplierTaxCode===inv.supplierTaxCode && invoice.invoiceDate===inv.invoiceDate && !invoice.isAdjustment && (invoice.totalAmount||0)>0)
+  for(const invoice of [inv,...rows])if(invoice.supplierTaxCode===inv.supplierTaxCode && invoice.invoiceDate===inv.invoiceDate && !invoice.isAdjustment && (invoice.totalAmount||0)>0 && (invoice.totalAmount||0)<maxEach)
     distinct.set(`${invoice.supplierTaxCode}:${invoice.invoiceSeries || ''}:${invoice.invoiceNumber}`,invoice);
   return [...distinct.values()].reduce((sum,i)=>sum+(i.totalAmount||0),0);
 }

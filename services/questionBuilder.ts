@@ -25,7 +25,7 @@ type Option = ActionOption;
 const option = (id: 'A' | 'B', label: string, actionDescription: string, resultingAction: Option['resultingAction']): Option => ({ id, label, actionDescription, resultingAction });
 
 export interface ConcreteIssue { reason: string; ask: string; options?: [Option, Option] }
-export interface QuestionContext { config?: Partial<SystemPolicyConfig>; nonCashThreshold: number; dailyTotal?: number; kttLimit: number }
+export interface QuestionContext { config?: Partial<SystemPolicyConfig>; nonCashThreshold: number; dailyTotal?: number; splitTotal?: number; kttLimit: number }
 
 export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReason'>, inv: InvoiceInput, ctx: QuestionContext): ConcreteIssue | null {
   const tax = vnd(inv.taxAmount), total = vnd(inv.totalAmount), item = `“${inv.itemName}”`;
@@ -129,6 +129,13 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
         ask: `CFO có phê duyệt khoản chi ${item} của ${inv.supplierName} không?`,
         options: [option('A', `CFO phê duyệt chi ${total} — khấu trừ ${tax}`, 'Phê duyệt trong thẩm quyền CFO; chỉ hoàn tất khi mọi phát hiện khác đã được giải quyết.', 'ACCEPT_WITH_DOCS'),
           option('B', 'Tạm dừng để thẩm tra hợp đồng', 'Giữ hồ sơ, chưa duyệt thuế cho đến khi thẩm tra xong điều khoản hợp đồng.', 'REQUEST_INFORMATION')]
+      };
+    case 'AUTHORITY_SPLIT_PURCHASE':
+      return {
+        reason: `Hóa đơn ${total} từ ${inv.supplierName}; cộng các hóa đơn cùng bên bán ngày ${viDate(inv.invoiceDate)} (mỗi tờ dưới hạn mức) là ${vnd(ctx.splitTotal || inv.totalAmount)} ≥ hạn mức Kế toán trưởng ${vnd(ctx.kttLimit)} — có thể là một giao dịch bị tách nhỏ (SOP Điều 3.3).`,
+        ask: 'CFO xác nhận đây là các giao dịch độc lập?',
+        options: [option('A', `Giao dịch độc lập, có hợp đồng/đơn hàng riêng — CFO duyệt, khấu trừ ${tax}`, 'CFO phê duyệt trong thẩm quyền; lưu hợp đồng/đơn hàng làm bằng chứng.', 'ACCEPT_WITH_DOCS'),
+          option('B', 'Cùng một giao dịch bị tách — giữ hồ sơ, gộp phê duyệt', 'Giữ hồ sơ, chưa ghi nhận thuế; gộp phê duyệt theo hạn mức CFO.', 'REQUEST_INFORMATION')]
       };
     case 'RULE_DUPLICATE_INVOICE':
       return {
