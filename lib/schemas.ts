@@ -87,7 +87,8 @@ export const SystemPolicyConfigSchema = z.object({
   // Nhóm khoản chi SOP không bao phủ: luôn chuyển người có thẩm quyền (ngoài phạm vi quy định). Mặc định trong policyEngine.
   scopeNotCoveredCategories: z.array(z.string()).optional(),
   // Ngưỡng trọng yếu: hóa đơn từ mức này phải biết trạng thái MST bên bán trước khi tự duyệt.
-  sellerStatusMaterialityVnd: z.number().finite().nonnegative().default(20_000_000)
+  sellerStatusMaterialityVnd: z.number().finite().nonnegative().default(20_000_000),
+  postAuditRate: z.number().min(0).max(1).default(0.1) // Tỉ lệ hậu kiểm ngẫu nhiên ca tự duyệt (lấy mẫu kiểm toán)
 });
 export type SystemPolicyConfig = z.infer<typeof SystemPolicyConfigSchema>;
 

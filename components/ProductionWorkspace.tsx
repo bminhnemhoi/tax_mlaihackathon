@@ -3,6 +3,7 @@ import WorkflowAuditHistory from '@/components/WorkflowAuditHistory';
 import WorkflowControls from '@/components/WorkflowControls';
 import {HandoffContext} from '@/components/HandoffContext';
 import {HandoffAnswerPanel} from '@/components/HandoffAnswerPanel';
+import {PostAuditPanel} from '@/components/PostAuditPanel';
 
 import {caseDeadline, eventLabels, riskGroupLabels, workflowStatusLabels} from '@/lib/workflowPresentation';
 
@@ -733,6 +734,7 @@ export function ProductionWorkspace({
             {/* Dossier / Audit Trail View (Tiêu chí 6: 20 Điểm) */}
             {!loading && !error && view === 'dossier' && (
               <div className="space-y-4">
+                <PostAuditPanel canReview={user.role !== 'ACCOUNTANT'} onChanged={loadWorkspace} />
                 <label className="block text-sm">Chọn hồ sơ để xem đầu vào và lịch sử<select className="mt-1 w-full rounded border p-2" value={auditInvoiceId} onChange={e=>setAuditInvoiceId(e.target.value)}><option value="">Chọn hồ sơ</option><option value="system:auto-approve">Sự kiện hệ thống · công tắc dừng tự động hóa</option>{items.map(i=><option key={i.id} value={i.id}>{i.invoiceNumber} · {i.supplierName} · {workflowStatusLabels[i.status] || i.status}</option>)}</select></label>
                 {auditInvoiceId && <WorkflowAuditHistory key={`${auditInvoiceId}:${items.find(i=>i.id===auditInvoiceId)?.revision}`} invoiceId={auditInvoiceId} />}
                 <AuditTrailTable
