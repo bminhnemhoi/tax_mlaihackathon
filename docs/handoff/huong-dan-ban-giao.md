@@ -1,6 +1,6 @@
 # Hướng dẫn bàn giao — việc cần làm từ 15/10 đến Demo Day 17/10
 
-**Dành cho:** Khánh (merge, deploy, quay video) và Minh (hồ sơ nộp, phối hợp người dùng).
+**Dành cho:** Khánh — từ 15/10, Khánh phụ trách **toàn bộ** việc còn lại: merge, deploy, quay video, **nộp bài trên Drive**, vòng phản hồi người dùng 16/10 và Demo Day. Minh đã bàn giao xong mã nguồn, tài liệu và PR #1.
 **Đi kèm:** [Báo cáo cải tiến](bao-cao-cai-tien-2026-10-15.md) · [README](../../README.md) · [RUNBOOK](../../RUNBOOK.md) · [Hostinger](../../deployment/HOSTINGER.md)
 
 ## Mốc thời gian
@@ -9,14 +9,14 @@
 |---|---|---|
 | **Ngay hôm nay 15/10** | Merge PR (main công khai còn 3 người dùng bịa → nguy cơ truất quyền) | Khánh |
 | 15/10, trước khóa repo | Deploy lên Hostinger, kiểm tra, lưu bằng chứng Verify live | Khánh |
-| **15/10, trước 19:00** | Nộp mục câu hỏi người dùng trong Proposal | Minh |
-| 15/10 | Quay video 3 phút trên live mới; nộp slide + video lên Drive | Khánh + Minh |
-| 16/10, ~13:00 | Nhận phản hồi 3 người dùng → tổng hợp → 1–2 commit cải tiến → cập nhật slide 3/5 → deploy lại | Cả đội |
+| **15/10, trước 19:00** | Nộp mục câu hỏi người dùng trong Proposal (mục B1) | Khánh |
+| 15/10 | Quay video 3 phút trên live mới; nộp slide + video lên Drive (mục A4, B2) | Khánh |
+| 16/10, ~13:00 | Nhận phản hồi 3 người dùng → tổng hợp → 1–2 commit cải tiến → cập nhật slide 3/5 → deploy lại (mục A5) | Khánh |
 | 17/10 | Demo Day: live demo 45 · Q&A 35 · track test 20 | Cả đội |
 
 ---
 
-## Phần A — Việc của Khánh
+## Phần A — Kỹ thuật (Khánh)
 
 ### A1. Review và merge PR (hôm nay)
 1. Mở PR `feat/track-a-hardening → main` trên GitHub, đọc mô tả và [báo cáo cải tiến](bao-cao-cai-tien-2026-10-15.md).
@@ -84,7 +84,7 @@ Rồi thử bằng trình duyệt ẩn danh (cả máy tính và điện thoại
 ### A4. Quay video 3 phút (sau khi deploy)
 Theo [docs/video-script-3-minutes.md](../video-script-3-minutes.md): quay mộc trên **live mới** (kiểm `/api/health` có commit mới trước khi quay), ≤ 3:00, cửa sổ ẩn danh, không lộ key. Thứ tự: Verify 9 ca → thử dữ liệu mới → ca mẫu 0009004 trả lời "1A, 2A" → Nhật ký → Dừng/Hoàn tác → nói rõ giới hạn.
 
-### A5. Ngày 16/10 — vòng phản hồi người dùng (cùng Minh)
+### A5. Ngày 16/10 — vòng phản hồi người dùng
 1. Chép `docs/evidence/user-study/responses.template.json` → `responses.json`, điền **đúng câu người dùng tự viết** (không điền thay, không ước đoán).
 2. `npx tsx scripts/qa/evaluate-user-study.ts docs/evidence/user-study/responses.json > docs/evidence/user-study/report.md` — commit cả hai file.
 3. **Commit cải tiến từ phản hồi** (mỗi thay đổi một commit, message trích phản hồi). Việc đã chuẩn bị sẵn sau buổi thử:
@@ -100,13 +100,27 @@ Theo [docs/video-script-3-minutes.md](../video-script-3-minutes.md): quay mộc 
 
 ---
 
-## Phần B — Việc của Minh
-- [x] Mở PR (đã làm cùng tài liệu này).
-- [ ] **Trước 19:00 15/10:** chép nội dung [docs/submission/proposal-user-questions.md](../submission/proposal-user-questions.md) vào mục câu hỏi người dùng của Proposal trên Drive.
-- [ ] Tải `docs/submission/Tax-Referee-5-slides.pptx` và video lên đúng thư mục nộp bài trên Drive; xóa mọi bản slide/proposal cũ có tên người dùng giả định.
-- [ ] Nhắc Khánh merge + deploy hôm nay; kiểm tra lại `/api/health` trên live.
-- [ ] 16/10: nhận phản hồi BTC, cùng Khánh làm mục A5. Không điền bất kỳ số liệu/ý kiến nào không do người dùng thật cung cấp.
-- [ ] Chuẩn bị Q&A: câu hỏi khó nhất và bằng chứng trong [báo cáo cải tiến](bao-cao-cai-tien-2026-10-15.md) mục 5–6.
+## Phần B — Nộp bài trên Drive (Khánh)
+
+### B1. Proposal — mục câu hỏi người dùng (**hạn 19:00 ngày 15/10**)
+1. Mở file Proposal của đội trên Drive (thư mục nộp bài BTC đã cấp).
+2. Chép toàn bộ nội dung [docs/submission/proposal-user-questions.md](../submission/proposal-user-questions.md) vào mục "Câu hỏi cho người dùng": kịch bản buổi thử 15 phút, phiếu thông tin + đồng ý trích dẫn, 5 ca U1–U5 (người dùng ghi quyết định **trước** khi xem kết quả hệ thống), 20 câu hỏi.
+3. Giữ nguyên câu ghi chú: danh tính người dùng luôn cung cấp cho BTC/giám khảo để xác minh; lựa chọn đồng ý chỉ áp dụng cho việc công bố.
+4. **Không** nói trước với người dùng ca nào là ca bẫy (U2).
+
+### B2. Slide, video và dọn bản cũ
+1. Tải [docs/submission/Tax-Referee-5-slides.pptx](../submission/Tax-Referee-5-slides.pptx) lên thư mục nộp bài (ô `[CẬP NHẬT 16/10]` trên slide 3 để nguyên đến khi có phản hồi thật).
+2. Tải video 3 phút (mục A4) lên cùng thư mục.
+3. Rà Drive và **xóa mọi bản slide/proposal cũ** có tên Trần Thị Mai, Nguyễn Hữu Đức, Lê Hoàng Nam hoặc trích dẫn "người dùng" không có thật.
+4. Build log: [docs/build-log-1-page.md](../build-log-1-page.md) (nếu BTC yêu cầu nộp riêng).
+
+### B3. 16/10 — phản hồi người dùng và slide
+1. Nhận phản hồi do BTC chuyển (khoảng 13:00), làm theo mục A5.
+2. Sau khi có số và trích dẫn thật: điền các ô `[CẬP NHẬT 16/10]` trong `docs/submission/slides-content.md` (slide 3 và 5), dựng lại `.pptx` (hoặc sửa trực tiếp trong PowerPoint), tải bản mới lên Drive.
+3. Không điền bất kỳ số liệu/ý kiến nào không do người dùng thật cung cấp; ô chưa có dữ liệu ghi "chưa có".
+
+### B4. Q&A Demo Day
+Câu hỏi khó và bằng chứng trả lời: [báo cáo cải tiến](bao-cao-cai-tien-2026-10-15.md) mục 4–6 (lỗi đã sửa, giới hạn còn lại, cách tái lập số liệu). Khi cần hỗ trợ kỹ thuật (tổng hợp phản hồi, sửa lỗi, cập nhật slide), liên hệ Minh.
 
 ---
 
