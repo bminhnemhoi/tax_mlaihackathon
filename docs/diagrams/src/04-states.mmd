@@ -1,0 +1,21 @@
+flowchart LR
+  S(("Tiếp nhận")) --> E["Đang đánh giá<br/><small>EVALUATING</small>"]
+  E -- "thường quy" --> A["Đã hoàn tất<br/><small>APPROVED</small>"]
+  E -- "chuyển tiếp dưới 200 tr<br/>hoặc thường quy khi đã dừng tự động hóa" --> K["Chờ Kế toán trưởng<br/><small>WAITING_CHIEF_ACCOUNTANT</small>"]
+  E -- "từ 200 tr" --> C["Chờ CFO<br/><small>WAITING_CFO</small>"]
+  K -- "chuyển CFO" --> F["Đã chuyển CFO<br/><small>FORWARDED</small>"]
+  K & C & F -- "trả lời / duyệt có thẩm quyền" --> A
+  K & C -- "từ chối khấu trừ" --> R["Đã từ chối<br/><small>REJECTED</small>"]
+  K & C -- "yêu cầu bổ sung" --> H["Chờ bổ sung<br/><small>ON_HOLD</small>"]
+  H -- "bổ sung → đánh giá lại" --> E
+  E -. "quá hạn đánh giá" .-> H
+  K <-- "dừng / tiếp tục" --> P["Đã dừng<br/><small>PAUSED</small>"]
+  A & R -. "hoàn tác = sự kiện mới<br/>(về trạng thái trước)" .-> K
+  classDef wait fill:#c8e64a,stroke:#0f2a1d,stroke-width:2px,color:#0f2a1d,font-weight:bold
+  classDef done fill:#e3f1d0,stroke:#2f6b3a,color:#0f2a1d
+  classDef stop fill:#fde2e1,stroke:#b42318,color:#4a0d08
+  classDef hold fill:#fff4d6,stroke:#b98a10,color:#3b2a00
+  class K,C,F wait
+  class A done
+  class R stop
+  class H,P hold
