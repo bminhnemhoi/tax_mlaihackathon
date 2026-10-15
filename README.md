@@ -15,6 +15,7 @@ Mọi quyết định có nhật ký kiểm toán, dừng và hoàn tác đượ
 | **Tài liệu quy định (SOP)** | https://limegreen-salamander-517622.hostingersite.com/sop |
 | **Phiên bản đang chạy** | [`/api/health`](https://limegreen-salamander-517622.hostingersite.com/api/health) trả về commit, phiên bản policy và contract quy tắc |
 | Runbook (clone sạch → chạy → kiểm chứng) | [RUNBOOK.md](RUNBOOK.md) |
+| Báo cáo cải tiến 14–15/10 và hướng dẫn bàn giao | [docs/handoff/](docs/handoff/bao-cao-cai-tien-2026-10-15.md) · [hướng dẫn](docs/handoff/huong-dan-ban-giao.md) |
 
 ## Giám khảo: 90 giây
 
