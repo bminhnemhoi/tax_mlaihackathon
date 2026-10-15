@@ -5,7 +5,7 @@ import { getActivePolicy, getDatabase, runIsolated } from '../../lib/server/db';
 import { switchRole } from '../../lib/server/auth';
 import { listAuditEventsForEntity } from '../../lib/server/audit';
 import { evaluateWorkflow, readRecord, reviewPostAudit } from '../../services/workflowService';
-import { listPostAudits, postAuditDraw } from '../../services/postAuditService';
+import { listPostAudits, postAuditDraw, stratifiedRate } from '../../services/postAuditService';
 
 const routine = (n: string) => ({ id: `PA-${n}`, invoiceNumber: n, invoiceDate: '2026-10-05', supplierTaxCode: '0312345678', supplierName: 'Công ty TNHH Minh An',
   itemName: 'Phí chuyển phát tài liệu', preTaxAmount: 2_000_000, taxRate: 10, taxAmount: 200_000, totalAmount: 2_200_000, paymentMethod: 'BANK_TRANSFER' });
@@ -19,6 +19,16 @@ test('chọn mẫu tất định và đúng tỉ lệ: cùng hồ sơ cho cùng 
   assert.equal(postAuditDraw('HD-1', 'abc'), postAuditDraw('HD-1', 'abc'));
   const n = 4000, hit = Array.from({ length: n }, (_, i) => postAuditDraw(`HD-${i}`, `hash-${i}`)).filter(x => x < 0.1).length;
   assert.ok(hit / n > 0.08 && hit / n < 0.12, `tỉ lệ ${hit / n}`);
+});
+
+test('lấy mẫu phân tầng: ca sát dưới ngưỡng được chọn với tỉ lệ gấp 3; có khóa audit thì kết quả chọn khác (không đoán trước được)', () => {
+  assert.deepEqual(stratifiedRate(0.1, 4_600_000, [5_000_000, 20_000_000, 200_000_000]), { rate: 0.30000000000000004, nearThreshold: 5_000_000 });
+  assert.deepEqual(stratifiedRate(0.1, 2_200_000, [5_000_000, 20_000_000, 200_000_000]), { rate: 0.1, nearThreshold: null });
+  assert.equal(stratifiedRate(0.1, 195_000_000, [5_000_000, 20_000_000, 200_000_000]).nearThreshold, 200_000_000);
+  const plain = postAuditDraw('HD-9', 'h');
+  const saved = process.env.TAX_REFEREE_AUDIT_KEY;
+  process.env.TAX_REFEREE_AUDIT_KEY = 'k'.repeat(40);
+  try { assert.notEqual(postAuditDraw('HD-9', 'h'), plain); } finally { if (saved === undefined) delete process.env.TAX_REFEREE_AUDIT_KEY; else process.env.TAX_REFEREE_AUDIT_KEY = saved; }
 });
 
 test('ca tự duyệt được chọn hậu kiểm: vẫn duyệt, vào danh sách chờ, có sự kiện nhật ký; tỉ lệ 0 thì không chọn', async () => {

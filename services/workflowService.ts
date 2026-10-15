@@ -12,7 +12,7 @@ import {fieldAsk,type FieldAsk} from './questionBuilder';
 import {buildHandoff,checkHandoff,describeRuleEvidence} from './handoffService';
 import { fieldLabels } from '@/lib/workflowPresentation';
 import { recordConfirmedSupplierAlias } from './taxLookupService';
-import { DEFAULT_POST_AUDIT_RATE, postAuditStatus, recordPostAuditReview, samplePostAudit } from './postAuditService';
+import { DEFAULT_POST_AUDIT_RATE, postAuditStatus, recordPostAuditReview, samplePostAudit, stratifiedRate } from './postAuditService';
 import { runningCommit } from '@/lib/server/buildInfo';
 import { isAutomationPaused } from './automationControl';
 import { POLICY_CONTRACT_VERSION } from '@/data/policyContract';
@@ -306,7 +306,7 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
       const row=readRecord(id);syncVoucher(row);recomputeMacro();
       recordAction(row,null,autoApprove?'ROUTINE_AUTO_APPROVED':held?'ROUTINE_HELD_AUTOMATION_PAUSED':'INVOICE_EVALUATED',held?`Tự động hóa đang dừng toàn hệ thống: ca thường quy chờ Kế toán trưởng duyệt tay. ${decision.plainExplanation}`:decision.plainExplanation,before);
       // Hậu kiểm ngẫu nhiên: một tỉ lệ ca tự duyệt được đưa vào danh sách để Kế toán trưởng xem lại (không làm chậm luồng duyệt).
-      if(autoApprove) samplePostAudit({id,content_hash:row.content_hash,evaluation_id:evaluationId},policy.config.postAuditRate ?? DEFAULT_POST_AUDIT_RATE);
+      if(autoApprove){const strat=stratifiedRate(policy.config.postAuditRate ?? DEFAULT_POST_AUDIT_RATE,invoice.totalAmount,[paymentThreshold(invoice,policy.config),policy.config.sellerStatusMaterialityVnd ?? 20_000_000,policy.config.kttApprovalLimit]);samplePostAudit({id,content_hash:row.content_hash,evaluation_id:evaluationId},strat.rate,false,strat.nearThreshold);}
       // Cụm tiền mặt cùng ngày vượt ngưỡng: hóa đơn tiền mặt cùng bên bán đã tự duyệt trước đó cũng mất điều kiện khấu trừ → giữ thuế cả cụm.
       if(decision.status==='ESCALATED' && decision.findings?.some((f:{ruleId:string})=>f.ruleId==='STATUTORY_SAME_DAY_CASH_5M') && holdLinkedCashInvoices(row,invoice).length) recomputeMacro();
     })();

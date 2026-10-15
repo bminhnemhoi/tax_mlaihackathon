@@ -18,20 +18,35 @@ function ensureTable(): void {
     status TEXT NOT NULL DEFAULT 'PENDING', result TEXT, reviewer_id TEXT, reviewer_role TEXT, reason TEXT, reviewed_at TEXT)`);
 }
 
-/** Băm mã hồ sơ + băm nội dung → số trong [0, 1); dưới tỉ lệ thì được chọn. Cùng hồ sơ, cùng nội dung luôn cho cùng kết quả. */
+/**
+ * Số ngẫu nhiên tất định trong [0, 1) cho một hồ sơ. Có khóa audit thì dùng HMAC (người nhập không đoán trước được ca nào
+ * bị chọn để né — như Amazon A2I lấy mẫu "để kiểm toán mô hình"); không có khóa thì băm thường. Cùng hồ sơ, cùng nội dung → cùng kết quả.
+ */
 export function postAuditDraw(invoiceId: string, contentHash: string): number {
-  return parseInt(crypto.createHash('sha256').update(`${invoiceId}|${contentHash}`).digest('hex').slice(0, 8), 16) / 0x100000000;
+  const key = process.env.TAX_REFEREE_AUDIT_KEY && process.env.TAX_REFEREE_AUDIT_KEY.length >= 32 ? process.env.TAX_REFEREE_AUDIT_KEY : '';
+  const digest = key ? crypto.createHmac('sha256', key).update(`post-audit|${invoiceId}|${contentHash}`).digest('hex') : crypto.createHash('sha256').update(`${invoiceId}|${contentHash}`).digest('hex');
+  return parseInt(digest.slice(0, 8), 16) / 0x100000000;
+}
+
+/**
+ * Lấy mẫu phân tầng (ISA 530): ca sát dưới một ngưỡng quyết định (trong khoảng 15% dưới ngưỡng tiền mặt, ngưỡng trạng thái MST,
+ * hạn mức Kế toán trưởng) có rủi ro sai/lách cao hơn nên được chọn với tỉ lệ gấp 3 (tối đa 100%).
+ */
+export function stratifiedRate(baseRate: number, totalAmount: number, thresholds: number[]): { rate: number; nearThreshold: number | null } {
+  const amount = Math.abs(totalAmount);
+  const near = thresholds.find(t => t > 0 && amount < t && amount >= t * 0.85) ?? null;
+  return { rate: near ? Math.min(1, baseRate * 3) : baseRate, nearThreshold: near };
 }
 
 /** Gọi sau khi một ca thường quy được tự duyệt. Trả về true nếu ca được chọn hậu kiểm. */
-export function samplePostAudit(row: { id: string; content_hash: string; evaluation_id?: string }, rate: number, forced = false): boolean {
+export function samplePostAudit(row: { id: string; content_hash: string; evaluation_id?: string }, rate: number, forced = false, nearThreshold: number | null = null): boolean {
   if (!forced && !(rate > 0 && postAuditDraw(row.id, row.content_hash) < rate)) return false;
   ensureTable();
   const db = getDatabase();
   const existing = db.prepare('SELECT status FROM post_audits WHERE invoice_id = ?').get(row.id) as { status: string } | undefined;
   if (existing) return true;
   db.prepare('INSERT INTO post_audits (invoice_id, evaluation_id, sampled_at, rate, forced) VALUES (?, ?, ?, ?, ?)').run(row.id, row.evaluation_id || null, jsonNow(), rate, forced ? 1 : 0);
-  appendAuditEvent({ eventType: 'POST_AUDIT_SAMPLED', entityId: row.id, payload: { rate, forced, reason: `Ca tự duyệt được chọn hậu kiểm ngẫu nhiên (tỉ lệ ${Math.round(rate * 100)}%) để Kế toán trưởng xem lại.` } });
+  appendAuditEvent({ eventType: 'POST_AUDIT_SAMPLED', entityId: row.id, payload: { rate, forced, nearThreshold, reason: `Ca tự duyệt được chọn hậu kiểm ngẫu nhiên (tỉ lệ ${Math.round(rate * 100)}%${nearThreshold ? `, tầng sát ngưỡng ${new Intl.NumberFormat('vi-VN').format(nearThreshold)}₫` : ''}) để Kế toán trưởng xem lại.` } });
   return true;
 }
 
