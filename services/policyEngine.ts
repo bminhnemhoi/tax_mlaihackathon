@@ -11,15 +11,17 @@ import {buildHandoff,describeRuleEvidence} from './handoffService';
 import {concreteIssue} from './questionBuilder';
 import {groupOf,orderFindings,riskGroupsOf} from '@/lib/riskTaxonomy';
 import {fieldLabels} from '@/lib/workflowPresentation';
+import {invoiceFrameworkAt,vat8Basis,vat8ExcludedPhrases,vatReductionAt} from '@/lib/legalBasis';
 
-/** Hàng hóa/dịch vụ không được giảm thuế 8% (NQ 204/2025/QH15): viễn thông, công nghệ thông tin… */
-const VAT8_EXCLUDED_PHRASES=['CƯỚC INTERNET','INTERNET','CÁP QUANG','CƯỚC DI ĐỘNG','THUÊ BAO DI ĐỘNG','ĐIỆN THOẠI DI ĐỘNG','CƯỚC ĐIỆN THOẠI','ĐIỆN THOẠI','4G','5G','CÔNG NGHỆ THÔNG TIN','PHẦN MỀM','MÁY TÍNH','LAPTOP','THÉP','SẮT THÉP','ỐNG ĐỒNG','DÂY ĐỒNG','ĐỒNG THAU','NHÔM','INOX','XĂNG','XĂNG DẦU','DẦU DIESEL','DẦU DO','DẦU MAZUT','NHIÊN LIỆU','BIA','RƯỢU','THUỐC LÁ','Ô TÔ','THAN ĐÁ','QUẶNG'];
 /** Cụm từ chứa từ khóa loại trừ nhưng là hàng hóa thông thường (VD "mũ bảo hiểm" không phải dịch vụ bảo hiểm). */
 const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HIỂM','GĂNG TAY BẢO HIỂM'];
-/** So khớp nguyên cụm từ (không khớp giữa từ) với danh mục cấu hình + cụm từ viễn thông/CNTT. */
-function isVat8Excluded(textUpper:string,categories:string[]):boolean {
+/**
+ * So khớp nguyên cụm từ với danh mục loại trừ 8% CỦA KỲ LẬP HÓA ĐƠN (lib/legalBasis): từ 01/7/2025, NQ 204/2025 cho xăng,
+ * nhiên liệu dầu, than, hóa chất, CNTT được giảm 8%; viễn thông, kim loại, hàng chịu TTĐB (trừ xăng) vẫn bị loại.
+ */
+function isVat8Excluded(textUpper:string,categories:string[],invoiceDate:string):boolean {
   const text=VAT8_NOT_EXCLUDED.reduce((acc,phrase)=>acc.split(phrase).join(' '),textUpper);
-  return [...categories,...VAT8_EXCLUDED_PHRASES].some(phrase=>matchesKeyword(text,phrase));
+  return vat8ExcludedPhrases(invoiceDate,categories).some(phrase=>matchesKeyword(text,phrase));
 }
 /** Chi tiếp khách/đồ uống có cồn/giải trí (SOP: cần làm rõ mục đích). So khớp nguyên từ để "BAVIA" hay "BÌA" không bị nhầm với "BIA". */
 const SENSITIVE_ITEMS=['RƯỢU','BIA','WHISKY','WHISKEY','WINE','VODKA','CHAMPAGNE','BEER','LIQUOR','COCKTAIL','SOJU','SAKE','THUỐC LÁ','CIGAR','KARAOKE','MASSAGE','NHẬU','TIẾP KHÁCH'];
@@ -128,13 +130,13 @@ export function validateLineItems(
 
     // 2. Rà soát danh mục loại trừ thuế suất 8% (Nghị quyết 204/2025/QH15)
     if (item.taxRate === 8) {
-      const isExcluded = isVat8Excluded(nameUpper, excluded);
+      const isExcluded = isVat8Excluded(nameUpper, excluded, inv.invoiceDate);
       if (isExcluded) {
-        warnings.push(`Dòng ${item.lineNumber} [${item.itemName}]: Mặt hàng thuộc danh mục loại trừ nhưng đang áp thuế suất ưu đãi 8% thay vì 10% (NQ 204/2025/QH15).`);
+        warnings.push(`Dòng ${item.lineNumber} [${item.itemName}]: Mặt hàng thuộc danh mục loại trừ nhưng đang áp thuế suất ưu đãi 8% thay vì 10% (${vat8Basis(inv.invoiceDate)}).`);
         flaggedCount++;
         hasExcludedVat8Item = true;
         item.isExcludedCategory = true;
-        item.flaggedReason = 'Sai thuế suất 8% theo NQ 204/2025/QH15';
+        item.flaggedReason = `Sai thuế suất 8% theo ${vat8Basis(inv.invoiceDate)}`;
       }
     }
 
@@ -337,7 +339,7 @@ function evaluateInvoiceLocallyInternal(
       riskGroup: 'UNCERTAIN_INFO',
       flaggedReason: 'Mã số thuế nhà cung cấp đang ở trạng thái tạm ngừng; cần xác nhận thời điểm giao dịch và hồ sơ hàng hóa.',
       plainExplanation: 'Nhà cung cấp đang bị tạm ngừng hoạt động trên CSDL Thuế. Cần kiểm tra thời điểm phát sinh giao dịch có trước thời điểm tạm ngừng hay không.',
-      legalBasis: 'Điều 2.2 Quy chế Tax-SOP-2026 & Nghị định 123/2020/NĐ-CP',
+      legalBasis: `Điều 2.2 Quy chế Tax-SOP-2026 & ${invoiceFrameworkAt(inv.invoiceDate).decree}`,
       sopClause: 'Điều 2.2 Quy chế Tax-SOP-2026',
       actionableQuestion: `Nhà cung cấp ${inv.supplierName} đang ở trạng thái tạm ngừng hoạt động. KTT xử lý thế nào?`,
       options: [
@@ -439,9 +441,9 @@ function evaluateInvoiceLocallyInternal(
           severity: 'HIGH',
           riskGroup: 'UNCERTAIN_INFO',
           flaggedReason: `Ký hiệu hóa đơn '${inv.invoiceSeries}' là loại có mã của Cơ quan thuế (ký tự thứ 2 là 'C') nhưng thiếu hoặc sai định dạng chuỗi MCCQT 34 ký tự (hiện có: ${mccqt ? mccqt.length + ' ký tự' : 'Trống'}).`,
-          plainExplanation: 'Theo Nghị định 123/2020/NĐ-CP và Thông tư 78/2021/TT-BTC, hóa đơn điện tử có mã của cơ quan thuế bắt buộc phải có chuỗi cấp mã gồm đúng 34 ký tự từ Tổng cục Thuế trước khi gửi cho người mua. Hóa đơn chưa có mã CQT hợp lệ thì chưa có giá trị pháp lý để kê khai thuế.',
-          legalBasis: 'Điều 14 Nghị định 123/2020/NĐ-CP & Điều 4 Thông tư 78/2021/TT-BTC',
-          sopClause: 'Điều 14 Nghị định 123/2020/NĐ-CP & Điều 4 Thông tư 78/2021/TT-BTC',
+          plainExplanation: `Theo ${invoiceFrameworkAt(inv.invoiceDate).decree} và ${invoiceFrameworkAt(inv.invoiceDate).circular}, hóa đơn điện tử có mã của cơ quan thuế bắt buộc phải có chuỗi mã của cơ quan thuế (34 ký tự) trước khi gửi cho người mua. Hóa đơn chưa có mã CQT hợp lệ thì chưa có giá trị pháp lý để kê khai thuế.`,
+          legalBasis: invoiceFrameworkAt(inv.invoiceDate).legacy ? 'Điều 14 Nghị định 123/2020/NĐ-CP & Điều 4 Thông tư 78/2021/TT-BTC' : `${invoiceFrameworkAt(inv.invoiceDate).decree} & ${invoiceFrameworkAt(inv.invoiceDate).circular} (hóa đơn có mã của cơ quan thuế)`,
+          sopClause: invoiceFrameworkAt(inv.invoiceDate).legacy ? 'Điều 14 Nghị định 123/2020/NĐ-CP & Điều 4 Thông tư 78/2021/TT-BTC' : `${invoiceFrameworkAt(inv.invoiceDate).decree} & ${invoiceFrameworkAt(inv.invoiceDate).circular}`,
           actionableQuestion: `Hóa đơn ${inv.invoiceNumber} thuộc nhóm có mã CQT nhưng chưa có mã MCCQT 34 ký tự hợp lệ. KTT xử lý thế nào?`,
           options: [
             {
@@ -474,9 +476,9 @@ function evaluateInvoiceLocallyInternal(
           severity: 'HIGH',
           riskGroup: 'UNCERTAIN_INFO',
           flaggedReason: `Ký hiệu hóa đơn '${inv.invoiceSeries}' (dải năm ${seriesYear}) không khớp với năm lập hóa đơn (${inv.invoiceDate}, năm ${invYear}).`,
-          plainExplanation: 'Theo Điểm a Khoản 1 Điều 4 Thông tư 78/2021/TT-BTC, hai chữ số năm trong ký hiệu hóa đơn thể hiện năm lập hóa đơn điện tử. Việc lệch dải năm phản ánh nguy cơ phát hành lùi ngày bất hợp pháp hoặc xuất hóa đơn trên dải ký hiệu cũ chưa thông báo phát hành lại.',
-          legalBasis: 'Điểm a Khoản 1 Điều 4 Thông tư 78/2021/TT-BTC',
-          sopClause: 'Điểm a Khoản 1 Điều 4 Thông tư 78/2021/TT-BTC',
+          plainExplanation: `Theo quy định về ký hiệu hóa đơn (${invoiceFrameworkAt(inv.invoiceDate).legacy ? 'điểm a khoản 1 Điều 4 Thông tư 78/2021/TT-BTC' : invoiceFrameworkAt(inv.invoiceDate).circular}), hai chữ số năm trong ký hiệu hóa đơn thể hiện năm lập hóa đơn điện tử. Việc lệch dải năm phản ánh nguy cơ phát hành lùi ngày bất hợp pháp hoặc xuất hóa đơn trên dải ký hiệu cũ chưa thông báo phát hành lại.`,
+          legalBasis: invoiceFrameworkAt(inv.invoiceDate).legacy ? 'Điểm a Khoản 1 Điều 4 Thông tư 78/2021/TT-BTC' : `${invoiceFrameworkAt(inv.invoiceDate).circular} (ký hiệu hóa đơn)`,
+          sopClause: invoiceFrameworkAt(inv.invoiceDate).legacy ? 'Điểm a Khoản 1 Điều 4 Thông tư 78/2021/TT-BTC' : `${invoiceFrameworkAt(inv.invoiceDate).circular} (ký hiệu hóa đơn)`,
           actionableQuestion: `Hóa đơn ${inv.invoiceNumber} có ký hiệu dải năm '${seriesYear}' khác năm lập thực tế '${invYear}'. KTT xử lý thế nào?`,
           options: [
             {
@@ -510,9 +512,9 @@ function evaluateInvoiceLocallyInternal(
         severity: 'MEDIUM',
         riskGroup: 'UNCERTAIN_INFO',
         flaggedReason: `Chữ ký số bên bán được ký vào ngày ${inv.signingDate}, lệch ${Math.abs(diffDays)} ngày so với ngày lập hóa đơn (${inv.invoiceDate}).`,
-        plainExplanation: `Theo Khoản 9 Điều 10 Nghị định 123/2020/NĐ-CP, thời điểm ký số và thời điểm lập hóa đơn có sự khác biệt lớn (${Math.abs(diffDays)} ngày). Cần lưu ý thời điểm khai thuế theo ngày lập hoặc ngày ký theo hướng dẫn của CQT địa phương.`,
-        legalBasis: 'Khoản 9 Điều 10 Nghị định 123/2020/NĐ-CP',
-        sopClause: 'Khoản 9 Điều 10 Nghị định 123/2020/NĐ-CP',
+        plainExplanation: `Theo quy định về thời điểm ký số và thời điểm lập hóa đơn (${inv.invoiceDate < '2026-07-01' ? 'khoản 9 Điều 10 Nghị định 123/2020/NĐ-CP' : invoiceFrameworkAt(inv.invoiceDate).decree}), hai thời điểm này đang lệch nhau ${Math.abs(diffDays)} ngày. Cần lưu ý thời điểm khai thuế theo ngày lập hoặc ngày ký theo hướng dẫn của CQT địa phương.`,
+        legalBasis: inv.invoiceDate < '2026-07-01' ? 'Khoản 9 Điều 10 Nghị định 123/2020/NĐ-CP' : `${invoiceFrameworkAt(inv.invoiceDate).decree} (thời điểm lập và ký số hóa đơn)`,
+        sopClause: inv.invoiceDate < '2026-07-01' ? 'Khoản 9 Điều 10 Nghị định 123/2020/NĐ-CP' : `${invoiceFrameworkAt(inv.invoiceDate).decree} (thời điểm lập và ký số hóa đơn)`,
         actionableQuestion: `Hóa đơn ${inv.invoiceNumber} có ngày ký số lệch ${Math.abs(diffDays)} ngày so với ngày lập. KTT xử lý thế nào?`,
         options: [
           {
@@ -587,8 +589,8 @@ function evaluateInvoiceLocallyInternal(
         riskGroup: 'OUT_OF_POLICY',
         flaggedReason: 'Hóa đơn từ ' + (nonCashThreshold / 1_000_000) + ' triệu đồng thanh toán TIỀN MẶT' + (isExceedKtt ? ' (vượt hạn mức KTT)' : '') + ' cần đối chiếu điều kiện thanh toán theo SOP',
         plainExplanation: 'Luật thuế quy định hóa đơn từng lần từ ' + (nonCashThreshold / 1_000_000) + ' triệu VNĐ trở lên bắt buộc phải có chứng từ thanh toán không dùng tiền mặt (Ủy nhiệm chi ngân hàng) để được khấu trừ. Tuyệt đối không áp dụng tiền lệ tự duyệt cho vi phạm luật định.',
-        legalBasis: 'Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 1.2 Tax-SOP-2026',
-        sopClause: 'Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 1.2 Tax-SOP-2026',
+        legalBasis: inv.invoiceDate < '2025-07-01' ? 'Khoản 2 Điều 15 Thông tư 219/2013/TT-BTC & Điều 1.2 Tax-SOP-2026' : 'Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 26 Nghị định 181/2025/NĐ-CP & Điều 1.2 Tax-SOP-2026',
+        sopClause: inv.invoiceDate < '2025-07-01' ? 'Khoản 2 Điều 15 Thông tư 219/2013/TT-BTC & Điều 1.2 Tax-SOP-2026' : 'Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 26 Nghị định 181/2025/NĐ-CP & Điều 1.2 Tax-SOP-2026',
         actionableQuestion: 'Hóa đơn ' + inv.invoiceNumber + ' trị giá ' + inv.totalAmount.toLocaleString('vi-VN') + '₫ thanh toán Tiền mặt' + (isExceedKtt ? ' (vượt thẩm quyền KTT)' : '') + '. ' + (isExceedKtt ? 'CFO' : 'KTT') + ' xử lý thế nào?',
         options: [
           {
@@ -641,9 +643,9 @@ function evaluateInvoiceLocallyInternal(
           severity: 'CRITICAL',
           riskGroup: 'OUT_OF_POLICY',
           flaggedReason: `Cụm ${sameDayCheck.invoiceCount} hóa đơn cùng ngày (${inv.invoiceDate}) từ NCC [${inv.supplierName}] có tổng giá trị ${sameDayCheck.dailyTotal.toLocaleString('vi-VN')}₫ (≥ ${nonCashThreshold / 1_000_000} triệu đồng) thanh toán TIỀN MẶT`,
-          plainExplanation: 'Theo Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15, mua hàng hóa/dịch vụ của cùng một nhà cung cấp nhiều lần trong cùng một ngày có tổng giá trị từ 5 triệu đồng trở lên bắt buộc phải có chứng từ thanh toán không dùng tiền mặt (Ủy nhiệm chi ngân hàng) để được khấu trừ thuế và tính chi phí được trừ khi tính thuế TNDN.',
-          legalBasis: 'Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Khoản 1 Điều 9 Luật Thuế TNDN 67/2025/QH15',
-          sopClause: 'Khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Khoản 1 Điều 9 Luật Thuế TNDN 67/2025/QH15',
+          plainExplanation: 'Theo khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP (hướng dẫn Luật Thuế GTGT 48/2024/QH15), mua hàng hóa/dịch vụ của cùng một người bán nhiều lần trong cùng một ngày, mỗi lần dưới 5 triệu nhưng tổng từ 5 triệu đồng trở lên, chỉ được khấu trừ thuế khi có chứng từ thanh toán không dùng tiền mặt (Ủy nhiệm chi ngân hàng).',
+          legalBasis: 'Khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP & Luật Thuế GTGT 48/2024/QH15',
+          sopClause: 'Khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP & Luật Thuế GTGT 48/2024/QH15',
           actionableQuestion: `Phát hiện cụm hóa đơn cùng ngày từ ${inv.supplierName} đạt ${sameDayCheck.dailyTotal.toLocaleString('vi-VN')}₫ thanh toán tiền mặt. KTT xử lý thế nào?`,
           options: [
             {
@@ -671,7 +673,7 @@ function evaluateInvoiceLocallyInternal(
     'BẤT ĐỘNG SẢN', 'KIM LOẠI', 'KHAI KHOÁNG', 'HÓA CHẤT', 'TIÊU THỤ ĐẶC BIỆT'
   ]).map((value) => value.trim().toLocaleUpperCase('vi-VN')).filter(Boolean);
   const normalizedItemName = inv.itemName.normalize('NFC').toLocaleUpperCase('vi-VN');
-  const isExcludedItem = isVat8Excluded(normalizedItemName, excludedCategories);
+  const isExcludedItem = isVat8Excluded(normalizedItemName, excludedCategories, inv.invoiceDate);
   if ((isExcludedItem && inv.taxRate === 8) || lineItemResult.hasExcludedVat8Item) {
     const flagMsg = lineItemResult.hasExcludedVat8Item
       ? 'Dòng hàng có thuế suất 8% trong danh mục loại trừ đang cấu hình; cần đối chiếu ngành hàng và nguồn quy định'
@@ -683,9 +685,9 @@ function evaluateInvoiceLocallyInternal(
       severity: 'HIGH',
       riskGroup: 'OUT_OF_POLICY',
       flaggedReason: flagMsg + (isExceedKtt ? ' (vượt hạn mức KTT)' : ''),
-      plainExplanation: 'Bên bán xuất hóa đơn thuế suất ưu đãi 8% cho mặt hàng thuộc danh mục loại trừ không được giảm thuế theo Nghị quyết 204/2025/QH15 (phải áp dụng 10%). Kê khai 8% sẽ bị phạt 20% khi thanh tra thuế. Không áp dụng tiền lệ cho sai sót thuế suất.',
-      legalBasis: 'Điều 1.3 Quy chế Tax-SOP-2026 & Nghị quyết 204/2025/QH15',
-      sopClause: 'Điều 1.3 Quy chế Tax-SOP-2026 & Nghị quyết 204/2025/QH15',
+      plainExplanation: `Bên bán xuất hóa đơn thuế suất ưu đãi 8% cho mặt hàng thuộc danh mục loại trừ không được giảm thuế theo ${vat8Basis(inv.invoiceDate)} (phải áp dụng 10%). Kê khai sai thuế suất có thể bị truy thu và xử phạt khi thanh tra thuế. Không áp dụng tiền lệ cho sai sót thuế suất.`,
+      legalBasis: `Điều 1.3 Quy chế Tax-SOP-2026 & ${vat8Basis(inv.invoiceDate)}`,
+      sopClause: `Điều 1.3 Quy chế Tax-SOP-2026 & ${vat8Basis(inv.invoiceDate)}`,
       actionableQuestion: 'Hóa đơn ' + inv.invoiceNumber + ' từ ' + inv.supplierName + ' áp thuế 8% cho ngành hàng thuộc danh mục cần đối chiếu' + (isExceedKtt ? ' (vượt trần KTT)' : '') + '. ' + (isExceedKtt ? 'CFO' : 'KTT') + ' xử lý thế nào?',
       options: [
         {
@@ -758,14 +760,14 @@ function evaluateInvoiceLocallyInternal(
     });
   }
 
-  // 13c. SCOPE: Thuế suất 8% ngoài thời gian giảm thuế đã cấu hình (NQ 204/2025/QH15 hết hiệu lực sau 31/12/2026)
+  // 13c. SCOPE: Thuế suất 8% ngoài mọi kỳ giảm thuế GTGT (bảng kỳ trong lib/legalBasis: 02/2022–12/2022, 07/2023–12/2026)
   const usesVat8=inv.taxRate===8 || (inv.items||[]).some(i=>i.taxRate===8);
-  if (usesVat8 && !regInfo.hasVatReductionPolicy && (inv.invoiceDate>'2026-12-31' || inv.invoiceDate<'2022-02-01')) {
+  if (usesVat8 && !vatReductionAt(inv.invoiceDate)) {
     evaluatedFindings.push({
       ruleId: 'RULE_SCOPE_VAT8_PERIOD', kind: 'STATUTORY', severity: 'HIGH', riskGroup: 'OUT_OF_POLICY',
       flaggedReason: `Hóa đơn ngày ${inv.invoiceDate} áp thuế suất 8% ngoài thời gian giảm thuế GTGT đã cấu hình.`,
       plainExplanation: 'Mức thuế 8% chỉ áp dụng trong thời gian có nghị quyết giảm thuế GTGT. Hóa đơn lập ngoài thời gian này phải dùng thuế suất phổ thông 10%.',
-      legalBasis: 'Điều 1.3 Quy chế Tax-SOP-2026 & Nghị quyết 204/2025/QH15', sopClause: 'Điều 1.3 Quy chế Tax-SOP-2026',
+      legalBasis: 'Điều 1.3 Quy chế Tax-SOP-2026 & các nghị quyết giảm thuế GTGT theo kỳ (gần nhất: Nghị quyết 204/2025/QH15, hết 31/12/2026)', sopClause: 'Điều 1.3 Quy chế Tax-SOP-2026',
       actionableQuestion: `Hóa đơn ${inv.invoiceNumber} áp 8% ngoài thời gian giảm thuế. ${isExceedKtt ? 'CFO' : 'KTT'} xử lý thế nào?`,
       options: [
         {id:'A',label:'Yêu cầu NCC xuất lại hóa đơn 10%',actionDescription:'Giữ hồ sơ, chưa khấu trừ cho đến khi có hóa đơn đúng thuế suất.',resultingAction:'REQUEST_SUPPLIER_REISSUE'},

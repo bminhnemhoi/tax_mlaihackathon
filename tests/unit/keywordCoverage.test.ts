@@ -9,6 +9,7 @@ import { evaluateWorkflow } from '../../services/workflowService';
 import { userStudyCases } from '../../data/verification/userStudyCases';
 import type { RefereeDecision } from '../../lib/schemas';
 import { checkHandoff } from '../../services/handoffService';
+import { invoiceFrameworkAt } from '../../lib/legalBasis';
 
 const COMPANY = '0102030405';
 const accountant = { id: 'kw-accountant', role: 'ACCOUNTANT' as const, email: 'kw@test', displayName: 'Kiểm thử từ khóa' };
@@ -34,12 +35,38 @@ test('ngoài quy định được nhận ra cả khi gõ không dấu, tiếng A
   }
 });
 
-test('hàng không được giảm thuế 8% (thép, ống đồng, xăng dầu, bia, thuốc lá) bị chặn khi áp 8%', async () => {
-  for (const item of ['Thép hộp mạ kẽm', 'Ống đồng máy lạnh', 'Xăng RON95', 'Dầu diesel', 'Bia lon Hà Nội', 'Thuốc lá', 'thep tam can nong']) {
+test('hàng không được giảm thuế 8% theo NQ 204/2025 (kim loại, hàng chịu TTĐB trừ xăng, viễn thông) bị chặn khi áp 8%', async () => {
+  for (const item of ['Thép hộp mạ kẽm', 'Ống đồng máy lạnh', 'Bia lon Hà Nội', 'Thuốc lá', 'thep tam can nong', 'Cước Internet cáp quang tháng 9']) {
     const d = await judge(item, at8);
     assert.equal(d.status, 'ESCALATED', item);
     assert.ok(d.status === 'ESCALATED' && d.findings?.some(f => f.ruleId === 'STATUTORY_RES_204_VAT_8_EXCLUDED' || f.ruleId === 'INTERNAL_POLICY_GUEST_ENTERTAINMENT'), item);
   }
+});
+
+test('NQ 204/2025 (từ 01/7/2025): xăng, dầu nhiên liệu, than, hóa chất, CNTT được giảm 8% — không chặn; trước 01/7/2025 vẫn chặn theo NQ 174/2024', async () => {
+  for (const item of ['Xăng RON95', 'Dầu diesel', 'Than đá cám', 'Hóa chất tẩy rửa công nghiệp', 'Laptop Dell Latitude', 'Dịch vụ công nghệ thông tin']) {
+    const d = await judge(item, at8);
+    assert.equal(d.status, 'ROUTINE', `${item} (10/2026, NQ 204/2025)`);
+  }
+  for (const item of ['Xăng RON95', 'Laptop Dell Latitude', 'Hóa chất tẩy rửa công nghiệp']) {
+    const d = await judge(item, { ...at8, invoiceDate: '2025-03-10' });
+    assert.equal(d.status, 'ESCALATED', `${item} (03/2025)`);
+    const f = d.status === 'ESCALATED' ? d.findings?.find(x => x.ruleId === 'STATUTORY_RES_204_VAT_8_EXCLUDED') : undefined;
+    assert.ok(f, `${item} (03/2025) bị chặn vì danh mục loại trừ`);
+    assert.match(f!.legalBasis, /180\/2024\/NĐ-CP/, 'căn cứ đúng kỳ: NĐ 180/2024 (NQ 174/2024)');
+    assert.doesNotMatch(f!.legalBasis, /174\/2025/, 'không viện dẫn văn bản chưa có hiệu lực');
+  }
+});
+
+test('8% ngoài mọi kỳ giảm thuế (03/2023) bị chặn; căn cứ hóa đơn và cộng dồn tiền mặt theo văn bản còn hiệu lực', async () => {
+  const gap = await judge('Văn phòng phẩm', { ...at8, invoiceDate: '2023-03-15' });
+  assert.ok(gap.status === 'ESCALATED' && gap.findings?.some(f => f.ruleId === 'RULE_SCOPE_VAT8_PERIOD'));
+  assert.deepEqual(invoiceFrameworkAt('2026-10-05'), { decree: 'Nghị định 254/2026/NĐ-CP', circular: 'Thông tư 91/2026/TT-BTC', legacy: false });
+  assert.equal(invoiceFrameworkAt('2025-09-01').circular, 'Thông tư 32/2025/TT-BTC');
+  assert.equal(invoiceFrameworkAt('2025-03-01').circular, 'Thông tư 78/2021/TT-BTC');
+  const series = await judge('Văn phòng phẩm', { invoiceSeries: '1C25TAA', invoiceDate: '2026-10-05' });
+  const f = series.status === 'ESCALATED' ? series.findings?.find(x => x.ruleId === 'RULE_SERIES_YEAR_MISMATCH') : undefined;
+  if (f) { assert.doesNotMatch(f.legalBasis, /78\/2021|123\/2020/); assert.match(f.legalBasis, /254\/2026|91\/2026/); }
 });
 
 test('không chặn nhầm hàng thông thường', async () => {

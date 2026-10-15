@@ -1,5 +1,6 @@
 import type { PolicyRule, SystemPolicyConfig } from '@/lib/schemas';
 import { groupOf } from '@/lib/riskTaxonomy';
+import { vatReductionAt } from '@/lib/legalBasis';
 export const POLICY_CONTRACT_VERSION='referee-contract-2026-10-16';
 export interface PolicyRuleContract {
   id:string;label:string;clause:string;condition:string;requiredFields:string[];group:'UNCERTAIN_INFO'|'OUT_OF_POLICY'|'EXCEED_AUTHORITY';
@@ -51,11 +52,15 @@ const officialSources={
   vat:{code:'174/2025/NĐ-CP',url:'https://vanban.chinhphu.vn/?docid=214310&pageid=27160',effectiveFrom:'2025-07-01'},
   invoice:{code:'254/2026/NĐ-CP',url:'https://vanban.chinhphu.vn/?docid=218689&pageid=27160',effectiveFrom:'2026-07-01'},
   earlierInvoice:{code:'70/2025/NĐ-CP',url:'https://vanban.chinhphu.vn/?docid=213179&pageid=27160',effectiveFrom:'2025-06-01'},
+  legacyInvoice:{code:'123/2020/NĐ-CP',url:'https://vanban.chinhphu.vn/?pageid=27160&docid=201509',effectiveFrom:'2022-07-01'},
 };
 export function ruleContract(id:string,invoiceDate?:string):PolicyRuleContract {
   const check=checks.find(row=>row[0]===id);
-  const source=id.includes('CASH')?(invoiceDate && invoiceDate<'2025-07-01'?undefined:officialSources.payment):id.includes('VAT_8')||id==='RULE_SCOPE_VAT8_PERIOD'?officialSources.vat:
-    /CLOSED_SELLER|BUYER_TAX|ADJUSTMENT|MCCQT|SERIES|SIGNING/.test(id)?invoiceDate && invoiceDate<'2026-07-01'?(invoiceDate>='2025-06-01'?officialSources.earlierInvoice:undefined):officialSources.invoice:undefined;
+  // Văn bản theo NGÀY LẬP hóa đơn (lib/legalBasis): kỳ giảm thuế 8% và khung hóa đơn điện tử đổi theo hiệu lực.
+  const vatPeriod=invoiceDate?vatReductionAt(invoiceDate):null;
+  const vatSource=!invoiceDate || vatPeriod?.nq204 || invoiceDate>'2026-12-31'?officialSources.vat:vatPeriod?{code:vatPeriod.decree,url:'',effectiveFrom:vatPeriod.from}:undefined;
+  const source=id.includes('CASH')?(invoiceDate && invoiceDate<'2025-07-01'?undefined:officialSources.payment):id.includes('VAT_8')||id==='RULE_SCOPE_VAT8_PERIOD'?vatSource:
+    /CLOSED_SELLER|BUYER_TAX|ADJUSTMENT|MCCQT|SERIES|SIGNING/.test(id)?invoiceDate && invoiceDate<'2026-07-01'?(invoiceDate>='2025-06-01'?officialSources.earlierInvoice:officialSources.legacyInvoice):officialSources.invoice:undefined;
   // Nhóm lấy từ bảng phân loại duy nhất (lib/riskTaxonomy) — SOP, engine và workflow không thể lệch nhau.
   const group=groupOf(id);
   return {id,label:check?.[1]||id,clause:check?.[2]||'Dữ liệu đầu vào',condition:check?.[3]||'Xác minh dữ kiện trước khi tiếp tục.',requiredFields:fields[id]||[],
