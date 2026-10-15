@@ -1,0 +1,11 @@
+flowchart LR
+  IN["ĐẦU VÀO<br/>XML · PDF · ảnh<br/>nhập tay"] --> R["Đọc chứng từ<br/>AI chỉ đọc ảnh/PDF"] --> V["Kiểm tra dữ kiện<br/>so chứng từ gốc"] --> E["24 quy tắc<br/>3 kiểu dừng"] --> D{"Thường<br/>quy?"}
+  D -- "Có" --> OK["Tự duyệt<br/>+ chứng từ nội bộ"]
+  D -- "Không" --> Q["1 câu hỏi · số tiền<br/>thuế chờ quyết định"] --> H["Kế toán trưởng / CFO<br/>trả lời “1A, 2B”"]
+  OK & H --> L[("Nhật ký<br/>chống sửa")]
+  classDef human fill:#c8e64a,stroke:#0f2a1d,stroke-width:2px,color:#0f2a1d,font-weight:bold
+  classDef ok fill:#e3f1d0,stroke:#2f6b3a,color:#0f2a1d
+  classDef q fill:#fff4d6,stroke:#b98a10,color:#3b2a00
+  class H human
+  class OK ok
+  class Q q

@@ -1,0 +1,23 @@
+flowchart TB
+  F["Các phát hiện của engine cho một hóa đơn"] --> U{"Số tiền / dữ kiện quyết định<br/>đã xác minh chưa?"}
+  U -- "Chưa (ảnh mờ, tổng lệch qua ngưỡng,<br/>khác chứng từ gốc)" --> C3
+  U -- "Rồi" --> P["Chọn nhóm chính theo thứ tự ưu tiên"]
+  P --> C1 & C2 & C3
+  C1["① NGOÀI QUY ĐỊNH<br/>tiền mặt từ 5 triệu · 8% sai/ngoài thời hạn<br/>MST người mua sai · tài trợ, phạt, quà, chi cá nhân<br/>tiếp khách / đồ uống có cồn"]
+  C2["② VƯỢT THẨM QUYỀN<br/>tổng từ 200 triệu (hạn mức Kế toán trưởng)<br/>hệ số K vùng đỏ"]
+  C3["③ CHƯA RÕ THÔNG TIN<br/>thiếu / mờ / lệch dữ kiện<br/>trạng thái MST bên bán (từ 20 triệu)<br/>phương thức thanh toán (từ 5 triệu)"]
+  C1 --> K["Kế toán trưởng<br/>(CFO nếu từ 200 triệu)"]
+  C2 --> CFO["CFO"]
+  C3 --> K2["Kế toán trưởng<br/>(CFO nếu từ 200 triệu)"]
+  K & CFO & K2 --> QQ["Một câu hỏi gộp các ý · trả lời một lần<br/>mỗi đáp án ghi rõ hệ quả bằng tiền"]
+  N["Không hỏi thừa: dữ kiện không làm đổi kết quả<br/>thì không hỏi → ca nhỏ, đủ chứng từ được tự xử lý"]
+  classDef c1 fill:#fde2e1,stroke:#b42318,color:#4a0d08
+  classDef c2 fill:#e6ecff,stroke:#2f4fb3,color:#0d1a4a
+  classDef c3 fill:#fff4d6,stroke:#b98a10,color:#3b2a00
+  classDef human fill:#c8e64a,stroke:#0f2a1d,stroke-width:2px,color:#0f2a1d,font-weight:bold
+  classDef note fill:#f2f5ef,stroke:#9fb19a,color:#2f4a38,stroke-dasharray:4 3
+  class C1 c1
+  class C2 c2
+  class C3 c3
+  class K,CFO,K2 human
+  class N note

@@ -22,6 +22,8 @@ Slide 3 và 5 có trọng số lớn: mọi con số phải có phương pháp v
 
 ## Slide 2 — Đầu vào → Xử lý → Đầu ra, và chỗ con người quyết định
 
+> **Bản .pptx 15/10:** tiêu đề "Đầu vào → Xử lý → Đầu ra"; sơ đồ luồng xử lý (`docs/diagrams/s1-pipeline-slide.png`, bản chi tiết `01-pipeline.png`) tô nổi điểm Kế toán trưởng/CFO quyết định; bên dưới 3 thẻ ví dụ câu hỏi cho 3 kiểu dừng.
+
 ```
 ĐẦU VÀO                    XỬ LÝ (tất định trước, AI sau)                      ĐẦU RA
 XML HĐĐT (TT78)  ──►  1. Đọc & kiểm nguồn: thiếu / mờ / khác chứng từ gốc  ──►  Tự xử lý: duyệt thuế, chứng từ nội bộ, audit
@@ -81,6 +83,8 @@ Mỗi câu hỏi chuyển tiếp hiển thị "VAT chờ quyết định" để 
 ---
 
 ## Slide 4 — Kiến trúc: thành phần thật / giả lập, dữ liệu thật / tổng hợp
+
+> **Bản .pptx 15/10:** tiêu đề "Kiến trúc & công nghệ: thật và giả lập"; trái: sơ đồ kiến trúc (`docs/diagrams/s3-architecture-slide.png`, bản chi tiết `03-architecture.png`); phải: bảng 9 tầng công nghệ (giao diện, lõi quyết định, đọc chứng từ, dữ liệu/kiểm toán, bảo mật, kiểm thử/CI, triển khai — Thật; ERP/ngân hàng/TCT — Giả lập; dữ liệu kiểm thử — Tổng hợp).
 
 ```
 Next.js 15 (Hostinger Node) ── API routes ── Policy engine (24 quy tắc, TypeScript, tất định)
