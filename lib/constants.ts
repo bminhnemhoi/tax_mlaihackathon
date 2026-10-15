@@ -81,6 +81,7 @@ export const DEFAULT_POLICY_CONFIG = {
   strictSeriesYearCheck: true,
   strictMccqtCheck: true,
   sellerStatusMaterialityVnd: 20_000_000,
+  postAuditRate: 0.1,
   excludedVat8Categories: [
     'VIỄN THÔNG', 'TÀI CHÍNH', 'NGÂN HÀNG', 'CHỨNG KHOÁN', 'BẢO HIỂM',
     'BẤT ĐỘNG SẢN', 'KIM LOẠI', 'KHAI KHOÁNG', 'HÓA CHẤT', 'TIÊU THỤ ĐẶC BIỆT'

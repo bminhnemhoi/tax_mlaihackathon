@@ -37,7 +37,7 @@ test('engine thật: mỗi quy tắc khi bị kích hoạt gắn đúng nhóm d�
       seen.add(ruleId);
     }
     // Quy tắc cần ngữ cảnh database được thử trong test-referee-core; phần còn lại phải có đầu dò ở đây.
-    const contextOnly = new Set(['RULE_SOURCE_REVIEW', 'RULE_SOURCE_CONFLICT', 'RULE_DUPLICATE_INVOICE', 'STATUTORY_SAME_DAY_CASH_5M', 'RULE_HIGH_RISK_SUPPLIER']);
+    const contextOnly = new Set(['RULE_SOURCE_REVIEW', 'RULE_SOURCE_CONFLICT', 'RULE_DUPLICATE_INVOICE', 'STATUTORY_SAME_DAY_CASH_5M', 'RULE_HIGH_RISK_SUPPLIER', 'AUTHORITY_SPLIT_PURCHASE']);
     for (const ruleId of Object.keys(RULE_CATALOG)) if (!contextOnly.has(ruleId)) assert.ok(seen.has(ruleId), `${ruleId}: thiếu đầu dò engine`);
   });
 });

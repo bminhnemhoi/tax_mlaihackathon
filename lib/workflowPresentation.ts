@@ -24,7 +24,7 @@ export const eventLabels: Record<string, string> = {
   INVOICE_ACTION_REVERTED: 'Hoàn tác', BANK_EVIDENCE_RECORDED: 'Bổ sung bằng chứng ngân hàng',
   THRESHOLD_ADAPTED: 'Điều chỉnh ngưỡng nội bộ', THRESHOLD_ROLLED_BACK: 'Phục hồi ngưỡng trước',
   POLICY_PUBLISHED: 'Ban hành phiên bản quy chế', POLICY_ROLLED_BACK: 'Phục hồi quy chế',
-  HANDOFF_ANSWERED: 'Trả lời câu hỏi chuyển tiếp', AUTOMATION_PAUSED: 'Dừng tự động hóa toàn hệ thống', AUTOMATION_RESUMED: 'Bật lại tự động hóa',
+  HANDOFF_ANSWERED: 'Trả lời câu hỏi chuyển tiếp', POST_AUDIT_SAMPLED: 'Được chọn hậu kiểm ngẫu nhiên', LINKED_CASH_HOLD: 'Giữ thuế do cụm tiền mặt cùng ngày vượt ngưỡng', POST_AUDIT_REVIEWED: 'Kết quả hậu kiểm', AUTOMATION_PAUSED: 'Dừng tự động hóa toàn hệ thống', AUTOMATION_RESUMED: 'Bật lại tự động hóa',
   ROUTINE_HELD_AUTOMATION_PAUSED: 'Giữ ca thường quy chờ duyệt tay (tự động hóa đang dừng)', ROUTINE_RELEASED_AFTER_RESUME: 'Hoàn tất ca thường quy sau khi bật lại tự động hóa',
   SANDBOX_RESET: 'Xóa dữ liệu demo', THRESHOLD_CANDIDATE_REJECTED: 'Bác ngưỡng đề xuất (không đạt kiểm chứng)', INTERNAL_LOGIN: 'Đăng nhập nội bộ', ROLE_SWITCHED: 'Đổi vai trò mô phỏng'
 };

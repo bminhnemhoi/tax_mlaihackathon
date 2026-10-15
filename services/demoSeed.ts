@@ -1,7 +1,8 @@
 import { getDatabase } from '@/lib/server/db';
 import type { AppUser, AppRole } from '@/lib/server/auth';
 import type { RefereeDecision } from '@/lib/schemas';
-import { evaluateWorkflow } from './workflowService';
+import { evaluateWorkflow, readRecord } from './workflowService';
+import { samplePostAudit } from './postAuditService';
 
 const SAMPLE_SUPPLIER = { supplierTaxCode: '0312345678', supplierName: 'Công ty TNHH Dịch vụ Minh An (dữ liệu mẫu)' };
 const sample = (invoiceNumber: string, fields: Record<string, unknown>) => ({
@@ -28,5 +29,8 @@ export async function seedDemoCases(): Promise<RefereeDecision[]> {
   const accountant: AppUser = { id: row.id, email: row.email, displayName: row.display_name, role: row.role };
   const decisions: RefereeDecision[] = [];
   for (const invoice of DEMO_SAMPLE_CASES) decisions.push((await evaluateWorkflow(invoice, accountant, { forceLocalOnly: true })).decision as RefereeDecision);
+  // Ca thường quy mẫu luôn được đưa vào hậu kiểm để thấy luồng "máy tự duyệt → người xem lại".
+  const routine = readRecord('MAU-0009001');
+  if (routine.status === 'APPROVED') samplePostAudit({ id: routine.id, content_hash: routine.content_hash, evaluation_id: routine.evaluation_id }, 0.1, true);
   return decisions;
 }

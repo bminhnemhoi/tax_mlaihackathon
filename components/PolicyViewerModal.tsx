@@ -41,6 +41,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
   const [policyValidation,setPolicyValidation]=useState<{valid:boolean;errors:string[];changes:Array<{invoiceId:string;before:string;after:string;beforeRole:string;afterRole:string}>;parameterChanges:string[]}|null>(null);
   const [changeLogNote, setChangeLogNote] = useState<string>('');
   const [pendingPolicyVersion, setPendingPolicyVersion] = useState<string | null>(null);
+  const [pendingDrafts, setPendingDrafts] = useState<Array<{version:string;createdByName:string|null;createdAt:string;loosening:string[]}>>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [legalUpdates, setLegalUpdates] = useState<LegalUpdateCandidate[]>([]);
   const [isSyncingLegal, setIsSyncingLegal] = useState(false);
@@ -95,6 +96,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
     fetch('/api/policy')
       .then((response) => response.json())
       .then((data) => {
+        setPendingDrafts(data.pendingDrafts || []);
         const active = data.active;
         if (active?.version) {
           setPolicyMetadata((previous) => ({ ...previous, version: active.version, releaseDate: active.effectiveFrom, text: data.executableText || active.policyText || previous.text }));
@@ -158,24 +160,37 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
         if(!validation.valid)toast.error('Bản nháp chưa đạt kiểm tra. Xem chi tiết trước khi sửa.');
         toast.info(`Đã tạo bản nháp ${data.policy.version}. Bấm lại để duyệt và áp dụng.`);
       } else {
-        const response = await fetch('/api/policy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'publish', version: pendingPolicyVersion, actorId: 'local-admin', reason: 'Đã kiểm tra cấu hình trên Policy Studio' })
-        });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Không thể publish policy');
-        setPendingPolicyVersion(null);
-        onConfigUpdated?.(data.policy.config);
-        onPolicyUpdated?.(data.policy.version);
-        setPolicyMetadata((previous) => ({ ...previous, version: data.policy.version, releaseDate: data.policy.effectiveFrom, text: data.policy.policyText || previous.text }));
-        toast.success(`Đã duyệt và áp dụng ${data.policy.version} thành công.`);
+        await publishVersion(pendingPolicyVersion);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không thể lưu policy');
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Công bố một bản nháp. Bản nháp làm lỏng kiểm soát cần CFO khác người soạn duyệt (nguyên tắc bốn mắt) — server quyết định.
+  const publishVersion = async (version: string) => {
+    const response = await fetch('/api/policy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'publish', version, reason: 'Đã kiểm tra cấu hình trên Policy Studio' })
+    });
+    const data = await response.json();
+    if (response.status === 403 && data.needsSecondApprover) {
+      fetch('/api/policy').then(r => r.json()).then(d => setPendingDrafts(d.pendingDrafts || [])).catch(() => undefined);
+      setPendingPolicyVersion(null);
+      toast.warning(`${data.error} Bản nháp ${version} đã nằm trong mục "Bản nháp chờ duyệt".`, { duration: 9000 });
+      return;
+    }
+    if (!response.ok) throw new Error(data.error || 'Không thể publish policy');
+    setPendingPolicyVersion(null);
+    setPendingDrafts(drafts => drafts.filter(d => d.version !== version));
+    onConfigUpdated?.(data.policy.config);
+    onPolicyUpdated?.(data.policy.version);
+    setDynamicConfig(data.policy.config);
+    setPolicyMetadata((previous) => ({ ...previous, version: data.policy.version, releaseDate: data.policy.effectiveFrom, text: data.policy.policyText || previous.text }));
+    toast.success(`Đã duyệt và áp dụng ${data.policy.version} thành công.`);
   };
 
   // Khôi phục cấu hình chuẩn 2026
@@ -312,6 +327,16 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                 </div>
               </div>
 
+              {pendingDrafts.length>0&&<div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm" data-testid="pending-drafts">
+                <p className="font-semibold text-amber-900">Bản nháp chờ duyệt · nguyên tắc bốn mắt</p>
+                <p className="mt-1 text-xs text-amber-800">Bản nháp làm lỏng kiểm soát chỉ được công bố khi một CFO khác người soạn duyệt. Bản nháp chặt hơn hoặc trung tính thì người soạn tự công bố được.</p>
+                {pendingDrafts.map(d=><div key={d.version} className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-white p-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0"><p className="font-medium text-slate-900">{d.version}</p>
+                    <p className="text-xs text-slate-600">Người soạn: {d.createdByName||'không rõ'} · {new Date(d.createdAt).toLocaleString('vi-VN')}</p>
+                    <p className="mt-1 text-xs text-slate-700">{d.loosening.length?`Nới lỏng: ${d.loosening.join('; ')}`:'Không nới lỏng tham số kiểm soát.'}</p></div>
+                  <button onClick={()=>{setIsSaving(true);publishVersion(d.version).catch(e=>toast.error(e instanceof Error?e.message:'Không thể công bố')).finally(()=>setIsSaving(false));}} disabled={isSaving} className="shrink-0 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60">Duyệt & áp dụng</button>
+                </div>)}
+              </div>}
               {/* Grid 4 Control Cards */}
               {policyValidation&&<details open className="rounded-xl border border-slate-200 p-4 text-sm"><summary className="cursor-pointer font-semibold">Kiểm tra bản nháp · {policyValidation.valid?'Đạt':'Chưa đạt'} · {policyValidation.changes.length} hồ sơ đổi kết quả</summary>
                 <p className="mt-2 text-xs text-slate-600">Tham số đổi: {policyValidation.parameterChanges.join(', ')||'Không có'}.</p>

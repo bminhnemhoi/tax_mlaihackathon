@@ -53,7 +53,7 @@ export function checkHandoff(decision:RefereeDecision):{valid:boolean;errors:str
 export function describeRuleEvidence(finding:RuleFinding,invoiceDate?:string):RuleFinding {
   const rule=ruleContract(finding.ruleId,invoiceDate);
   return {...finding,legalBasis:`${rule.clause} · Tax-SOP-2026${rule.source?` · ${rule.source.code} (văn bản đã đối chiếu; diễn giải quy tắc chưa xác minh)`:rule.legalVerification==='INTERNAL_POLICY'?' · kiểm soát nội bộ':' · căn cứ pháp lý chưa xác minh'}`,
-    sopClause:rule.clause,legalVerification:rule.legalVerification,sourceUrl:rule.source?.url,
+    sopClause:rule.clause,legalVerification:rule.legalVerification,sourceUrl:rule.source?.url || undefined,
     // Giữ lời giải thích dễ hiểu cho người không chuyên; chỉ nối thêm lưu ý khi diễn giải pháp lý chưa được xác nhận.
     plainExplanation:rule.legalVerification==='INTERNAL_POLICY'||finding.plainExplanation.includes('Lưu ý: diễn giải')?finding.plainExplanation:`${finding.plainExplanation} Lưu ý: diễn giải điều khoản pháp lý của quy tắc này cần kế toán xác nhận.`};
 }

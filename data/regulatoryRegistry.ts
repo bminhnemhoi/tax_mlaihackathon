@@ -48,17 +48,19 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
     officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=213890',
     keyRules: [
       'Tiếp tục giảm 2% thuế suất thuế GTGT (từ 10% xuống 8%) áp dụng đến hết ngày 31/12/2026',
-      'DANH MỤC LOẠI TRỪ BẮT BUỘC 10%: Viễn thông, Hoạt động tài chính, Ngân hàng, Chứng khoán, Bảo hiểm, Kinh doanh bất động sản, Kim loại, Sản phẩm khai khoáng, Hóa chất, Hàng hóa chịu thuế Tiêu thụ đặc biệt',
-      'Dịch vụ phần mềm thuộc đối tượng không chịu thuế GTGT; dịch vụ CNTT thông thường không mặc nhiên bị loại khỏi 8% (phải đối chiếu theo mã ngành cấp 7 và mã sản phẩm VCPA)'
+      'DANH MỤC LOẠI TRỪ (giữ 10%), theo nguyên văn Điều 1 khoản 1: viễn thông, hoạt động tài chính, ngân hàng, chứng khoán, bảo hiểm, kinh doanh bất động sản, sản phẩm kim loại, sản phẩm khai khoáng (trừ than), sản phẩm hàng hóa và dịch vụ chịu thuế tiêu thụ đặc biệt (trừ xăng)',
+      'So với NQ 174/2024: than cốc, dầu mỏ tinh chế, sản phẩm hóa chất và hàng hóa/dịch vụ công nghệ thông tin KHÔNG còn bị loại trừ; xăng, nhiên liệu dầu, than ở mọi khâu được giảm 8% (Phụ lục NĐ 174/2025/NĐ-CP)',
+      'Dịch vụ phần mềm thuộc đối tượng không chịu thuế GTGT (trường hợp riêng, không phải 8%/10%)'
     ],
     summary: 'Chính sách giảm thuế GTGT 8% và danh mục ngành nghề loại trừ nghiêm ngặt áp dụng suốt niên độ 2025 - 2026.'
   },
   {
     id: 'ND-123-2020',
     code: '123/2020/NĐ-CP',
-    title: 'Nghị định quy định về hóa đơn, chứng từ điện tử',
+    title: 'Nghị định quy định về hóa đơn, chứng từ điện tử (hết hiệu lực từ 01/7/2026, thay bằng NĐ 254/2026/NĐ-CP)',
     issuer: 'CHÍNH PHỦ',
     effectiveFrom: '2022-07-01',
+    effectiveTo: '2026-06-30',
     status: 'ACTIVE',
     officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=201509',
     keyRules: [
@@ -71,9 +73,10 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
   {
     id: 'TT-78-2021',
     code: '78/2021/TT-BTC',
-    title: 'Thông tư hướng dẫn thực hiện Nghị định số 123/2020/NĐ-CP về hóa đơn, chứng từ',
+    title: 'Thông tư hướng dẫn thực hiện Nghị định số 123/2020/NĐ-CP về hóa đơn, chứng từ (thay bằng TT 32/2025/TT-BTC từ 01/6/2025)',
     issuer: 'BỘ TÀI CHÍNH',
     effectiveFrom: '2022-07-01',
+    effectiveTo: '2025-05-31',
     status: 'ACTIVE',
     officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=204090',
     keyRules: [
@@ -84,13 +87,28 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
     summary: 'Thông tư hướng dẫn chi tiết về cấu trúc ký hiệu, mã cơ quan thuế và xử lý sai sót hóa đơn điện tử.'
   },
   {
+    id: 'TT-32-2025',
+    code: '32/2025/TT-BTC',
+    title: 'Thông tư hướng dẫn Luật Quản lý thuế, NĐ 123/2020 và NĐ 70/2025 về hóa đơn, chứng từ (thay TT 78/2021; thay bằng TT 91/2026/TT-BTC từ 01/7/2026)',
+    issuer: 'BỘ TÀI CHÍNH',
+    effectiveFrom: '2025-06-01',
+    effectiveTo: '2026-06-30',
+    status: 'ACTIVE',
+    officialUrl: 'https://luatvietnam.vn/thue/thong-tu-32-2025-tt-btc-huong-dan-luat-quan-ly-thue-va-nghi-dinh-ve-hoa-don-chung-tu-401781-d1.html',
+    keyRules: [
+      'Ký hiệu mẫu số và ký hiệu hóa đơn: hai chữ số năm trong ký hiệu thể hiện năm lập hóa đơn',
+      'Xử lý hóa đơn điện tử có sai sót; hóa đơn điện tử khởi tạo từ máy tính tiền'
+    ],
+    summary: 'Thông tư hướng dẫn hóa đơn điện tử áp dụng từ 01/6/2025 đến 30/6/2026.'
+  },
+  {
     id: 'ND-254-2026',
     code: '254/2026/NĐ-CP',
-    title: 'Nghị định quy định về hóa đơn, chứng từ điện tử nâng cao (kèm TT 91/2026/TT-BTC)',
+    title: 'Nghị định quy định về hóa đơn, chứng từ điện tử, hướng dẫn Luật Quản lý thuế 108/2025/QH15 (thay NĐ 123/2020 và NĐ 70/2025; kèm TT 91/2026/TT-BTC)',
     issuer: 'CHÍNH PHỦ',
     effectiveFrom: '2026-07-01',
     status: 'ACTIVE',
-    officialUrl: 'https://vanban.chinhphu.vn',
+    officialUrl: 'https://vanban.chinhphu.vn/?docid=218689&pageid=27160',
     keyRules: [
       'Bắt buộc lưu trữ và đối soát dữ liệu hóa đơn điện tử gốc định dạng XML có chữ ký số CA hợp lệ',
       'Hóa đơn điều chỉnh/thay thế bắt buộc phải ghi rõ thông tin tham chiếu Số hóa đơn, Ký hiệu, Ngày lập của hóa đơn gốc',
@@ -227,8 +245,8 @@ export const LEGAL_CITATIONS_REGISTRY: Record<string, LegalCitation> = {
     effectiveFrom: '2025-07-01',
     effectiveTo: '2026-12-31',
     officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=213890',
-    exactQuote: 'Giảm 2% thuế suất thuế giá trị gia tăng đối với các nhóm hàng hóa, dịch vụ đang áp dụng mức thuế suất 10% (còn 8%), trừ một số nhóm hàng hóa, dịch vụ: viễn thông, hoạt động tài chính, ngân hàng, chứng khoán, bảo hiểm, kinh doanh bất động sản, kim loại, sản phẩm khai khoáng, hóa chất, hàng hóa chịu thuế tiêu thụ đặc biệt.',
-    summary: 'Giảm 2% thuế suất thuế GTGT kèm danh mục loại trừ nghiêm ngặt áp dụng suốt niên độ 2025 - 2026.'
+    exactQuote: 'Giảm 2% thuế suất thuế giá trị gia tăng, áp dụng đối với các nhóm hàng hóa, dịch vụ quy định tại khoản 3 Điều 9 … trừ một số nhóm hàng hóa, dịch vụ sau: viễn thông, hoạt động tài chính, ngân hàng, chứng khoán, bảo hiểm, kinh doanh bất động sản, sản phẩm kim loại, sản phẩm khai khoáng (trừ than), sản phẩm hàng hóa và dịch vụ chịu thuế tiêu thụ đặc biệt (trừ xăng).',
+    summary: 'Giảm 2% thuế suất thuế GTGT từ 01/7/2025 đến 31/12/2026; xăng và than được giảm, kim loại/viễn thông/TTĐB khác vẫn 10%.'
   },
   'LUAT-67-2025-D9-K1': {
     documentCode: '67/2025/QH15',

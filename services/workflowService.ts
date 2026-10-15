@@ -12,6 +12,7 @@ import {fieldAsk,type FieldAsk} from './questionBuilder';
 import {buildHandoff,checkHandoff,describeRuleEvidence} from './handoffService';
 import { fieldLabels } from '@/lib/workflowPresentation';
 import { recordConfirmedSupplierAlias } from './taxLookupService';
+import { DEFAULT_POST_AUDIT_RATE, postAuditStatus, recordPostAuditReview, samplePostAudit, stratifiedRate } from './postAuditService';
 import { runningCommit } from '@/lib/server/buildInfo';
 import { isAutomationPaused } from './automationControl';
 import { POLICY_CONTRACT_VERSION } from '@/data/policyContract';
@@ -304,6 +305,10 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
       db.prepare('UPDATE invoices SET status=?,approved_deductible_tax=?,updated_at=?,evaluation_deadline=NULL WHERE id=?').run(status,autoApprove && decision.status==='ROUTINE' ? decision.approvedTaxAmount : 0,jsonNow(),id);
       const row=readRecord(id);syncVoucher(row);recomputeMacro();
       recordAction(row,null,autoApprove?'ROUTINE_AUTO_APPROVED':held?'ROUTINE_HELD_AUTOMATION_PAUSED':'INVOICE_EVALUATED',held?`Tự động hóa đang dừng toàn hệ thống: ca thường quy chờ Kế toán trưởng duyệt tay. ${decision.plainExplanation}`:decision.plainExplanation,before);
+      // Hậu kiểm ngẫu nhiên: một tỉ lệ ca tự duyệt được đưa vào danh sách để Kế toán trưởng xem lại (không làm chậm luồng duyệt).
+      if(autoApprove){const strat=stratifiedRate(policy.config.postAuditRate ?? DEFAULT_POST_AUDIT_RATE,invoice.totalAmount,[paymentThreshold(invoice,policy.config),policy.config.sellerStatusMaterialityVnd ?? 20_000_000,policy.config.kttApprovalLimit]);samplePostAudit({id,content_hash:row.content_hash,evaluation_id:evaluationId},strat.rate,false,strat.nearThreshold);}
+      // Cụm tiền mặt cùng ngày vượt ngưỡng: hóa đơn tiền mặt cùng bên bán đã tự duyệt trước đó cũng mất điều kiện khấu trừ → giữ thuế cả cụm.
+      if(decision.status==='ESCALATED' && decision.findings?.some((f:{ruleId:string})=>f.ruleId==='STATUTORY_SAME_DAY_CASH_5M') && holdLinkedCashInvoices(row,invoice).length) recomputeMacro();
     })();
     const row=readRecord(id);
     return {...result,decision,workflow:{status:row.status,revision,evaluationId,autoApproved:row.status==='APPROVED',externalSync:'MANUAL',internalVoucherId:(db.prepare('SELECT id FROM internal_vouchers WHERE invoice_id=?').get(id) as {id:string}|undefined)?.id || null},policy};
@@ -397,6 +402,39 @@ export async function answerHandoff(id: string, user: AppUser, raw: unknown) {
   }
   if(accepted.length) return finish(applyWorkflowAction(id,user,{action:'OVERRIDE',targetStatus:'APPROVED',reason:`Trả lời ${reply}. ${input.reason}`,...current,resolvedFindingIds:accepted}),'APPROVED');
   throw new WorkflowError('Câu trả lời không tạo thay đổi nào.',400);
+}
+
+/** Giữ thuế các hóa đơn tiền mặt cùng bên bán, cùng ngày đã tự duyệt khi cả cụm vượt ngưỡng thanh toán không dùng tiền mặt. */
+function holdLinkedCashInvoices(current: WorkflowRecord, invoice: InvoiceInput): string[] {
+  const db=getDatabase();
+  const rows=db.prepare("SELECT id FROM invoices WHERE supplier_tax_code=? AND invoice_date=? AND id!=? AND status='APPROVED' AND tax_hold=0").all(invoice.supplierTaxCode,invoice.invoiceDate,current.id) as {id:string}[];
+  const held:string[]=[];
+  for(const {id} of rows){
+    const linked=readRecord(id); const payload=JSON.parse(linked.payload_json) as InvoiceInput;
+    if(payload.paymentMethod!=='CASH' || payload.isAdjustment) continue;
+    const before=snapshot(linked);
+    db.prepare("UPDATE invoices SET tax_hold=1,status='ON_HOLD',approved_deductible_tax=0,revision=revision+1,updated_at=? WHERE id=?").run(jsonNow(),id);
+    syncVoucher(readRecord(id));
+    recordAction(linked,null,'LINKED_CASH_HOLD',`Cộng các hóa đơn tiền mặt cùng bên bán ngày ${invoice.invoiceDate} (gồm hóa đơn ${invoice.invoiceNumber}) vượt ngưỡng thanh toán không dùng tiền mặt: giữ thuế hóa đơn này để Kế toán trưởng xem lại cả cụm.`,before,{linkedInvoiceId:current.id});
+    held.push(id);
+  }
+  return held;
+}
+
+const PostAuditInputSchema=z.object({result:z.enum(['CONFIRMED','DISAGREE']),reason:z.string().trim().min(8,'Ghi lý do ít nhất 8 ký tự.')});
+/** Hậu kiểm một ca tự duyệt: KTT/CFO (không phải người nhập) đồng ý hoặc không đồng ý; không đồng ý thì giữ thuế để xem lại. */
+export function reviewPostAudit(id: string, user: AppUser, raw: unknown) {
+  if(user.role==='ACCOUNTANT') throw new WorkflowError('Cần Kế toán trưởng hoặc CFO hậu kiểm.',403);
+  const input=PostAuditInputSchema.parse(raw);
+  const row=readRecord(id);
+  const current=postAuditStatus(id);
+  if(!current) throw new WorkflowError('Hồ sơ không thuộc mẫu hậu kiểm.',404);
+  if(current.status!=='PENDING') throw new WorkflowError('Hồ sơ đã được hậu kiểm.',409);
+  if(row.created_by_user_id===user.id) throw new WorkflowError('Người nhập hồ sơ không được tự hậu kiểm.',403);
+  recordPostAuditReview(id,user,input.result,input.reason);
+  if(input.result==='DISAGREE' && row.status==='APPROVED')
+    return {...applyWorkflowAction(id,user,{action:'TAX_HOLD',reason:`Hậu kiểm không đồng ý với quyết định tự duyệt: ${input.reason}`,revision:row.revision,evaluationId:row.evaluation_id}),result:input.result};
+  return {ok:true,status:row.status,result:input.result};
 }
 
 const WORKFLOW_ACTIONS=['PAUSE','RESUME','TAX_HOLD','RELEASE_TAX_HOLD','UNDO','RESOLVE','OVERRIDE'] as const;

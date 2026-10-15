@@ -1,5 +1,6 @@
 import type { ActionOption, InvoiceInput, RiskGroup, RuleFinding, SystemPolicyConfig } from '@/lib/schemas';
 import { RISK_GROUP_LABELS, groupOf } from '@/lib/riskTaxonomy';
+import { vat8Basis } from '@/lib/legalBasis';
 
 /**
  * Câu hỏi chuyển tiếp "trả lời trong một câu": mỗi ý nêu lý do bằng số liệu cụ thể và hai đáp án có hệ quả rõ
@@ -25,7 +26,7 @@ type Option = ActionOption;
 const option = (id: 'A' | 'B', label: string, actionDescription: string, resultingAction: Option['resultingAction']): Option => ({ id, label, actionDescription, resultingAction });
 
 export interface ConcreteIssue { reason: string; ask: string; options?: [Option, Option] }
-export interface QuestionContext { config?: Partial<SystemPolicyConfig>; nonCashThreshold: number; dailyTotal?: number; kttLimit: number }
+export interface QuestionContext { config?: Partial<SystemPolicyConfig>; nonCashThreshold: number; dailyTotal?: number; splitTotal?: number; kttLimit: number; duplicateOf?: { id: string; invoiceNumber: string } }
 
 export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReason'>, inv: InvoiceInput, ctx: QuestionContext): ConcreteIssue | null {
   const tax = vnd(inv.taxAmount), total = vnd(inv.totalAmount), item = `“${inv.itemName}”`;
@@ -81,7 +82,7 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
       const correct = Math.round(base * standardRate / 100);
       const subject = flagged.length ? `Dòng hàng ${flagged.map(line => `“${line.itemName}”`).join(', ')}` : item;
       return {
-        reason: `${subject} có thể thuộc nhóm không được giảm thuế (viễn thông/CNTT/tài chính… theo NQ 204/2025/QH15) nhưng đang áp 8%: thuế ${vnd(invoiced)} trên ${vnd(base)}, nếu đúng ${standardRate}% phải là ${vnd(correct)}.`,
+        reason: `${subject} có thể thuộc nhóm không được giảm thuế (viễn thông/kim loại/tài chính/hàng chịu TTĐB… theo ${vat8Basis(inv.invoiceDate)}) nhưng đang áp 8%: thuế ${vnd(invoiced)} trên ${vnd(base)}, nếu đúng ${standardRate}% phải là ${vnd(correct)}.`,
         ask: 'Xác nhận ngành hàng và xử lý thế nào?',
         options: [option('A', `Đúng nhóm loại trừ — yêu cầu NCC xuất lại ${standardRate}%`, 'Giữ hồ sơ, chưa khấu trừ cho đến khi có hóa đơn đúng thuế suất.', 'REQUEST_SUPPLIER_REISSUE'),
           option('B', `Không khấu trừ ${vnd(invoiced)} phần thuế sai thuế suất`, 'Ghi nhận chi phí nội bộ, loại phần thuế sai.', 'REJECT_TAX_DEDUCTION')]
@@ -89,7 +90,7 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
     }
     case 'RULE_SCOPE_VAT8_PERIOD':
       return {
-        reason: `Hóa đơn ngày ${viDate(inv.invoiceDate)} áp thuế suất 8% nhưng ngày này nằm ngoài thời gian giảm thuế GTGT đã cấu hình (NQ 204/2025/QH15: 01/07/2025–31/12/2026).`,
+        reason: `Hóa đơn ngày ${viDate(inv.invoiceDate)} áp thuế suất 8% nhưng ngày này nằm ngoài mọi kỳ giảm thuế GTGT (gần nhất: NQ 204/2025/QH15, 01/07/2025–31/12/2026).`,
         ask: 'Xử lý thế nào?',
         options: [option('A', `Yêu cầu NCC xuất lại hóa đơn ${standardRate}%`, 'Giữ hồ sơ, chưa khấu trừ cho đến khi có hóa đơn đúng thuế suất.', 'REQUEST_SUPPLIER_REISSUE'),
           option('B', `Không khấu trừ ${tax} trên hóa đơn sai thuế suất`, 'Ghi nhận chi phí nội bộ, loại phần thuế sai.', 'REJECT_TAX_DEDUCTION')]
@@ -130,9 +131,16 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
         options: [option('A', `CFO phê duyệt chi ${total} — khấu trừ ${tax}`, 'Phê duyệt trong thẩm quyền CFO; chỉ hoàn tất khi mọi phát hiện khác đã được giải quyết.', 'ACCEPT_WITH_DOCS'),
           option('B', 'Tạm dừng để thẩm tra hợp đồng', 'Giữ hồ sơ, chưa duyệt thuế cho đến khi thẩm tra xong điều khoản hợp đồng.', 'REQUEST_INFORMATION')]
       };
+    case 'AUTHORITY_SPLIT_PURCHASE':
+      return {
+        reason: `Hóa đơn ${total} từ ${inv.supplierName}; cộng các hóa đơn cùng bên bán ngày ${viDate(inv.invoiceDate)} (mỗi tờ dưới hạn mức) là ${vnd(ctx.splitTotal || inv.totalAmount)} ≥ hạn mức Kế toán trưởng ${vnd(ctx.kttLimit)} — có thể là một giao dịch bị tách nhỏ (SOP Điều 3.3).`,
+        ask: 'CFO xác nhận đây là các giao dịch độc lập?',
+        options: [option('A', `Giao dịch độc lập, có hợp đồng/đơn hàng riêng — CFO duyệt, khấu trừ ${tax}`, 'CFO phê duyệt trong thẩm quyền; lưu hợp đồng/đơn hàng làm bằng chứng.', 'ACCEPT_WITH_DOCS'),
+          option('B', 'Cùng một giao dịch bị tách — giữ hồ sơ, gộp phê duyệt', 'Giữ hồ sơ, chưa ghi nhận thuế; gộp phê duyệt theo hạn mức CFO.', 'REQUEST_INFORMATION')]
+      };
     case 'RULE_DUPLICATE_INVOICE':
       return {
-        reason: `Trùng với hóa đơn đã tiếp nhận (cùng MST ${inv.supplierTaxCode} + ký hiệu + số ${inv.invoiceNumber}).`,
+        reason: `Trùng với hóa đơn đã tiếp nhận${ctx.duplicateOf ? ` [${ctx.duplicateOf.id}]` : ''} (cùng MST ${inv.supplierTaxCode} + ký hiệu + số ${inv.invoiceNumber}${ctx.duplicateOf && ctx.duplicateOf.invoiceNumber !== inv.invoiceNumber ? `, hồ sơ gốc ghi số "${ctx.duplicateOf.invoiceNumber}"` : ''}).`,
         ask: 'Đây là bản trùng hay hóa đơn thay thế?',
         options: [option('A', 'Bản trùng — từ chối, không kê khai lần hai', 'Hủy tiếp nhận bản trùng để tránh kê khai trùng thuế.', 'REJECT_TAX_DEDUCTION'),
           option('B', 'Hóa đơn thay thế — bổ sung biên bản và số HĐ gốc rồi đánh giá lại', 'Giữ hồ sơ chờ biên bản thay thế và tham chiếu hóa đơn gốc.', 'REQUEST_INFORMATION')]

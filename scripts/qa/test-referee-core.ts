@@ -48,6 +48,8 @@ async function main():Promise<void>{
    await evaluateWorkflow({...base,id:'DAY1',invoiceNumber:'DAY1',totalAmount:3_300_000,preTaxAmount:3_000_000,taxAmount:300_000,paymentMethod:'CASH',hasBankSlip:false},accountant,{forceLocalOnly:true});
    const day=evaluateInvoiceLocally({...base,id:'DAY2',invoiceNumber:'DAY2',totalAmount:2_200_000,preTaxAmount:2_000_000,taxAmount:200_000,paymentMethod:'CASH',hasBankSlip:false},p.config);assert.ok(day.findings?.some(f=>f.ruleId==='STATUTORY_SAME_DAY_CASH_5M'));coverage.add('STATUTORY_SAME_DAY_CASH_5M');
    upsertSupplier({taxCode:base.supplierTaxCode,legalName:base.supplierName,riskLevel:'HIGH_RISK_INVOICE',status:'ACTIVE'});
+   await evaluateWorkflow({...base,id:'SPLIT1',invoiceNumber:'SPLIT1',totalAmount:165_000_000,preTaxAmount:150_000_000,taxAmount:15_000_000},accountant,{forceLocalOnly:true});
+   const split=evaluateInvoiceLocally({...base,id:'SPLIT2',invoiceNumber:'SPLIT2',totalAmount:165_000_000,preTaxAmount:150_000_000,taxAmount:15_000_000},p.config);assert.ok(split.findings?.some(f=>f.ruleId==='AUTHORITY_SPLIT_PURCHASE'));coverage.add('AUTHORITY_SPLIT_PURCHASE');
    const risk=evaluateInvoiceLocally(base,p.config);assert.ok(risk.findings?.some(f=>f.ruleId==='RULE_HIGH_RISK_SUPPLIER'));coverage.add('RULE_HIGH_RISK_SUPPLIER');
    upsertSupplier({taxCode:base.supplierTaxCode,legalName:base.supplierName,riskLevel:'LOW',status:'SUSPENDED'});
    assert.equal(evaluateInvoiceLocally(base,p.config).status,'ESCALATED');pass('Supplier master warnings cannot be bypassed or be used to infer ACTIVE');

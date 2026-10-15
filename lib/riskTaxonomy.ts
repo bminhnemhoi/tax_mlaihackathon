@@ -37,7 +37,8 @@ export const RULE_CATALOG: Record<string, RuleTaxonomy> = {
   RULE_SCOPE_NOT_COVERED: { group: 'OUT_OF_POLICY', humanAcceptable: true, triggerFields: ['itemName', 'items'] },
   INTERNAL_POLICY_GUEST_ENTERTAINMENT: { group: 'OUT_OF_POLICY', humanAcceptable: true, triggerFields: ['itemName', 'items'] },
   AUTHORITY_EXCEED_KTT_LIMIT: { group: 'EXCEED_AUTHORITY', humanAcceptable: true, triggerFields: ['totalAmount'] },
-  AUTHORITY_K_FACTOR_RED: { group: 'EXCEED_AUTHORITY', humanAcceptable: true, triggerFields: ['preTaxAmount'] }
+  AUTHORITY_K_FACTOR_RED: { group: 'EXCEED_AUTHORITY', humanAcceptable: true, triggerFields: ['preTaxAmount'] },
+  AUTHORITY_SPLIT_PURCHASE: { group: 'EXCEED_AUTHORITY', humanAcceptable: true, triggerFields: ['totalAmount', 'supplierTaxCode', 'invoiceDate'] }
 };
 
 /** Thứ tự ưu tiên nhóm chính: vi phạm/ngoài quy định trước, rồi vượt quyền, rồi thiếu thông tin. */
