@@ -29,6 +29,17 @@ Mọi quyết định có nhật ký kiểm toán, dừng và hoàn tác đượ
 
 Chi tiết, cách tự thử và bằng chứng: [docs/submission/tinh-nang-noi-bat.md](docs/submission/tinh-nang-noi-bat.md).
 
+### Cải tiến từ nghiên cứu (15/10, nhánh `feat/finals-improvements`)
+
+Đối chiếu 63 nguồn (paper, chuẩn mực, luật, sản phẩm như AppZen/Coupa/MISA) → [docs/research/nghien-cuu-lien-quan.md](docs/research/nghien-cuu-lien-quan.md). Mỗi cải tiến một commit kèm test:
+
+- **Hậu kiểm ngẫu nhiên ca tự duyệt** (ISA 530, Amazon A2I): 10% ca, tầng sát ngưỡng ×3, chọn mẫu bằng HMAC; tỉ lệ đồng thuận người–máy kèm Wilson 95% (khối "Hậu kiểm" trong Nhật ký).
+- **Nguyên tắc bốn mắt cho policy** (COSO): policy nới lỏng kiểm soát cần CFO khác người soạn duyệt.
+- **Điểm neo nhật ký**: phát hiện cắt đuôi/viết lại so với điểm neo đã lưu ra ngoài (`/api/audit/anchor`).
+- **Tách nhỏ hóa đơn để né hạn mức** → CFO; **cụm tiền mặt cùng ngày** giữ thuế cả hóa đơn đã tự duyệt trước đó.
+- **Căn cứ pháp lý theo ngày lập**: danh mục loại trừ 8% đúng nguyên văn NQ 204/2025 (xăng, than, hóa chất, CNTT được 8% từ 01/7/2025); TT 78/2021 → TT 32/2025 → NĐ 254/2026 + TT 91/2026.
+- **Trùng hóa đơn khác cách ghi** ("123" = "0000123") và **kiểm thử thuộc tính** (fast-check, ~1.500 hóa đơn sinh ngẫu nhiên).
+
 ## Giám khảo: 90 giây
 
 1. Mở Live URL → bấm **① Chạy Verify** → **Chạy Verify**. Bảng in 4 ca chung + 5 ca Đề A (3 tự xử lý, 2 chuyển tiếp), PASS/FAIL và thời điểm chạy từng ca.
@@ -117,7 +128,7 @@ CI (GitHub Actions, Ubuntu + Windows): typecheck, lint, test, build khi đẩy m
 - **Người dùng thực tế:** đang thử nghiệm với 3 người dùng do BTC điều phối (bộ câu hỏi: [docs/submission/proposal-user-questions.md](docs/submission/proposal-user-questions.md)). Chưa có kết quả tại thời điểm khóa repo; kết quả và cải tiến từ phản hồi sẽ được ghi ở `docs/evidence/` kèm commit riêng.
 - **Độ chính xác:** các bộ Verify và 60 ca phát triển là dữ liệu tổng hợp đội tự gán nhãn; 72 ca red team do agent AI viết từ SOP (không đọc `services/policyEngine.ts`, có đọc SOP và module ngưỡng `lib/refereeRequirements.ts`; nhãn do AI gán, chưa được người nghiệp vụ duyệt) (`data/verification/redteam/cases.json`, 72/72). Tất cả **chưa phải đánh giá độc lập**. Công cụ khóa nhãn và chấm độc lập đã có (`npm run labels:lock`, `npm run evaluate:independent`).
 - **Pháp lý:** quy tắc mô tả SOP nội bộ; điều khoản luật được dẫn nguồn nhưng diễn giải cần kế toán xác nhận.
-- **Đã biết:** "ngoài phạm vi" được nhận diện bằng danh sách từ khóa, nên chi cá nhân ghi tên khác vẫn có thể tự duyệt (VD "tiệc cưới người thân giám đốc" — giữ nguyên làm ca bẫy U2 cho buổi thử 16/10 đã công bố trong Proposal); hóa đơn tách nhỏ cùng nhà cung cấp cùng ngày chưa được cộng dồn khi xét hạn mức CFO; ngày lập tương lai gần chưa bị chặn (chỉ chặn khi quá 6 tháng); dữ liệu ảnh gửi qua dịch vụ AI bên thứ ba; SQLite một instance; đăng nhập nội bộ là MVP.
+- **Đã biết:** "ngoài phạm vi" được nhận diện bằng danh sách từ khóa, nên chi cá nhân ghi tên khác vẫn có thể tự duyệt (VD "tiệc cưới người thân giám đốc" — giữ nguyên làm ca bẫy U2 cho buổi thử 16/10 đã công bố trong Proposal); tách nhỏ hóa đơn mới cộng dồn trong cùng ngày, cùng nhà cung cấp (chưa có cửa sổ nhiều ngày); chưa xác thực chữ ký số XML; ngày lập tương lai gần chưa bị chặn (chỉ chặn khi quá 6 tháng); dữ liệu ảnh gửi qua dịch vụ AI bên thứ ba; SQLite một instance; đăng nhập nội bộ là MVP.
 
 Các thư mục `brainstorming/` là ghi chú nháp do AI hỗ trợ soạn, **không phải bằng chứng** (xem [brainstorming/README.md](brainstorming/README.md)).
 Lịch sử commit trước 14/10 có bản nháp AI chứa 3 persona giả định kèm trích dẫn **không có thật** và một bảng số liệu "tập độc lập 42 ca" không có lần chạy tương ứng; đội đã gỡ/đính chính công khai ở commit `3ace396` và trong `brainstorming/opus-evaluation.md` (§6, §7). Không viết lại lịch sử git để giữ minh bạch.

@@ -92,6 +92,13 @@ Theo [docs/video-script-3-minutes.md](../video-script-3-minutes.md): quay mộc 
    - 1 cải tiến khác lấy từ phản hồi thật (VD câu hỏi khó hiểu, bước thừa).
 4. Cập nhật slide 3 và 5: điền các ô `[CẬP NHẬT 16/10]` **chỉ bằng số và trích dẫn thật** (tên + chức danh theo phạm vi đồng ý), dựng lại `.pptx`, deploy lại, chạy lại mục A3.
 
+### A5b. PR cải tiến từ nghiên cứu (`feat/finals-improvements`)
+Nhánh này đã merge `main` mới nhất; review như A1 (merge commit, không squash). Nội dung và căn cứ: [docs/research/nghien-cuu-lien-quan.md](../research/nghien-cuu-lien-quan.md) mục 7. Sau khi deploy, kiểm thêm:
+- `GET /api/post-audits` (đăng nhập KTT/CFO) trả `stats`; khối **Hậu kiểm** hiện trong Nhật ký, có sẵn 1 ca mẫu (MAU-0009001) chờ hậu kiểm.
+- `GET /api/audit/anchor` trả `{count, headHash, createdAt, signature, signed}`. `signed: true` chỉ khi đã đặt `TAX_REFEREE_AUDIT_KEY` (≥ 32 ký tự); khóa này cũng làm việc chọn mẫu hậu kiểm không đoán trước được.
+- Policy Studio: tạo bản nháp nâng hạn mức KTT bằng vai KTT → bấm duyệt bị chặn (cần CFO khác người soạn) → chuyển vai CFO → khối "Bản nháp chờ duyệt" → Duyệt & áp dụng.
+- Ca thử nhanh: "Xăng RON95" thuế 8% ngày 2026-10-05 phải **tự xử lý** (NQ 204/2025 cho xăng 8%); "Thép hộp" 8% vẫn bị chặn.
+
 ### A6. Trước Demo Day 17/10
 - Đặt `TAX_REFEREE_DEMO_PER_HOUR=200`; sao lưu SQLite bằng `deployment/backup.sh` (hoặc SQLite backup API) trước khi trình diễn.
 - Diễn tập: 8 phút theo [docs/judge-cheat-sheet-8-mins.md](../judge-cheat-sheet-8-mins.md) trên live; mời người ngoài tự gõ ca mới.

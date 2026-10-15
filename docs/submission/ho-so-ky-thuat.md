@@ -148,7 +148,7 @@ Các chuyển dịch phụ:
 
 ## 9. Kiểm thử và CI
 
-- **`npm test`:** 16 bộ gồm 44 unit test (10 file trong `tests/unit/`) và 15 bộ hồi quy, trong đó có 72 ca red team. Mỗi bộ chạy trong tiến trình riêng với thư mục dữ liệu tạm; các bộ có đường gọi AI dùng khóa giả, và CI không có khóa AI thật. Bộ nào in ít dòng PASS hơn ngưỡng `minChecks` bị tính là FAIL.
+- **`npm test`:** 16 bộ gồm 68 unit test (16 file trong `tests/unit/`, có kiểm thử thuộc tính bằng fast-check trên ~1.500 hóa đơn sinh ngẫu nhiên với seed cố định) và 15 bộ hồi quy, trong đó có 72 ca red team. Mỗi bộ chạy trong tiến trình riêng với thư mục dữ liệu tạm; các bộ có đường gọi AI dùng khóa giả, và CI không có khóa AI thật. Bộ nào in ít dòng PASS hơn ngưỡng `minChecks` bị tính là FAIL.
 - **CI** (`.github/workflows/ci.yml`): ma trận ubuntu-latest và windows-latest chạy typecheck, typecheck:referee, lint, test; job build chạy sau khi test đạt.
 - **Smoke HTTP** (`scripts/qa/test-api-smoke.ts`, `TEST_BASE_URL`): cô lập giữa hai phiên demo, lỗi 409 khi gửi revision cũ, hoàn tác, đọc chứng từ.
 - **Phục hồi:** `npm run test:recovery` kiểm tra dữ liệu còn nguyên sau khởi động lại.
@@ -166,18 +166,20 @@ Các chuyển dịch phụ:
 
 | Nhóm quy tắc | Văn bản dẫn chiếu | Mức xác minh |
 |---|---|---|
-| Thanh toán không dùng tiền mặt (5 triệu từ 01/07/2025; 20 triệu trước đó theo TT 219/2013/TT-BTC); gộp mua cùng bên bán trong ngày | Luật 48/2024/QH15; NĐ 181/2025/NĐ-CP | DOCUMENT_CONFIRMED_RULE_PENDING (hóa đơn từ 01/07/2025) |
-| Thuế suất 8% cho hàng thuộc danh mục loại trừ, hoặc hóa đơn lập ngoài thời gian giảm thuế (sau 31/12/2026 hoặc trước 01/02/2022) | NQ 204/2025/QH15; NĐ 174/2025/NĐ-CP | DOCUMENT_CONFIRMED_RULE_PENDING |
+| Thanh toán không dùng tiền mặt (5 triệu từ 01/07/2025; 20 triệu trước đó theo TT 219/2013/TT-BTC); gộp mua cùng bên bán trong ngày | Luật 48/2024/QH15; Điều 26 NĐ 181/2025/NĐ-CP (mua nhiều lần trong ngày: khoản 3) | DOCUMENT_CONFIRMED_RULE_PENDING (hóa đơn từ 01/07/2025) |
+| Thuế suất 8% cho hàng thuộc danh mục loại trừ **của kỳ lập hóa đơn**, hoặc hóa đơn lập ngoài mọi kỳ giảm thuế (bảng kỳ trong `lib/legalBasis.ts`: 02–12/2022, 07/2023–12/2026) | Từ 01/7/2025: NQ 204/2025/QH15 + NĐ 174/2025/NĐ-CP; các kỳ trước: NQ 43/2022 … NQ 174/2024 + nghị định hướng dẫn | DOCUMENT_CONFIRMED_RULE_PENDING |
 | Hóa đơn lập sau ngày bên bán đóng MST; sai MST người mua | NĐ 70/2025/NĐ-CP; NĐ 254/2026/NĐ-CP (theo ghi nhận trong repo), chọn theo ngày lập | DOCUMENT_CONFIRMED_RULE_PENDING (hóa đơn từ 01/06/2025) |
-| Ký hiệu, mã CQT, ngày ký, hóa đơn điều chỉnh | NĐ 123/2020/NĐ-CP; TT 78/2021/TT-BTC (căn cứ engine ghi); nguồn đối chiếu của hợp đồng: NĐ 70/2025/NĐ-CP, NĐ 254/2026/NĐ-CP | DOCUMENT_CONFIRMED_RULE_PENDING (hóa đơn từ 01/06/2025) / UNVERIFIED (trước đó) |
+| Ký hiệu, mã CQT, ngày ký, hóa đơn điều chỉnh | Chọn theo ngày lập: NĐ 123/2020 + TT 78/2021 (trước 01/6/2025); NĐ 123/2020 sửa bởi NĐ 70/2025 + TT 32/2025 (01/6/2025–30/6/2026); NĐ 254/2026 + TT 91/2026 (từ 01/7/2026) | DOCUMENT_CONFIRMED_RULE_PENDING |
 | Hóa đơn trùng; nhà cung cấp có cảnh báo | Kiểm soát nội bộ | INTERNAL_POLICY / UNVERIFIED |
 | Tiếp khách, chi ngoài phạm vi; hạn mức KTT; hệ số K | SOP mẫu Điều 2.1, 2.3, 3.3, 4.3 | INTERNAL_POLICY |
 
 `DOCUMENT_CONFIRMED_RULE_PENDING` chỉ xác nhận văn bản tồn tại và ngày hiệu lực, chưa xác nhận diễn giải điều khoản. Ba điểm cần chuyên gia thuế chốt:
 
-1. Engine ghi căn cứ ngưỡng 5 triệu là "Khoản 2 Điều 14 Luật 48/2024/QH15", trong khi nguồn đối chiếu của hợp đồng quy tắc là NĐ 181/2025/NĐ-CP.
-2. Danh mục loại trừ 8% được nhận diện bằng từ khóa tên hàng; registry ghi dịch vụ CNTT "không mặc nhiên bị loại khỏi 8%" nhưng danh sách từ khóa có CNTT và phần mềm. Vì vậy quy tắc chỉ chuyển tiếp để đối chiếu.
-3. Hệ số K được registry gắn với CV 2392/TCT-QLRR nhưng hợp đồng quy tắc xếp là ngưỡng nội bộ.
+1. ~~Căn cứ ngưỡng 5 triệu ghi "Khoản 2 Điều 14 Luật 48/2024/QH15"~~ → **đã sửa 15/10**: Điều 14 Luật 48/2024 và Điều 26 NĐ 181/2025 (cụm trong ngày: khoản 3 Điều 26, đã đối chiếu). Số khoản trong Điều 14 Luật 48 vẫn cần chuyên gia chốt.
+2. ~~Danh mục loại trừ 8% còn chứa CNTT, xăng, hóa chất~~ → **đã sửa 15/10**: đối chiếu nguyên văn NQ 204/2025 Điều 1 ("khai khoáng (trừ than)", "chịu thuế TTĐB (trừ xăng)") và NĐ 174/2025; danh mục loại trừ chọn theo kỳ lập hóa đơn. Nhận diện vẫn dựa trên từ khóa tên hàng nên quy tắc chỉ chuyển tiếp để đối chiếu, không tự loại thuế.
+3. Hệ số K được registry gắn với CV 2392/TCT-QLRR nhưng hợp đồng quy tắc xếp là ngưỡng nội bộ (CV 2392 nói về cảnh báo theo hệ số K, không phải danh bạ nhà cung cấp rủi ro).
+
+Chi tiết đối chiếu pháp lý, nguồn và giới hạn: [docs/research/nghien-cuu-lien-quan.md](../research/nghien-cuu-lien-quan.md) mục 5.1.
 
 Văn bản mới từ nguồn cập nhật chỉ thành ứng viên `NEEDS_REVIEW`, cần người duyệt và được ghi audit (`services/legal/legalUpdateService.ts`).
 
@@ -217,5 +219,22 @@ Văn bản mới từ nguồn cập nhật chỉ thành ứng viên `NEEDS_REVIE
 - SQLite chạy một instance; bộ giới hạn tần suất nằm trong bộ nhớ của một tiến trình.
 - Ảnh hóa đơn được gửi tới dịch vụ AI bên thứ ba qua proxy; XML không qua AI.
 - Đọc ảnh mất nhiều giây (đo 15/10: ảnh ~14 giây, PDF scan ~26 giây).
-- Chuỗi audit chỉ chống được việc tính lại toàn bộ chuỗi khi đã đặt `TAX_REFEREE_AUDIT_KEY`.
-- "Ngoài phạm vi SOP" nhận diện bằng từ khóa; hóa đơn tách nhỏ chưa cộng dồn khi xét hạn mức CFO; ngày lập ở tương lai gần chưa bị chặn.
+- Chuỗi audit chỉ chống được việc tính lại toàn bộ chuỗi khi đã đặt `TAX_REFEREE_AUDIT_KEY`; cắt đuôi hoặc viết lại chỉ bị phát hiện khi đối chiếu với một điểm neo đã lưu ra ngoài (`/api/audit/anchor`). Khóa HMAC là khóa tĩnh (chưa tiến hóa theo kỷ nguyên).
+- "Ngoài phạm vi SOP" nhận diện bằng từ khóa (danh sách đen); đảo sang danh sách trắng chỉ làm sau buổi thử 16/10 vì ca bẫy U2. Tách nhỏ hóa đơn mới cộng dồn trong cùng ngày, cùng bên bán (chưa có cửa sổ nhiều ngày). Ngày lập ở tương lai quá 6 tháng bị chặn; tương lai gần chưa bị chặn.
+- Chưa xác thực mật mã chữ ký số XML (chỉ so ngày ký với ngày lập); chưa đồng bộ dữ liệu cơ quan thuế.
+
+## 15. Đối chiếu nghiên cứu và khung giám sát
+
+Báo cáo đầy đủ: [docs/research/nghien-cuu-lien-quan.md](../research/nghien-cuu-lien-quan.md) — 63 nguồn ở 4 mảng (khi nào máy tự quyết; giám sát của con người; Document AI và tuân thủ thuế Việt Nam; nhật ký chống sửa và kiểm thử), bảng so sánh với AppZen, Coupa, SAP Concur, Rossum/Vic.ai, MISA meInvoice, và bảng đối chiếu EU AI Act Điều 12/14, NIST AI RMF, ISO/IEC 42001, OECD 1.4, COSO, ISA/VSA 530, Luật 134/2025/QH15 (tách cột "cơ chế" và "bằng chứng hiệu quả"; chuẩn tham chiếu tự nguyện, không tuyên bố tuân thủ).
+
+Cải tiến đã làm từ nghiên cứu (nhánh `feat/finals-improvements`, mỗi mục một commit kèm test):
+
+| Cải tiến | Căn cứ | Mã |
+|---|---|---|
+| Hậu kiểm ngẫu nhiên ca tự duyệt (10%, tầng sát ngưỡng ×3, chọn mẫu HMAC), tỉ lệ đồng thuận người–máy kèm Wilson 95% | Amazon A2I; ISA/VSA 530; COSO P10/P16 | `services/postAuditService.ts`, `components/PostAuditPanel.tsx`, `/api/post-audits` |
+| Nguyên tắc bốn mắt: policy nới lỏng kiểm soát cần CFO khác người soạn; không rollback bản nháp | COSO P10; EU AI Act 14(5); Luật 134/2025 Điều 7.4 | `services/policyService.ts` (`policyLoosening`, `publishPolicy`) |
+| Điểm neo nhật ký ký HMAC: phát hiện cắt đuôi và viết lại | Schneier–Kelsey 1999; Ma–Tsudik 2009; RFC 9162 | `lib/server/audit.ts`, `/api/audit/anchor` |
+| Tách nhỏ hóa đơn để né hạn mức → CFO; cụm tiền mặt cùng ngày giữ thuế cả hóa đơn đã tự duyệt | VA/SSA OIG; Coupa; khoản 3 Điều 26 NĐ 181/2025 | `services/policyEngine.ts`, `services/workflowService.ts` |
+| Căn cứ pháp lý và danh mục loại trừ 8% theo ngày lập | NQ 204/2025; NĐ 174/2025; TT 32/2025; NĐ 254/2026; TT 91/2026 | `lib/legalBasis.ts` |
+| Phát hiện trùng sau chuẩn hóa số hóa đơn | Coupa; AppZen | `services/duplicateDetector.ts` |
+| Kiểm thử thuộc tính (7 bất biến) | QuickCheck; kiểm thử biến hình | `tests/unit/engineProperties.test.ts` |
