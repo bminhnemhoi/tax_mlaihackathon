@@ -16,6 +16,7 @@ Mọi quyết định có nhật ký kiểm toán, dừng và hoàn tác đượ
 | **Phiên bản đang chạy** | [`/api/health`](https://limegreen-salamander-517622.hostingersite.com/api/health) trả về commit, phiên bản policy và contract quy tắc |
 | Runbook (clone sạch → chạy → kiểm chứng) | [RUNBOOK.md](RUNBOOK.md) |
 | Báo cáo cải tiến 14–15/10 và hướng dẫn bàn giao | [docs/handoff/](docs/handoff/bao-cao-cai-tien-2026-10-15.md) · [hướng dẫn](docs/handoff/huong-dan-ban-giao.md) |
+| Hướng dẫn đóng góp (Contributing) | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ## Giám khảo: 90 giây
 
@@ -121,5 +122,14 @@ Lịch sử commit trước 14/10 có bản nháp AI chứa 3 persona giả đ�
 | `data/policyContract.ts` | SOP sinh từ registry quy tắc (trang `/sop`) |
 | `data/verification/` | Fixture Verify (tổng hợp) |
 | `scripts/qa/run-all.ts`, `tests/unit/` | Bộ kiểm thử |
+
+## Đội ngũ thực hiện (Team & Contributors)
+
+Dự án được xây dựng và phát triển bởi đội ngũ **Fprinciples** (MLAI Hackathon 2026 · Track VNG):
+- **Khánh Lê** ([@khanhle1406](https://github.com/khanhle1406)) — Lead / Core Architecture
+- **Minh** ([@bminhnemhoi](https://github.com/bminhnemhoi)) — Core Logic & Hardening
+- **Tiến** ([@Towfienes](https://github.com/Towfienes)) — Contributor & Documentation
+
+---
 
 MIT License · Đội Fprinciples · MLAI Hackathon 2026 · Track VNG
