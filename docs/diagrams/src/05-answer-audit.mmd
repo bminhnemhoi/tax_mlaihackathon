@@ -1,0 +1,25 @@
+sequenceDiagram
+  autonumber
+  actor H as Kế toán trưởng / CFO
+  participant UI as Bảng "Trả lời một lần"
+  participant API as /api/invoices/:id/answer
+  participant WF as workflowService
+  participant EN as Engine quy tắc
+  participant AU as Nhật ký (audit_events)
+  H->>UI: gõ "1A, 2A" + lý do
+  UI->>API: answers, lý do, revision
+  API->>WF: kiểm quyền: không phải Kế toán viên,<br/>không phải người nhập, ca từ 200 tr phải là CFO
+  alt có đáp án Từ chối / Yêu cầu bổ sung
+    WF->>WF: REJECTED / ON_HOLD
+  else gán hoặc xác nhận dữ kiện
+    WF->>EN: đánh giá lại toàn bộ quy tắc
+    EN-->>WF: phát hiện còn mở
+    alt mọi phát hiện còn mở đã được chấp nhận
+      WF->>WF: APPROVED + chứng từ nội bộ
+    else phát hiện do chính câu trả lời gây ra (VD tiền mặt từ 5 tr)
+      WF->>WF: kết thúc theo hệ quả (từ chối / treo), không hỏi lại
+    end
+  end
+  WF->>AU: ghi sự kiện: ai, lúc nào, trước → sau, quy chế, lý do
+  Note over AU: hash = SHA-256(hash trước | sự kiện)<br/>chữ ký = HMAC(khóa, chữ ký trước | hash)<br/>trigger SQLite chặn UPDATE/DELETE
+  AU-->>H: lịch sử hồ sơ · hoàn tác = sự kiện mới

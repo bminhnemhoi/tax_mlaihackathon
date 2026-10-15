@@ -1,0 +1,38 @@
+flowchart LR
+  subgraph IN["① ĐẦU VÀO"]
+    direction TB
+    A1["Hóa đơn điện tử XML<br/>Viettel · MISA · VNPT · FPT · TCT"]
+    A2["PDF / ảnh chụp<br/>(QR từ điện thoại)"]
+    A3["Nhập tay / dữ liệu mới"]
+  end
+  subgraph PROC["② XỬ LÝ — quy tắc tất định quyết định, AI chỉ đọc"]
+    direction TB
+    B1["Đọc chứng từ<br/>XML: parser chặn XXE<br/>Ảnh/PDF: Gemini Vision"]
+    B2["Kiểm tra dữ kiện<br/>so chứng từ gốc · số tiền khớp<br/>trường đọc từ ảnh = chưa xác minh"]
+    B3["Engine 24 quy tắc<br/>một bảng phân loại 3 kiểu dừng<br/>ngưỡng: 5 tr · 20 tr · 200 tr"]
+    D{"Thường quy?"}
+    B1 --> B2 --> B3 --> D
+  end
+  subgraph OUT["③ ĐẦU RA — con người quyết định ở đâu"]
+    direction TB
+    OK["Tự duyệt + chứng từ nội bộ<br/>(khi công tắc tự động hóa đang chạy)"]
+    H0["Công tắc đã dừng →<br/>Kế toán trưởng duyệt tay"]
+    Q["Câu hỏi một lần: ý đánh số,<br/>số tiền, thuế chờ quyết định"]
+    H1["Kế toán trưởng<br/>(dưới 200 triệu)"]
+    H2["CFO<br/>(từ 200 triệu)"]
+    ANS["Trả lời “1A, 2B” → duyệt ·<br/>treo bổ sung · từ chối · đánh giá lại"]
+    LOG[("Nhật ký chỉ ghi thêm<br/>hash + HMAC · hoàn tác = sự kiện mới")]
+    Q --> H1 & H2
+    H1 & H2 --> ANS
+  end
+  A1 & A2 & A3 --> B1
+  D -- "Có" --> OK
+  D -- "Có, nhưng đã dừng" --> H0
+  D -- "Không" --> Q
+  OK & H0 & ANS --> LOG
+  classDef human fill:#c8e64a,stroke:#0f2a1d,stroke-width:2px,color:#0f2a1d,font-weight:bold
+  classDef ok fill:#e3f1d0,stroke:#2f6b3a,color:#0f2a1d
+  classDef q fill:#fff4d6,stroke:#b98a10,color:#3b2a00
+  class H0,H1,H2,ANS human
+  class OK ok
+  class Q q

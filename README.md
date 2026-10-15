@@ -18,6 +18,17 @@ Mọi quyết định có nhật ký kiểm toán, dừng và hoàn tác đượ
 | Báo cáo cải tiến 14–15/10 và hướng dẫn bàn giao | [docs/handoff/](docs/handoff/bao-cao-cai-tien-2026-10-15.md) · [hướng dẫn](docs/handoff/huong-dan-ban-giao.md) |
 | Hướng dẫn đóng góp (Contributing) | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
+## Tính năng nổi bật
+
+1. **Kiểm chứng một nút, tất định:** 9 ca có giờ từng ca, không gọi AI (9/9 trên live).
+2. **Hỏi thay vì đoán:** số tiền lệch, trường đọc từ ảnh, khác chứng từ gốc → hỏi lại, không tự sửa số.
+3. **Đúng ba kiểu dừng, không hỏi thừa:** chưa rõ thông tin / ngoài quy định / vượt thẩm quyền; ca khác tự xử lý.
+4. **Một câu hỏi, đúng người:** ý đánh số, có số tiền và thuế chờ quyết định; trả lời "1A, 2A" ngay trên hồ sơ.
+5. **Con người nắm quyền kiểm soát:** chặn tự duyệt, công tắc dừng, hoàn tác, nhật ký chỉ ghi thêm và nối chuỗi chống sửa.
+6. **AI đọc, quy tắc quyết định:** XML hóa đơn điện tử (Viettel, MISA, VNPT, FPT, TCT), PDF, ảnh.
+
+Chi tiết, cách tự thử và bằng chứng: [docs/submission/tinh-nang-noi-bat.md](docs/submission/tinh-nang-noi-bat.md).
+
 ## Giám khảo: 90 giây
 
 1. Mở Live URL → bấm **① Chạy Verify** → **Chạy Verify**. Bảng in 4 ca chung + 5 ca Đề A (3 tự xử lý, 2 chuyển tiếp), PASS/FAIL và thời điểm chạy từng ca.

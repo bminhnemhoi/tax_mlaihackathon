@@ -1,0 +1,17 @@
+flowchart TB
+  U["Trình duyệt · điện thoại (QR)"] --> M["Hostinger · Node.js 22<br/>Next.js 15 + middleware bảo mật"]
+  M --> UI["Giao diện React 19<br/>Trang chủ · Verify · Workspace"]
+  M --> API["API routes<br/>parse · evaluate · answer · audit"]
+  API --> CORE["Lõi quy tắc tất định<br/>24 quy tắc · câu hỏi · workflow"]
+  CORE --> DB[("SQLite WAL<br/>DB nội bộ · DB mỗi demo")]
+  CORE --> AU[("Nhật ký chỉ ghi thêm<br/>hash + HMAC")]
+  CORE -. "chỉ đọc" .-> AI["Gemini 2.5 Flash Vision<br/>qua ShopAIKey"]
+  CORE -. "payload" .-> SIM["ERP · ngân hàng · TCT<br/>giả lập"]
+  classDef sim fill:#f3f3f3,stroke:#9a9a9a,color:#555,stroke-dasharray:5 4
+  classDef ext fill:#e6ecff,stroke:#2f4fb3,color:#0d1a4a
+  classDef data fill:#e3f1d0,stroke:#2f6b3a,color:#0f2a1d
+  classDef core fill:#0f2a1d,stroke:#0f2a1d,color:#ffffff,font-weight:bold
+  class SIM sim
+  class AI ext
+  class DB,AU data
+  class CORE core

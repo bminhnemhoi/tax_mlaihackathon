@@ -1,0 +1,45 @@
+flowchart TB
+  subgraph CL["NGƯỜI DÙNG"]
+    direction LR
+    U1["Trình duyệt máy tính / điện thoại<br/>giám khảo · kế toán viên · kế toán trưởng · CFO"]
+    U2["Điện thoại chụp hóa đơn qua mã QR"]
+  end
+  subgraph HOST["HOSTINGER · Node.js 22 (Passenger) · Next.js 15 standalone"]
+    direction TB
+    MW["middleware.ts — chống CSRF · header bảo mật · giới hạn tần suất"]
+    subgraph UI["Giao diện · React 19 + TypeScript + Tailwind"]
+      direction LR
+      P1["Trang chủ<br/>hướng dẫn giám khảo"] ~~~ P2["/verify<br/>9 ca một nút"] ~~~ P3["/sop<br/>quy chế đang chạy"] ~~~ P4["Workspace<br/>hộp chuyển tiếp · hồ sơ · nhật ký"]
+    end
+    subgraph API["API routes (Node runtime)"]
+      direction LR
+      R1["/documents/parse"] ~~~ R2["/evaluate"] ~~~ R3["/invoices/:id/answer<br/>/audit-action"] ~~~ R4["/system/automation"] ~~~ R5["/verify · /audit<br/>/health · /demo/session"]
+    end
+    subgraph SVC["Lõi nghiệp vụ · TypeScript thuần, tất định"]
+      direction LR
+      S1["policyEngine + riskTaxonomy<br/>24 quy tắc · 3 kiểu dừng"] ~~~ S2["questionBuilder + handoff<br/>câu hỏi một lần"] ~~~ S3["workflowService<br/>trạng thái · revision · chống rửa ca"] ~~~ S4["automation · verification<br/>feedback (holdout)"]
+    end
+    MW --> UI --> API --> SVC
+  end
+  subgraph DATA["DỮ LIỆU · SQLite WAL (better-sqlite3)"]
+    direction LR
+    D1[("DB nội bộ<br/>policy · hồ sơ · người dùng")] ~~~ D2[("DB riêng<br/>mỗi phiên demo")] ~~~ D3[("audit_events<br/>chỉ ghi thêm · hash + HMAC")] ~~~ D4[("Kho chứng từ gốc")]
+  end
+  subgraph EXT["DỊCH VỤ NGOÀI"]
+    direction LR
+    E1["ShopAIKey → Gemini 2.5 Flash Vision<br/>chỉ ĐỌC ảnh/PDF · có timeout"] ~~~ E2["ERP · ngân hàng · Cổng thuế<br/>GIẢ LẬP — chỉ xuất payload"]
+  end
+  GH["GitHub Actions CI · Ubuntu + Windows<br/>typecheck · lint · npm test 16 bộ · build"]
+  CL --> MW
+  SVC --> DATA
+  SVC -. "đọc chứng từ" .-> E1
+  SVC -. "payload" .-> E2
+  GH -. "kiểm thử mỗi lần đẩy mã" .-> HOST
+  classDef sim fill:#f3f3f3,stroke:#9a9a9a,color:#555,stroke-dasharray:5 4
+  classDef ext fill:#e6ecff,stroke:#2f4fb3,color:#0d1a4a
+  classDef data fill:#e3f1d0,stroke:#2f6b3a,color:#0f2a1d
+  classDef core fill:#ffffff,stroke:#0f2a1d,stroke-width:1.5px,color:#0f2a1d
+  class E2 sim
+  class E1 ext
+  class D1,D2,D3,D4 data
+  class S1,S2,S3,S4 core

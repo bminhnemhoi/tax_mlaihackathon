@@ -82,3 +82,6 @@ deepseek-agent/*.log
 
 # Commit stamp written by deployment/pack-hostinger.py
 /.git-commit
+
+# Thư mục gom hồ sơ nộp bài (có video, tải lên Drive)
+/NOP-BAI-*/
