@@ -17,18 +17,20 @@ Chuẩn bị: cửa sổ ẩn danh, zoom trình duyệt 110%, tắt thông báo,
 
 Sau khi quay: kiểm tra thời lượng ≤ 3:00, âm thanh rõ, không lộ thông tin nhạy cảm; tải lên Drive đúng thư mục nộp bài.
 
-## Bản đã quay ngày 15/10/2026
+## Bản đã quay ngày 15/10/2026 (bản 2)
 
-Quay tự động bằng Playwright trên Live URL (thao tác thật, không dựng cảnh), giọng đọc AI edge-tts (vi-VN-HoaiMyNeural), phụ đề in sẵn, 1920×1080, dài 2:04.
-Trong video có dòng ghi chú "Quay trực tiếp trên Live URL · giọng đọc AI". Mã dựng lại: `scratch/video/` (không commit).
+Quay tự động bằng Playwright trên Live URL (thao tác thật, không dựng cảnh); màn mở đầu tóm tắt 6 tính năng nổi bật; giọng đọc AI giọng nam edge-tts (vi-VN-NamMinhNeural); phụ đề in sẵn; 1920×1080; dài 2:41.
+Lời thuyết minh do 3 người viết theo 3 góc (kể chuyện, tiêu chí chấm, giá trị kinh doanh), một người tổng hợp và một người đối chiếu từng câu với mã nguồn. Trong video có dòng ghi chú "Quay trực tiếp trên Live URL · giọng đọc AI".
 
 | # | Phần | Lời đọc |
 |---|---|---|
-| 1 | Tax Referee · Trang chủ | Đây là Tax Referee, trọng tài hóa đơn đầu vào cho kế toán doanh nghiệp. Hệ thống tự xử lý hóa đơn thường quy, và chỉ dừng lại khi hóa đơn chưa rõ thông tin, ngoài quy định, hoặc vượt thẩm quyền. Giám khảo không cần tài khoản. |
-| 2 | ① Verify: 9 ca một nút | Một nút chạy chín ca kiểm thử: bốn ca chung và năm ca của Đề A, trên cơ sở dữ liệu tạm, không gọi AI. Mỗi ca có thời điểm chạy, kết quả kỳ vọng và thực tế. Ca thường quy được tự xử lý; các ca còn lại dừng đúng nhóm, kèm câu hỏi chuyển tiếp. |
-| 3 | Dữ liệu mới: hỏi thay vì đoán | Với dữ liệu mới chưa có trong bộ kiểm thử, hệ thống không tự sửa số. Tổng tiền in trên hóa đơn lệch với tiền hàng cộng thuế, nên nó hỏi kế toán trưởng: tổng đúng là bao nhiêu, và mỗi lựa chọn dẫn tới hệ quả gì. |
-| 4 | ② Demo riêng · 4 ca mẫu | Mỗi phiên demo có cơ sở dữ liệu riêng và bốn ca mẫu: một ca tự xử lý, và một ca cho mỗi kiểu dừng. |
-| 5 | Vượt thẩm quyền → CFO trả lời "1A, 2A" | Ca mua mười laptop, ba trăm ba mươi triệu đồng, vượt hạn mức của kế toán trưởng và chưa rõ trạng thái mã số thuế bên bán. CFO nhận một câu hỏi hai ý, và trả lời một lần: một A, hai A. Người nhập là kế toán viên, người duyệt là tài khoản khác; hệ thống chặn tự duyệt. |
-| 6 | Trả lời B → kết thúc theo hệ quả | Nếu kế toán trưởng xác nhận đã trả tiền mặt cho hóa đơn trên năm triệu, hồ sơ kết thúc bằng từ chối khấu trừ, không hỏi lại. |
-| 7 | Nhật ký · Hoàn tác · Dừng tự động hóa | Mỗi hành động được ghi vào nhật ký chỉ ghi thêm, có chữ ký chống sửa: ai làm, lúc nào, dữ liệu đầu vào và lý do. Hoàn tác là một sự kiện mới. Công tắc này dừng toàn bộ tự động hóa; khi đó ca thường quy chờ duyệt tay. |
-| 8 | Giới hạn hiện tại | Giới hạn: dữ liệu kiểm thử là dữ liệu tổng hợp, chưa phải đánh giá độc lập. Khoản ngoài phạm vi được nhận diện bằng từ khóa, nên chi cá nhân đặt tên khác vẫn có thể lọt. Đọc ảnh bằng AI mất mười lăm đến hai mươi lăm giây và luôn cần người kiểm tra. Đội đang thử nghiệm với ba người dùng do Ban tổ chức điều phối. |
+| 1 | Tax Referee · trọng tài hóa đơn đầu vào | Chào anh chị. Hóa đơn đầu vào thiếu một điều kiện là mất khấu trừ. Mà tờ nào cũng hỏi sếp thì không ai làm nổi. Tax Referee tự xử lý ca thường quy, dừng đúng lúc, hỏi đúng người. |
+| 2 | Trang chủ live · không cần tài khoản | Đây là bản chạy thật, không cần tài khoản. Trang chủ có hướng dẫn cho giám khảo và hai nút: chạy kiểm chứng, và mở hộp chuyển tiếp. |
+| 3 | Điểm 1 · Verify một nút: 9/9 ca đạt | Bấm chạy. Chín ca, bốn ca chung và năm ca Đề A, đạt cả chín, mỗi ca vài chục mili giây. Điểm thứ nhất: kiểm chứng một nút, không gọi trí tuệ nhân tạo. Ca dừng có nhóm, người nhận, câu hỏi ngay bên dưới. |
+| 4 | Điểm 2 · Hỏi thay vì đoán, không sửa số | Giờ thử dữ liệu mới. Hóa đơn in tổng bốn trăm tám mươi nghìn, nhưng tiền hàng cộng thuế ra bốn trăm chín mươi lăm. Điểm thứ hai: không đoán. Hệ thống không tự sửa số, mà hỏi kế toán trưởng số nào đúng, kèm hệ quả. |
+| 5 | Điểm 3 · Đúng 3 kiểu dừng, không hỏi thừa | Sang nút hai, mỗi phiên một bộ dữ liệu riêng, sẵn bốn ca mẫu. Điểm thứ ba: dừng đúng ba kiểu. Phí chuyển phát tự xử lý. Ba ca kia: chưa rõ thông tin, ngoài quy định, vượt thẩm quyền. |
+| 6 | Điểm 4 · Một câu hỏi, đúng người: 1A, 2A | Mở ca mười laptop, ba trăm ba mươi triệu, đổi vai CFO. Điểm thứ tư: một câu hỏi, đúng người. Ca này vượt hạn mức hai trăm triệu của kế toán trưởng, lại chưa rõ trạng thái mã số thuế bên bán. Thuế chờ quyết định: ba mươi triệu. Trả lời một lần: một A, hai A. Đã được phê duyệt. Người nhập không tự duyệt, kế toán trưởng không quyết thay CFO. |
+| 7 | Trả lời có hệ quả: 1B → từ chối khấu trừ | Còn trả lời bất lợi thì sao? Kế toán trưởng mở ca bộ lưu điện, chọn một B: trả tiền mặt. Từ năm triệu mà trả tiền mặt thì mất khấu trừ, hồ sơ bị từ chối, không hỏi lại. |
+| 8 | Điểm 5 · Hoàn tác, nhật ký, công tắc dừng | Điểm thứ năm: con người cầm lái. CFO bấm hoàn tác kèm lý do, ghi thành sự kiện mới. Nhật ký chỉ ghi thêm: ai làm, lúc nào, dữ liệu trước và sau, quy chế, lý do. Các dòng nối chuỗi, sửa lén là lộ. Công tắc này dừng mọi tự động hóa, ca thường quy chờ duyệt tay. |
+| 9 | Giới hạn hiện tại (nói thật) | Nói thật về giới hạn. Dữ liệu kiểm thử là tổng hợp, chưa phải đánh giá độc lập. Khoản ngoài phạm vi dò bằng từ khóa, chi cá nhân đặt tên khác có thể lọt. Đọc ảnh mất khoảng mười lăm giây, PDF hai mươi lăm giây, luôn cần người kiểm tra. Ba người dùng thực tế sẽ thử vào ngày mười sáu. |
+| 10 | Tự thử trên live · không cần tài khoản | Máy làm việc lặp lại, con người giữ quyết định khó, bước nào cũng có dấu vết. Mời anh chị tự thử: một nút kiểm chứng, demo riêng, không cần tài khoản. |
