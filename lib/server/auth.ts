@@ -12,10 +12,12 @@ const roleSeed: Array<{ role: AppRole; email: string; displayName: string; envKe
   { role: 'CFO', email: 'cfo@local', displayName: 'Giám đốc tài chính', envKey: 'TAX_REFEREE_CFO_PASSWORD', fallback: 'cfo-local' }
 ];
 
+const syncedPasswords = new WeakSet<object>();
+
 function ensureSeedUsers(): void {
   const db = getDatabase();
   const count = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-  if (count.count > 0) return;
+  if (count.count > 0) { syncConfiguredPasswords(db); return; }
   const insert = db.prepare(`
     INSERT INTO users (id, email, display_name, role, password_hash, created_at)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -29,6 +31,19 @@ function ensureSeedUsers(): void {
     }
   });
   tx();
+  syncedPasswords.add(db);
+}
+
+/** Mật khẩu đặt qua biến môi trường sau lần khởi động đầu vẫn có hiệu lực (mỗi kết nối kiểm tra một lần). */
+function syncConfiguredPasswords(db: ReturnType<typeof getDatabase>): void {
+  if (syncedPasswords.has(db)) return;
+  syncedPasswords.add(db);
+  for (const seed of roleSeed) {
+    const configured = process.env[seed.envKey];
+    if (!configured) continue;
+    const row = db.prepare('SELECT id, password_hash FROM users WHERE email = ?').get(seed.email) as { id: string; password_hash: string } | undefined;
+    if (row && !bcrypt.compareSync(configured, row.password_hash)) db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(bcrypt.hashSync(configured, 10), row.id);
+  }
 }
 
 function toUser(row: Record<string, unknown>): AppUser {

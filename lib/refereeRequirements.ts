@@ -12,9 +12,15 @@ export function needsItemManifest(invoice:Partial<InvoiceInput>):boolean {
     && !(invoice.items?.length && invoice.items.every(i=>i.itemName.trim().length>2));
 }
 export function requiredDecisionFields(invoice:Partial<InvoiceInput>,config?:Partial<SystemPolicyConfig>,sameDayTotal=0):Set<string> {
-  const required=new Set<string>([...coreDecisionFields,'paymentMethod','sellerStatus','isImageBlurry']);
+  const required=new Set<string>([...coreDecisionFields,'isImageBlurry']);
   const needsPaymentEvidence=Math.max(Math.abs(invoice.totalAmount || 0),sameDayTotal)>=paymentThreshold(invoice,config);
-  if(needsPaymentEvidence && (invoice.paymentMethod==='BANK_TRANSFER' || invoice.isStaffReimbursed===true))required.add('hasBankSlip');
+  // Hình thức thanh toán chỉ quyết định kết quả khi tổng (gộp cùng NCC trong ngày) đạt ngưỡng không dùng tiền mặt;
+  // dưới ngưỡng, hỏi thêm chỉ tạo chuyển tiếp thừa.
+  if(needsPaymentEvidence)required.add('paymentMethod');
+  if(needsPaymentEvidence && invoice.paymentMethod==='BANK_TRANSFER')required.add('hasBankSlip');
+  // Trạng thái MST bên bán bắt buộc từ ngưỡng trọng yếu (mặc định 20 triệu); dưới ngưỡng, trạng thái đóng/tạm ngừng
+  // đã biết (nhập tay hoặc danh bạ NCC) vẫn luôn được kiểm tra.
+  if(Math.abs(invoice.totalAmount || 0)>=(config?.sellerStatusMaterialityVnd ?? 20_000_000))required.add('sellerStatus');
   if(needsItemManifest(invoice))required.add('hasItemManifest');
   if(invoice.isAdjustment || (invoice.totalAmount || 0)<0)required.add('originalInvoiceRef');
   if(invoice.sellerStatus==='CLOSED')required.add('sellerSuspensionDate');

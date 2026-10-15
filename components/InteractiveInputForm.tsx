@@ -146,6 +146,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
     message: string;
     approvedTax?: number;
     riskGroup?: string;
+    held?: boolean;
   } | null>(null);
 
   const fingerprint=JSON.stringify(formData);
@@ -318,7 +319,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
       });
       setIsRobotSpeechOpen(true);
     } else if (lastResult?.status === 'ROUTINE') {
-      setRobotMessage({ title: 'Hồ sơ đạt chuẩn thường quy', items: [lastResult.message || 'Hồ sơ đạt chuẩn thường quy'], isError: false });
+      setRobotMessage({ title: lastResult.held ? 'Thường quy — chờ duyệt tay' : 'Hồ sơ đạt chuẩn thường quy', items: [lastResult.message || 'Hồ sơ đạt chuẩn thường quy'], isError: false });
       setIsRobotSpeechOpen(true);
     }
   }, [lastResult]);
@@ -901,10 +902,13 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
       setLastEngine(data.engine || decision.engineUsed || null);
 
       if (decision.status === 'ROUTINE') {
+        // Thông báo theo trạng thái hồ sơ thật: khi tự động hóa đang dừng, ca thường quy chờ KTT duyệt tay.
+        const held = data.workflow?.autoApproved === false;
         setLastResult({
           status: 'ROUTINE',
-          message: decision.plainExplanation,
-          approvedTax: decision.approvedTaxAmount
+          message: held ? 'Tự động hóa đang dừng: ca thường quy chờ Kế toán trưởng duyệt tay.' : decision.plainExplanation,
+          approvedTax: held ? 0 : decision.approvedTaxAmount,
+          held
         });
       } else {
         setLastResult({
@@ -929,7 +933,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
       {extractionTiming && <p role="status" data-testid="extraction-timing" data-elapsed-ms={extractionTiming.elapsedMs} data-cache-hit={String(extractionTiming.cacheHit)} className="sr-only">
         Đã điền dữ liệu sau {(extractionTiming.elapsedMs/1000).toFixed(2)} giây{extractionTiming.cacheHit ? ' · kết quả đã lưu của cùng chứng từ' : ''}. Kiểm tra các trường chưa xác minh trước khi thẩm định.
       </p>}
-      {(isParsingDocument || isEvaluating || lastResult) && <p role="status" className="sr-only">{isParsingDocument ? 'Đang đọc chứng từ…' : isEvaluating ? 'Đang kiểm tra quy tắc…' : lastResult?.status === 'ROUTINE' ? 'Đã tự xử lý và tạo chứng từ nội bộ.' : 'Đã dừng để xác minh / phê duyệt.'}</p>}
+      {(isParsingDocument || isEvaluating || lastResult) && <p role="status" className="sr-only">{isParsingDocument ? 'Đang đọc chứng từ…' : isEvaluating ? 'Đang kiểm tra quy tắc…' : lastResult?.status === 'ROUTINE' ? (lastResult.held ? 'Thường quy, chờ Kế toán trưởng duyệt tay vì tự động hóa đang dừng.' : 'Đã tự xử lý và tạo chứng từ nội bộ.') : 'Đã dừng để xác minh / phê duyệt.'}</p>}
       {/* ================= HEADER THANH ĐIỀU HƯỚNG CHẾ ĐỘ ================= */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2">
         <Heading className="text-2xl font-semibold tracking-tight text-foreground">Tiếp nhận chứng từ</Heading>

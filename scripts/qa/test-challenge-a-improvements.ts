@@ -22,9 +22,12 @@ async function main(){await runIsolated(async()=>{
  const db=getDatabase(),policy=getActivePolicy();policy.config.companyTaxCode=demoCompanyTaxCode;
  db.prepare('UPDATE policy_versions SET payload_json=? WHERE version=?').run(JSON.stringify(policy),policy.version);
  const base=challengeCases[0].invoice;
- const unknown={...base,id:'UNKNOWN-BUSINESS',invoiceNumber:'UNKNOWN-BUSINESS',paymentMethod:undefined,hasBankSlip:undefined,hasItemManifest:undefined,sellerStatus:'UNKNOWN' as const};
- await evaluateWorkflow(unknown,importer,{forceLocalOnly:true});
- check('Chỉ dữ kiện áp dụng mới chặn luồng; trạng thái và phương thức vẫn phải xác minh',()=>{const fields=JSON.parse(readRecord(unknown.id).source_review_json).unresolvedFields;for(const key of ['paymentMethod','sellerStatus'])assert.ok(fields.includes(key));for(const key of ['hasBankSlip','hasItemManifest'])assert.ok(!fields.includes(key));});
+ const unknownSmall={...base,id:'UNKNOWN-SMALL',invoiceNumber:'UNKNOWN-SMALL',paymentMethod:undefined,hasBankSlip:undefined,hasItemManifest:undefined,sellerStatus:'UNKNOWN' as const};
+ const small=await evaluateWorkflow(unknownSmall,importer,{forceLocalOnly:true});
+ check('Khoản nhỏ không bị chuyển tiếp thừa vì dữ kiện không ảnh hưởng kết quả',()=>{assert.equal(small.decision.status,'ROUTINE');assert.deepEqual(JSON.parse(readRecord(unknownSmall.id).source_review_json).unresolvedFields,[]);});
+ const unknown={...base,id:'UNKNOWN-BUSINESS',invoiceNumber:'UNKNOWN-BUSINESS',preTaxAmount:20_000_000,taxAmount:2_000_000,totalAmount:22_000_000,paymentMethod:undefined,hasBankSlip:undefined,hasItemManifest:undefined,sellerStatus:'UNKNOWN' as const};
+ const large=await evaluateWorkflow(unknown,importer,{forceLocalOnly:true});
+ check('Từ ngưỡng: phương thức thanh toán và trạng thái MST phải xác minh, hỏi bằng câu đóng có số tiền',()=>{const fields=JSON.parse(readRecord(unknown.id).source_review_json).unresolvedFields;for(const key of ['paymentMethod','sellerStatus'])assert.ok(fields.includes(key));for(const key of ['hasBankSlip','hasItemManifest'])assert.ok(!fields.includes(key));assert.equal(large.decision.riskGroup,'UNCERTAIN_INFO');assert.match(large.decision.actionableQuestion,/22\.000\.000₫/);assert.match(large.decision.actionableQuestion,/Tiền mặt → không được khấu trừ 2\.000\.000₫/);});
  check('Quota chặn chứng từ quá 15MB trước khi lưu',()=>assert.throws(()=>assertArtifactCapacity(16*1024*1024),/giới hạn/));
  const uncertain={...base,id:'PARTIAL',invoiceNumber:'PARTIAL',sourceUncertainFields:['supplierTaxCode','totalAmount']};
  await evaluateWorkflow(uncertain,importer,{forceLocalOnly:true});

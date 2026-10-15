@@ -2,7 +2,7 @@ import { FlatCompat } from '@eslint/eslintrc';
 
 const compat = new FlatCompat({ baseDirectory: import.meta.dirname });
 const config = [
-  { ignores: ['.next*/**', 'node_modules/**', 'data/runtime/**', 'data/uploads/**', 'backups/**', '.codex-finalizer/**', 'docs/evidence/**'] },
+  { ignores: ['.next*/**', 'node_modules/**', 'data/runtime/**', 'data/uploads/**', 'backups/**', '.codex-finalizer/**', 'docs/evidence/**', 'scratch/**'] },
   ...compat.extends('next/core-web-vitals'),
 ];
 

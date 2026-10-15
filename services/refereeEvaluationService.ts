@@ -9,17 +9,17 @@ export interface EvaluationMetric {count:number;denominator:number;rate:number|n
 export interface RefereeCaseSuccess {
   id:string;name:string;expected:'ROUTINE'|'ESCALATED';expectedRiskGroup?:RiskGroup;expectedRequiresCFO:boolean;
   actual:'ROUTINE'|'ESCALATED';actualRiskGroup:RiskGroup|null;requiresCFO:boolean;workflow:string;
-  approvedTax:number;voucher:boolean;auditCount:number;workflowValid:boolean;match:boolean;durationMs:number;
+  approvedTax:number;voucher:boolean;auditCount:number;workflowValid:boolean;match:boolean;durationMs:number;startedAt:string;finishedAt:string;
   question:string|null;questionCheck:{valid:boolean;errors:string[]};decision:RefereeDecision;rationale:string;provenance:string;policyHash:string;
 }
-export interface RefereeCaseError {id:string;name:string;expected:'ROUTINE'|'ESCALATED';actual:'ERROR';match:false;error:string;durationMs:number}
+export interface RefereeCaseError {id:string;name:string;expected:'ROUTINE'|'ESCALATED';actual:'ERROR';match:false;error:string;durationMs:number;startedAt:string;finishedAt:string}
 export type RefereeCaseResult=RefereeCaseSuccess|RefereeCaseError;
 export interface RefereeEvaluationReport {policy:PolicyBundle;policyHash:string;total:number;passed:number;errors:number;falseNegative:EvaluationMetric;falsePositive:EvaluationMetric;classificationAndRouting:EvaluationMetric;routineCompletion:EvaluationMetric;stp:EvaluationMetric;results:RefereeCaseResult[]}
 export async function evaluateRefereeCases(cases: RefereeCase[], policy?: PolicyBundle):Promise<RefereeEvaluationReport> {
   const snapshot = policy || await runIsolated(async()=>getActivePolicy());
   const results:RefereeCaseResult[] = [];
   for (const c of cases) {
-    const start = performance.now();
+    const start = performance.now(), startedAt = new Date().toISOString();
     try {
       const result = await runIsolated(async()=>{
         const db=getDatabase();
@@ -44,8 +44,8 @@ export async function evaluateRefereeCases(cases: RefereeCase[], policy?: Policy
           actual:d.status,actualRiskGroup:group,requiresCFO,workflow:row.status,approvedTax:row.approved_deductible_tax,voucher,auditCount,workflowValid:effects,
           match,question:d.status==='ESCALATED'?d.actionableQuestion:null,decision:d,rationale:c.rationale,provenance:c.provenance,policyHash:hashPayload(p.config)};
       });
-      results.push({...result,durationMs:Math.round(performance.now()-start)});
-    } catch(error) {results.push({id:c.id,name:c.name,expected:c.expectedStatus,actual:'ERROR' as const,match:false,error:error instanceof Error?error.message:String(error),durationMs:Math.round(performance.now()-start)});}
+      results.push({...result,durationMs:Math.round(performance.now()-start),startedAt,finishedAt:new Date().toISOString()});
+    } catch(error) {results.push({id:c.id,name:c.name,expected:c.expectedStatus,actual:'ERROR' as const,match:false,error:error instanceof Error?error.message:String(error),durationMs:Math.round(performance.now()-start),startedAt,finishedAt:new Date().toISOString()});}
   }
   const expectedE=cases.filter(c=>c.expectedStatus==='ESCALATED').length,expectedR=cases.length-expectedE;
   const metric=(count:number,denominator:number):EvaluationMetric=>({count,denominator,rate:denominator?count/denominator:null});

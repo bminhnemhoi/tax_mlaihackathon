@@ -1,5 +1,8 @@
 # Trạng thái triển khai 09–10/10/2026
 
+> 📌 **Ảnh chụp lịch sử** — số liệu và tên quy tắc trong file này có thể đã cũ. Số liệu hiện hành: [README](../README.md), trang `/verify`, `/sop` và `docs/evidence/`.
+
+
 ## Đã thực hiện trong mã
 
 - Service điều phối; transaction cho trạng /thái/evaluation/voucher/macro/audit; gửi lặp; guard evaluation/revision và khóa đánh giá cùng hồ sơ.

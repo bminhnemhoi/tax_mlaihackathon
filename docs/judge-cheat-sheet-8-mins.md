@@ -1,16 +1,13 @@
 # Tax Referee · Hướng dẫn giám khảo 8 phút
 
-Live: https://limegreen-salamander-517622.hostingersite.com. Không cần tài khoản để dùng Verify và demo riêng.
+Live: https://limegreen-salamander-517622.hostingersite.com — không cần tài khoản. Phiên bản đang chạy: `/api/health` (commit).
 
 | Thời gian | Thao tác | Điều cần quan sát |
 |---|---|---|
-| 0–90 giây | Trang đầu → **Chạy Verify** → chọn **5 ca Đề A** → **Chạy Verify** | 5/5; 3 thường quy đã hoàn tất, 2 ngoại lệ chờ KTT/CFO; các chỉ số có mẫu số và timestamp |
-| 90–150 giây | Đọc **SOP và các quy tắc đang kiểm thử**, **Tải báo cáo JSON** | Mã lượt chạy, policy/fixture hash; lời văn SOP không tự sửa quy tắc |
-| 150–240 giây | Form **Nhập Hóa Đơn Thử Nghiệm** hoặc trang đầu → **Thử dữ liệu mới** → **Tiếp Nhận Chứng Từ** | Nhập trường chưa biết hoặc tải XML/PDF/ảnh; dữ liệu nghi vấn chuyển tiếp, chưa duyệt thuế |
-| 240–330 giây | **Bàn Thẩm Định** → chọn hồ sơ → **Can thiệp và bổ sung hồ sơ** | Sửa từng trường, chọn đã đối chiếu và ghi bằng chứng riêng; trường chưa xác nhận vẫn cần xử lý; đánh giá lại toàn bộ findings |
-| 330–420 giây | Nhập lý do → **Dừng xử lý** → **Hoàn tác**; mở **Xem lịch sử trước/sau và dữ liệu nguồn** | Ai, lúc nào, lý do, input, policy snapshot, hiệu ứng lên voucher/thuế; phiên bản cũ bị chặn |
-| 420–480 giây | Xem hậu kiểm tiền lệ hoặc đổi vai trò trong demo | KTT không duyệt ca CFO; tiền lệ có scope/trần; ≥10 hồ sơ hậu kiểm mới hiệu chỉnh; có rollback |
+| 0:00–2:00 | **① Chạy Verify** (`/verify`) → **Chạy Verify** | PASS 9/9: 4 ca chung + 5 ca Đề A (3 tự xử lý, 2 chuyển tiếp); thời điểm từng ca; câu hỏi chuyển tiếp hiện ngay dưới ca |
+| 2:00–3:00 | Trang chủ → đọc dòng hướng dẫn → **② Mở hộp chuyển tiếp — demo riêng** | Vào workspace với database riêng của phiên, vai Kế toán viên, có sẵn 4 ca mẫu (1 tự xử lý + 1 ca mỗi kiểu dừng); đổi vai trò mô phỏng ở góc trên |
+| 3:00–5:00 | Verify → **Thử dữ liệu mới** (sửa JSON, bỏ trống trường chưa biết) hoặc workspace → **Tiếp nhận** (XML/PDF/ảnh) | Ca thường quy tự xử lý; ca nghi vấn chuyển tiếp với nhóm dừng + câu hỏi có số tiền, trả lời một lần; không lỗi khi dữ liệu lạ (VD thuế suất 7%) |
+| 5:00–6:30 | Bài kiểm tra Đề A: nhập ca không rõ ràng theo `/sop`; hoặc mở ca mẫu 0009004 (10 laptop 330 triệu) → đổi vai **CFO** → bảng **Trả lời** trên hồ sơ: bấm A/B từng ý hoặc gõ "1A, 2A" + lý do | Đúng nhóm (Chưa rõ thông tin / Ngoài quy định / Vượt thẩm quyền), đúng người nhận (KTT / CFO), câu hỏi quyết định được ngay; câu trả lời được áp dụng thật (gán giá trị → đánh giá lại; chấp nhận → duyệt; từ chối) |
+| 6:30–7:30 | Workspace → **Nhật ký** → chọn hồ sơ → xem sự kiện → **Dừng** → **Hoàn tác**; công tắc **Dừng tự động hóa** (vai KTT/CFO) | Ai, lúc nào, dữ liệu đầu vào (snapshot + inputHash), policy/contract/commit, lý do; hoàn tác là sự kiện mới; khi dừng tự động hóa, ca thường quy chờ duyệt tay, lịch sử bật/tắt ở mục "Sự kiện hệ thống" |
 
-Các bộ 4/5/15 là hồi quy tổng hợp và có ca trùng. Không coi tỷ lệ đúng của fixture là độ chính xác trên dữ liệu độc lập. API live và upload ba định dạng đã được kiểm tra; ảnh thử tổng hợp một lần mất khoảng 7,8 giây.
-
-Dừng/hoàn tác chỉ cập nhật dữ liệu kế toán nội bộ; không đảo giao dịch ERP bên ngoài. Luồng ERP/ngân hàng/TCT hiện là demo/xuất payload. Chưa có nhãn độc lập và nghiên cứu ba người dùng thật để công bố tiết kiệm thời gian hoặc tự xác định điểm thi.
+Ghi chú trung thực: dữ liệu Verify là tổng hợp, không phải đánh giá độc lập. Nhóm "Mở rộng · beta" (ngân hàng, đối soát TCT, ERP, báo cáo) là một phần giả lập, ngoài phạm vi Đề A. Thử nghiệm với 3 người dùng do BTC điều phối đang thực hiện.

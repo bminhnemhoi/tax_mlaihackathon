@@ -83,7 +83,11 @@ export const SystemPolicyConfigSchema = z.object({
   excludedVat8Categories: z.array(z.string()).default([
     'VIỄN THÔNG', 'TÀI CHÍNH', 'NGÂN HÀNG', 'CHỨNG KHOÁN', 'BẢO HIỂM',
     'BẤT ĐỘNG SẢN', 'KIM LOẠI', 'KHAI KHOÁNG', 'HÓA CHẤT', 'TIÊU THỤ ĐẶC BIỆT'
-  ])
+  ]),
+  // Nhóm khoản chi SOP không bao phủ: luôn chuyển người có thẩm quyền (ngoài phạm vi quy định). Mặc định trong policyEngine.
+  scopeNotCoveredCategories: z.array(z.string()).optional(),
+  // Ngưỡng trọng yếu: hóa đơn từ mức này phải biết trạng thái MST bên bán trước khi tự duyệt.
+  sellerStatusMaterialityVnd: z.number().finite().nonnegative().default(20_000_000)
 });
 export type SystemPolicyConfig = z.infer<typeof SystemPolicyConfigSchema>;
 
@@ -109,19 +113,19 @@ export type InvoiceLineItem = z.infer<typeof InvoiceLineItemSchema>;
 
 // 3. Schema Hóa đơn Đầu vào (Invoice Input)
 export const InvoiceInputSchema = z.object({
-  id: z.string().trim().min(1),
-  invoiceNumber: z.string().trim().min(1),
+  id: z.string().trim().min(1).max(200),
+  invoiceNumber: z.string().trim().min(1).max(100),
   invoiceDate: IsoDateSchema,         // Định dạng: YYYY-MM-DD
   supplierTaxCode: z.string().trim().regex(TAX_CODE_FORMAT_REGEX, 'MST phải có 10, 12 hoặc 13 chữ số'),
-  supplierName: z.string().trim().min(2),
-  supplierAddress: z.string().trim().optional(),
+  supplierName: z.string().trim().min(2).max(500),
+  supplierAddress: z.string().trim().max(1000).optional(),
   buyerTaxCode: z.string().trim().regex(TAX_CODE_FORMAT_REGEX, 'MST người mua phải có 10, 12 hoặc 13 chữ số').optional(),
   buyerName: z.string().trim().optional(),
   invoiceSeries: z.string().trim().optional(),         // Ký hiệu HĐ theo TT 78 (VD: 1C26TBB)
   invoiceTemplate: z.string().trim().optional(),       // Mẫu số HĐ (VD: 1/001)
   taxAuthorityCode: z.string().trim().optional(),      // Mã Cơ quan thuế (MCCQT 34 ký tự)
   signingDate: IsoDateSchema.optional(),               // Ngày ký số điện tử của bên bán
-  itemName: z.string().trim().min(1),
+  itemName: z.string().trim().min(1).max(5000),
   preTaxAmount: AmountSchema,
   taxRate: z.union([z.literal(0), z.literal(5), z.literal(8), z.literal(10)]),
   taxAmount: AmountSchema,
@@ -138,7 +142,7 @@ export const InvoiceInputSchema = z.object({
   isStaffReimbursed: z.boolean().optional(),        // Nhân viên thanh toán trước và hoàn ứng theo quy chế?
   sourceArtifactId: z.string().trim().min(1).optional(),
   sourceHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
-  items: z.array(InvoiceLineItemSchema).optional()  // Danh mục chi tiết các dòng hàng (IMP-08)
+  items: z.array(InvoiceLineItemSchema).max(1000).optional()  // Danh mục chi tiết các dòng hàng (IMP-08)
 });
 export type InvoiceInput = z.infer<typeof InvoiceInputSchema>;
 
@@ -312,6 +316,16 @@ export const RoutineDecisionSchema = z.object({
 });
 export type RoutineDecision = z.infer<typeof RoutineDecisionSchema>;
 
+// Hệ quả máy đọc được của một đáp án A/B trong câu hỏi chuyển tiếp (services/questionBuilder.ts).
+export const AnswerEffectSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('SET_FIELDS'), values: z.record(z.union([z.string(), z.number(), z.boolean()])), confirm: z.array(z.string()).optional() }),
+  z.object({ kind: z.literal('CONFIRM_FIELDS'), fields: z.array(z.string()) }),
+  z.object({ kind: z.literal('NEED_VALUE'), field: z.string() }),
+  z.object({ kind: z.literal('RESOLVE'), ruleId: z.string(), resultingAction: z.string() }),
+  z.object({ kind: z.literal('REQUEST_INFO') }),
+  z.object({ kind: z.literal('REJECT') })
+]);
+
 export const HandoffSchema = z.object({
   requiredRole: z.enum(['CHIEF_ACCOUNTANT','CFO']),
   invoiceNumber:z.string(), primaryRuleId:z.string(), question:z.string(),
@@ -322,6 +336,11 @@ export const HandoffSchema = z.object({
   policyRef:z.object({version:z.string(),hash:z.string().optional(),clause:z.string()}),
   questionSource:z.enum(['POLICY_TEMPLATE','AI_GROUNDED']),
   automatedCheck:z.object({valid:z.boolean(),errors:z.array(z.string())}),
+  // Câu hỏi có cấu trúc: mỗi ý một nhóm rủi ro và hai đáp án; trả lời một lần kiểu "1A, 2B".
+  questionSpec:z.object({
+    recipientRole:z.enum(['CHIEF_ACCOUNTANT','CFO']), taxAtStakeVnd:z.number(), replyHint:z.string(),
+    items:z.array(z.object({n:z.number().int().positive(),ruleIds:z.array(z.string()),riskGroup:RiskGroupEnum,text:z.string(),answers:z.tuple([z.string(),z.string()]),effects:z.tuple([AnswerEffectSchema,AnswerEffectSchema]).optional()}))
+  }).optional(),
 });
 export type RefereeHandoff = z.infer<typeof HandoffSchema>;
 
@@ -339,6 +358,7 @@ export type DuplicateInfo = z.infer<typeof DuplicateInfoSchema>;
 export const EscalatedDecisionSchema = z.object({
   status: z.literal('ESCALATED'),
   riskGroup: RiskGroupEnum,
+  riskGroups: z.array(RiskGroupEnum).optional(), // Mọi nhóm còn mở, nhóm đầu là nhóm chính
   invoiceId: z.string(),
   supplierName: z.string(),
   totalAmount: z.number(),

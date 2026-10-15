@@ -20,9 +20,15 @@ async function handleGET(request: NextRequest, context: { params: Promise<{ id: 
     }
 
     const body = fs.readFileSync(artifact.storage_path);
+    // Chứng từ do người dùng tải lên không bao giờ được trình duyệt chạy như trang web (HTML/SVG có script):
+    // chỉ ảnh raster và PDF hiển thị trực tiếp; mọi loại khác (XML…) trả về dạng văn bản thuần trong sandbox.
+    const viewable = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'].includes(artifact.mime_type);
+    const contentType = viewable ? artifact.mime_type : 'text/plain; charset=utf-8';
     return new NextResponse(body as unknown as BodyInit, {
       headers: {
-        'Content-Type': artifact.mime_type,
+        'Content-Type': contentType,
+        'X-Content-Type-Options': 'nosniff',
+        ...(artifact.mime_type === 'application/pdf' ? {} : { 'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox" }),
         'Content-Length': String(body.byteLength),
         'Content-Disposition': `inline; filename="${artifact.original_file_name.replace(/["\\\r\n]/g, '_')}"`,
         'X-Content-SHA256': artifact.content_hash,

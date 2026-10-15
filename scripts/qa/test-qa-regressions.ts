@@ -120,13 +120,15 @@ async function main() {
   let reached!:()=>void; let release!:(response:Response)=>void;
   const requestStarted=new Promise<void>(resolve=>{reached=resolve;});
   globalThis.fetch=async()=>{reached();return new Promise<Response>(resolve=>{release=resolve;});};
+  // Diễn đạt câu hỏi bằng AI tắt mặc định; bật riêng để tái hiện lượt đánh giá đang chờ nhà cung cấp AI.
+  process.env.QGEN_AI='1';
   try {
     const pending=evaluateWorkflow(inflight,importer,{forceLocalOnly:false});pending.catch(()=>{});
     await requestStarted;
     const incoming=await bankPost(req('/api/banking/sync',cfoSession.token,{content:JSON.stringify([{...statement[0],referenceNo:'INFLIGHT-REF',debitAmount:inflight.totalAmount,beneficiaryTaxCode:inflight.supplierTaxCode,description:'BANK-INFLIGHT MST 0100000002'}])}));assert.equal(incoming.status,200);
     release(new Response(JSON.stringify({choices:[{message:{content:'{}'}}]}),{status:200}));
     await assert.rejects(pending,/thay đổi/);assert.equal(readRecord(inflight.id).status,'ON_HOLD');pass('Bank evidence invalidates late evaluation');
-  }finally{globalThis.fetch=fetchOriginal;}
+  }finally{globalThis.fetch=fetchOriginal;delete process.env.QGEN_AI;}
 
  });console.log(`${checks} QA regression checks passed; no provider requests.`);
 }

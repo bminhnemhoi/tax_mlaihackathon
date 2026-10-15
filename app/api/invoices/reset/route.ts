@@ -4,16 +4,19 @@ import fs from 'node:fs';
 import { requireRequestUser } from '@/lib/server/auth';
 import { getDatabase, jsonNow } from '@/lib/server/db';
 import { MACRO_DEFAULTS } from '@/lib/constants';
+import { appendAuditEvent } from '@/lib/server/audit';
+import { automationState } from '@/services/automationControl';
 
 export const dynamic = 'force-dynamic';
 
 async function handlePOST(request: NextRequest) {
   try {
-    requireRequestUser(request);
+    const user = requireRequestUser(request);
     if (!isSandbox()) return NextResponse.json({ error: 'Reset chỉ dành cho sandbox demo.' }, { status: 403 });
     const db = getDatabase();
 
     const artifacts = db.prepare('SELECT storage_path FROM document_artifacts').all() as Array<{ storage_path: string }>;
+    const invoiceCount = (db.prepare('SELECT COUNT(*) n FROM invoices').get() as { n: number }).n;
 
     const resetTx = db.transaction(() => {
       db.exec(`
@@ -40,6 +43,11 @@ async function handlePOST(request: NextRequest) {
     });
 
     resetTx();
+    // Demo sạch thì tự động hóa chạy lại bình thường (công tắc dừng không còn treo từ phiên trước).
+    const wasPaused = automationState().paused;
+    db.exec("DELETE FROM system_controls WHERE key='AUTO_APPROVE'");
+    // Nhật ký audit được giữ nguyên; bản thân thao tác reset cũng là một sự kiện có người thực hiện.
+    appendAuditEvent({ eventType: 'SANDBOX_RESET', entityId: 'sandbox', actorId: user.id, payload: { role: user.role, deletedInvoices: invoiceCount, deletedArtifacts: artifacts.length, automationReset: wasPaused ? 'PAUSED→RUNNING' : 'RUNNING' } });
 
     for (const artifact of artifacts) {
       if (fs.existsSync(artifact.storage_path)) {

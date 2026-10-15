@@ -1,0 +1,1670 @@
+{
+ "provenance": "SYNTHETIC_REDTEAM: 72 ca do 6 trợ lý AI viết từ tài liệu quy định (data/policyContract.ts, lib/refereeRequirements.ts, README) mà KHÔNG đọc mã engine; nhãn kỳ vọng theo SOP. Không phải hóa đơn thật, không phải đánh giá độc lập bởi con người.",
+ "generatedOn": "2026-10-14",
+ "cases": [
+  {
+   "id": "EA-01-exact-200m",
+   "invoice": {
+    "invoiceNumber": "00003187",
+    "invoiceDate": "2026-09-15",
+    "supplierTaxCode": "0312456789",
+    "supplierName": "Công ty TNHH Thiết Bị An Ninh Sao Việt",
+    "itemName": "Hệ thống camera giám sát và đầu ghi hình cho kho Long An",
+    "preTaxAmount": 181818182,
+    "taxRate": 10,
+    "taxAmount": 18181818,
+    "totalAmount": 200000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "isImageBlurry": false
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "EXCEED_AUTHORITY",
+   "expectedRequiresCFO": true,
+   "rationale": "Boundary case at the limit. All facts are known and consistent: 181,818,182 x 10% = 18,181,818.2, rounded to 18,181,818, and the sum is exactly 200,000,000. Payment is by transfer with a bank slip, the seller is ACTIVE, the image is clear, the item needs no manifest and preTax is below 1 billion, so the K-factor rule does not apply. The only finding is AUTHORITY_EXCEED_KTT_LIMIT. The SOP says 'Mọi hóa đơn có trị tuyệt đối tổng tiền ≥ 200.000.000 ₫ cần CFO', and the operator is >= not >, so exactly 200,000,000 must escalate to the CFO.",
+   "mention": "Recipient CFO. States total 200,000,000 ₫ reaches (>=) the chief accountant (KTT) limit of 200,000,000 ₫. Options in one reply: A = CFO approves the payment and deduction of 18,181,818 ₫ VAT; B = hold to review the contract/acceptance. Must not ask about payment method, seller status or image, which are already known."
+  },
+  {
+   "id": "EA-02-200m-plus-1",
+   "invoice": {
+    "invoiceNumber": "00000569",
+    "invoiceDate": "2026-09-17",
+    "supplierTaxCode": "0108765432",
+    "supplierName": "Công ty Cổ phần Điện Năng Thịnh Phát",
+    "itemName": "Bộ lưu điện UPS 120 kVA kèm tủ ắc quy",
+    "preTaxAmount": 181818183,
+    "taxRate": 10,
+    "taxAmount": 18181818,
+    "totalAmount": 200000001,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "isImageBlurry": false
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "EXCEED_AUTHORITY",
+   "expectedRequiresCFO": true,
+   "rationale": "One dong above the KTT limit. The amounts are consistent: 181,818,183 x 10% = 18,181,818.3, rounded to 18,181,818, and the total is 200,000,001. Payment, bank slip, seller status and image are all clean, the item is not manifest-sensitive, and preTax is below 1 billion. Only AUTHORITY_EXCEED_KTT_LIMIT fires, because |total| >= 200,000,000. This guards against an off-by-one in either direction around the limit.",
+   "mention": "Recipient CFO. Total 200,000,001 ₫ is at or above the KTT limit of 200,000,000 ₫. A = CFO approves and deducts 18,181,818 ₫ VAT; B = hold or review. No questions about facts that are already known."
+  },
+  {
+   "id": "EA-03-below-limit-199999999-routine",
+   "invoice": {
+    "invoiceNumber": "00002214",
+    "invoiceDate": "2026-09-19",
+    "supplierTaxCode": "3701234567",
+    "supplierName": "Công ty TNHH Giá Kệ Minh Khang",
+    "itemName": "Kệ sắt chứa hàng tải trọng nặng cho kho Bình Dương",
+    "preTaxAmount": 181818181,
+    "taxRate": 10,
+    "taxAmount": 18181818,
+    "totalAmount": 199999999,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "isImageBlurry": false
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Control case one dong below the limit. The amounts are consistent: 181,818,181 x 10% = 18,181,818.1, rounded to 18,181,818, and the total is 199,999,999. Every conditionally required fact is present. Total >= 5M, so paymentMethod is BANK_TRANSFER and hasBankSlip is true. Total >= 20M, so sellerStatus is ACTIVE. The image is clear, the item needs no manifest, 10% is not an 8% excluded-category issue, it is not an adjustment, and preTax is below 1 billion so K does not apply. SOP 'Thường quy: đầy đủ dữ liệu, không còn phát hiện và dưới trần 200.000.000 ₫ → tự duyệt'. buyerTaxCode is left out on purpose: the brief says the company MST is 0102030405, but DEFAULT_POLICY_CONFIG.companyTaxCode in lib/constants.ts is 0100109106. Either value could trigger a false RULE_BUYER_TAX_CODE_MISMATCH depending on the deployed config, and strictBuyerTaxCodeCheck is false, so the field is not required.",
+   "mention": "No question should be generated. The invoice must be auto-approved with an internal voucher and audit entry and must not be routed to the KTT or CFO."
+  },
+  {
+   "id": "EA-04-negative-adjustment-250m",
+   "invoice": {
+    "invoiceNumber": "00000731",
+    "invoiceDate": "2026-09-25",
+    "supplierTaxCode": "0315678901",
+    "supplierName": "Công ty TNHH Tự Động Hóa Bách Khoa Miền Nam",
+    "itemName": "Điều chỉnh giảm giá trị hợp đồng cung cấp robot hàn tự động",
+    "preTaxAmount": -227272727,
+    "taxRate": 10,
+    "taxAmount": -22727273,
+    "totalAmount": -250000000,
+    "isAdjustment": true,
+    "originalInvoiceRef": "1C26TBK-00000412",
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "isImageBlurry": false
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "EXCEED_AUTHORITY",
+   "expectedRequiresCFO": true,
+   "rationale": "A negative amount that is properly flagged as an adjustment. isAdjustment is true and originalInvoiceRef is present, so RULE_ADJUSTMENT_NO_ORIGINAL and the 'số âm chưa là điều chỉnh' data-quality stop do not fire. The amounts are consistent: -227,272,727 x 10% = -22,727,272.7, rounded to -22,727,273, and the total is -250,000,000. |total| >= 5M and >= 20M, so payment evidence and seller status are supplied. The K-factor rule excludes adjustments. The SOP authority rule uses the absolute value ('trị tuyệt đối tổng tiền ≥ 200.000.000 ₫ cần CFO'), so a credit note of 250M still needs the CFO. A sign bug that compares the signed total against the limit would wrongly auto-approve it.",
+   "mention": "Recipient CFO. Mentions the downward adjustment of -250,000,000 ₫ (|total| >= 200,000,000 ₫ KTT limit), deductible VAT reduced by 22,727,273 ₫, and the original invoice ref 1C26TBK-00000412. A = CFO accepts the adjustment and reduces input VAT by 22,727,273 ₫ on the original invoice; B = hold to reconcile against the original invoice/contract annex. Must not ask for originalInvoiceRef, which is already given."
+  },
+  {
+   "id": "EA-05-big-equipment-1375m",
+   "invoice": {
+    "invoiceNumber": "00000098",
+    "invoiceDate": "2026-10-02",
+    "supplierTaxCode": "0316543210",
+    "supplierName": "Công ty Cổ phần Cơ Khí Chế Tạo Tân Phú Hưng",
+    "itemName": "Máy ép nhựa thủy lực 350 tấn và bộ khuôn",
+    "preTaxAmount": 1250000000,
+    "taxRate": 10,
+    "taxAmount": 125000000,
+    "totalAmount": 1375000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "isImageBlurry": false,
+    "items": [
+     {
+      "lineNumber": 1,
+      "itemName": "Máy ép nhựa thủy lực 350 tấn",
+      "quantity": 2,
+      "unitPrice": 525000000,
+      "amount": 1050000000,
+      "taxRate": 10,
+      "taxAmount": 105000000
+     },
+     {
+      "lineNumber": 2,
+      "itemName": "Bộ khuôn ép và lắp đặt chạy thử",
+      "quantity": 1,
+      "unitPrice": 200000000,
+      "amount": 200000000,
+      "taxRate": 10,
+      "taxAmount": 20000000
+     }
+    ]
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "EXCEED_AUTHORITY",
+   "expectedRequiresCFO": true,
+   "rationale": "Large capital equipment purchase. The line items reconcile exactly: 2 x 525M = 1,050M and 1 x 200M = 200M, so preTax is 1,250M; line VAT is 105M + 20M = 125M, and the total is 1,375M. Payment, slip, seller and image are clean, and no line is manifest-sensitive or an 8% case. AUTHORITY_EXCEED_KTT_LIMIT fires because 1,375,000,000 >= 200,000,000. preTax >= 1 billion and the invoice is not an adjustment, so AUTHORITY_K_FACTOR_RED may also fire depending on macroState, but it is in the same group. Either way the primary group is EXCEED_AUTHORITY and the CFO is required. No OUT_OF_POLICY or UNCERTAIN finding should appear.",
+   "mention": "Recipient CFO. Total 1,375,000,000 ₫ >= KTT limit 200,000,000 ₫; VAT 125,000,000 ₫. It may also mention that preTax 1,250,000,000 ₫ >= 1 billion triggers the K-factor (tồn kho/doanh số) check. A = CFO approves the purchase and deducts 125,000,000 ₫; B = hold for contract/acceptance or inventory review. Must not ask for line items or a manifest."
+  },
+  {
+   "id": "EA-06-authority-plus-unknown-seller",
+   "invoice": {
+    "invoiceNumber": "00004402",
+    "invoiceDate": "2026-09-18",
+    "supplierTaxCode": "0314567823",
+    "supplierName": "Công ty TNHH Cơ Điện Lạnh Phương Nam Việt",
+    "itemName": "Hệ thống điều hòa trung tâm VRV cho nhà xưởng",
+    "preTaxAmount": 300000000,
+    "taxRate": 10,
+    "taxAmount": 30000000,
+    "totalAmount": 330000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "isImageBlurry": false
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "EXCEED_AUTHORITY",
+   "expectedRequiresCFO": true,
+   "rationale": "Two findings. (1) AUTHORITY_EXCEED_KTT_LIMIT, because the known, consistent total of 330,000,000 is >= 200,000,000. (2) sellerStatus is omitted, which means unknown, while |total| >= the 20M materiality threshold (refereeRequirements: sellerStatus required). That is an UNCERTAIN_INFO missing fact. Precedence is OUT_OF_POLICY > EXCEED_AUTHORITY > UNCERTAIN_INFO. The authority finding is triggered by the total, which is verified, and not by the unknown seller status, so the unverified-fact exception does not demote it. Primary is EXCEED_AUTHORITY and the CFO is required. Seller status must still appear as a numbered sub-item.",
+   "mention": "One message with numbered items. (1) For the CFO: total 330,000,000 ₫ >= KTT limit 200,000,000 ₫, VAT 30,000,000 ₫; A approve / B hold. (2) Verify the operating status of seller MST 0314567823 (Công ty TNHH Cơ Điện Lạnh Phương Nam Việt), for example on the tax authority portal; candidate answers ACTIVE vs SUSPENDED/CLOSED (with the closure date if closed). The question must not pre-conclude that the seller is fine. Recipient CFO, with the KTT verifying the seller status. Answerable in one reply such as '1A, 2 ACTIVE'."
+  },
+  {
+   "id": "EA-07-authority-plus-cash",
+   "invoice": {
+    "invoiceNumber": "00001956",
+    "invoiceDate": "2026-09-10",
+    "supplierTaxCode": "0109123456",
+    "supplierName": "Công ty TNHH Năng Lượng Trường An",
+    "itemName": "Máy phát điện diesel 250 kVA",
+    "preTaxAmount": 240000000,
+    "taxRate": 10,
+    "taxAmount": 24000000,
+    "totalAmount": 264000000,
+    "paymentMethod": "CASH",
+    "sellerStatus": "ACTIVE",
+    "isImageBlurry": false
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": true,
+   "rationale": "The amounts are consistent: 240M + 24M = 264M. It is known that payment was CASH, and 264,000,000 >= the 5,000,000 non-cash threshold, so STATUTORY_LAW_48_CASH_PAYMENT (Điều 1.2) fires and the input VAT is not deductible unless non-cash payment evidence exists. That is OUT_OF_POLICY. AUTHORITY_EXCEED_KTT_LIMIT also fires (264M >= 200M). Precedence is OUT_OF_POLICY > EXCEED_AUTHORITY. Both findings rest on known facts, so the exception does not apply. Primary is OUT_OF_POLICY, and requiresCFO is still true because |total| >= 200M ('không bỏ qua ràng buộc ... luật định hoặc thẩm quyền').",
+   "mention": "Numbered items in one message. (1) Cash payment of 264,000,000 ₫ >= the 5,000,000 ₫ non-cash threshold: A = provide bank-transfer evidence or correct the payment method and re-evaluate; B = exclude 24,000,000 ₫ input VAT from deduction. (2) For the CFO: total 264,000,000 ₫ >= KTT limit 200,000,000 ₫, approve or hold. Recipient KTT plus CFO. Must not offer a CFO precedent that waives the statutory cash rule."
+  },
+  {
+   "id": "EA-08-authority-but-blurry-image",
+   "invoice": {
+    "invoiceNumber": "00000877",
+    "invoiceDate": "2026-10-05",
+    "supplierTaxCode": "0313579246",
+    "supplierName": "Công ty Cổ phần Thiết Bị Nâng Hạ Việt Long",
+    "itemName": "Xe nâng điện 3 tấn kèm bộ sạc",
+    "preTaxAmount": 380000000,
+    "taxRate": 10,
+    "taxAmount": 38000000,
+    "totalAmount": 418000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "isImageBlurry": true
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": true,
+   "rationale": "The amounts are arithmetically consistent (380M + 38M = 418M), but the source image is flagged blurry. RULE_IMAGE_BLURRY ('Ảnh mờ chưa xác minh luôn dừng tự động hóa') means every amount read from the image, including totalAmount, is unverified. AUTHORITY_EXCEED_KTT_LIMIT would fire on 418M >= 200M, but that finding is triggered by an unverified fact, and README says 'nếu số tiền chưa chắc, hệ thống không nói vượt quyền ... nó hỏi xác nhận số tiền trước'. Primary is therefore UNCERTAIN_INFO. requiresCFO is true because the stated |total| of 418,000,000 is >= 200M, so after confirmation it still goes to the CFO.",
+   "mention": "Recipient KTT first. Ask them to confirm the amounts read from the blurry image against the original or XML: preTax 380,000,000 ₫, VAT 38,000,000 ₫, total 418,000,000 ₫ (A = confirmed as read; B = different values, enter the correct ones and give the evidence source). It should note that the CFO step follows after confirmation because 418,000,000 ₫ >= the 200,000,000 ₫ limit, but must not state 'vượt thẩm quyền' as a conclusion before the amount is confirmed."
+  },
+  {
+   "id": "EA-09-total-mismatch-straddles-limit",
+   "invoice": {
+    "invoiceNumber": "00002630",
+    "invoiceDate": "2026-09-22",
+    "supplierTaxCode": "0315246813",
+    "supplierName": "Công ty TNHH Nhiệt Công Nghiệp Hưng Thịnh",
+    "itemName": "Lò sấy công nghiệp tuần hoàn khí nóng",
+    "preTaxAmount": 180000000,
+    "taxRate": 10,
+    "taxAmount": 18000000,
+    "totalAmount": 216000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "isImageBlurry": false
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": true,
+   "rationale": "The totals contradict each other. preTax 180,000,000 + VAT 18,000,000 = 198,000,000, but the printed total is 216,000,000, a gap of 18,000,000 (VAT apparently counted twice), far above the 10 ₫ tolerance in RULE_DATA_QUALITY. The two candidate totals straddle the KTT limit: 198M is below it and 216M is above it. Whether authority applies at all depends on the unverified total, so the authority finding must not be primary, and the primary is UNCERTAIN_INFO. By the stated label rule (requiresCFO iff |totalAmount| >= 200M on the field as entered), requiresCFO is true. The question must make clear that the CFO is needed only if 216,000,000 is confirmed. This tests 'không kết luận trên dữ liệu nghi vấn'.",
+   "mention": "Recipient KTT. Gives both candidates: A = 198,000,000 ₫ (180,000,000 + 18,000,000), correct and re-evaluate, which falls below the 200,000,000 ₫ KTT limit and needs no CFO; B = 216,000,000 ₫ as printed, ask the supplier to issue an adjusting invoice, and the CFO approval applies only if this amount stands. It must cite the 18,000,000 ₫ discrepancy and must not declare 'vượt thẩm quyền' before the total is confirmed."
+  },
+  {
+   "id": "EA-10-authority-plus-vat8-telecom",
+   "invoice": {
+    "invoiceNumber": "00005118",
+    "invoiceDate": "2026-10-01",
+    "supplierTaxCode": "0106842579",
+    "supplierName": "Công ty Cổ phần Hạ Tầng Viễn Thông Sao Bắc",
+    "itemName": "Cước thuê kênh truyền dẫn viễn thông quý 3/2026",
+    "preTaxAmount": 250000000,
+    "taxRate": 8,
+    "taxAmount": 20000000,
+    "totalAmount": 270000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "isImageBlurry": false
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": true,
+   "rationale": "The amounts are consistent at the stated rate: 250M x 8% = 20M, total 270M. The date 2026-10-01 is inside the 8% reduction window, so RULE_SCOPE_VAT8_PERIOD does not fire. The item name contains 'VIỄN THÔNG', which is in excludedVat8Categories, and the rate is 8%, so STATUTORY_RES_204_VAT_8_EXCLUDED (Điều 1.3) fires. That is OUT_OF_POLICY, and the supplier must reissue at 10%. AUTHORITY_EXCEED_KTT_LIMIT also fires on 270M >= 200M, a known fact. OUT_OF_POLICY outranks EXCEED_AUTHORITY, so the primary is OUT_OF_POLICY and requiresCFO is true.",
+   "mention": "Numbered items in one message. (1) 8% VAT applied to telecom services (excluded from the NQ 204/2025/QH15 reduction): A = ask the supplier to reissue at 10% (VAT 25,000,000 ₫, total 275,000,000 ₫); B = do not deduct the 20,000,000 ₫ until reissued, or exclude it. (2) For the CFO: total 270,000,000 ₫ (275,000,000 ₫ if reissued) >= KTT limit 200,000,000 ₫, approve or hold. Recipient KTT plus CFO."
+  },
+  {
+   "id": "UN-01-total-ne-pre-plus-tax",
+   "invoice": {
+    "invoiceNumber": "00004127",
+    "invoiceDate": "2026-09-08",
+    "supplierTaxCode": "0314567892",
+    "supplierName": "Công ty TNHH Thiết bị Văn phòng Minh Phát",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Hộp mực in laser HP 107A",
+    "preTaxAmount": 1450000,
+    "taxRate": 10,
+    "taxAmount": 145000,
+    "totalAmount": 1545000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_DATA_QUALITY: printed total 1,545,000 differs from pre-tax + tax = 1,595,000 by 50,000 (> 10 VND tolerance). Tax 145,000 = 10% x 1,450,000 is consistent, so the total is the contradictory fact. Both candidate totals are below the 5M non-cash threshold, so paymentMethod is not required, and below 20M, so sellerStatus is not required. Nothing violates policy, so the only stop is an unverified amount.",
+   "mention": "Recipient Kế toán trưởng. States printed total 1.545.000 ₫ vs tiền hàng + thuế 1.595.000 ₫ (chênh 50.000 ₫). A: 1.595.000 ₫, sửa và đánh giá lại (khấu trừ 145.000 ₫); B: 1.545.000 ₫ như in, yêu cầu NCC Minh Phát điều chỉnh hóa đơn. Must NOT ask about payment method or seller tax-code status."
+  },
+  {
+   "id": "UN-02-tax-ne-pre-times-rate",
+   "invoice": {
+    "invoiceNumber": "00000863",
+    "invoiceDate": "2026-09-15",
+    "supplierTaxCode": "0109876543",
+    "supplierName": "Công ty Cổ phần Nội thất Hòa Bình Xanh",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Bàn làm việc gỗ MDF 1m4 kèm hộc tủ",
+    "preTaxAmount": 12000000,
+    "taxRate": 10,
+    "taxAmount": 960000,
+    "totalAmount": 12960000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_DATA_QUALITY: total = pre + tax holds (12,960,000), but tax 960,000 is not 10% x 12,000,000 = 1,200,000 (diff 240,000 > 10 VND). The printed tax matches 8% exactly, so either the rate or the tax figure is wrong. Furniture is not an 8%-excluded category and 2026-09-15 is inside the reduction period, so both readings are lawful and the deductible VAT depends on which one is true. Payment is known (transfer with slip) and the total is below 20M, so no other fact is missing.",
+   "mention": "Recipient Kế toán trưởng. Thuế in 960.000 ₫ lệch 10% x 12.000.000 ₫ = 1.200.000 ₫. A: thuế suất thực tế 8% (thuế 960.000 ₫, tổng 12.960.000 ₫ khớp), sửa thuế suất và khấu trừ 960.000 ₫; B: thuế suất 10% như in, thuế đúng phải là 1.200.000 ₫ / tổng 13.200.000 ₫, yêu cầu NCC điều chỉnh."
+  },
+  {
+   "id": "UN-03-line-items-vs-header",
+   "invoice": {
+    "invoiceNumber": "00002291",
+    "invoiceDate": "2026-09-22",
+    "supplierTaxCode": "0316234517",
+    "supplierName": "Công ty TNHH Thiết bị Kho vận Tân Phong",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Kệ sắt và xe đẩy hàng kho",
+    "preTaxAmount": 13600000,
+    "taxRate": 10,
+    "taxAmount": 1360000,
+    "totalAmount": 14960000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "items": [
+     {
+      "lineNumber": 1,
+      "itemName": "Kệ sắt V lỗ 5 tầng",
+      "quantity": 4,
+      "unitPrice": 1650000,
+      "amount": 6600000,
+      "taxRate": 10,
+      "taxAmount": 660000
+     },
+     {
+      "lineNumber": 2,
+      "itemName": "Xe đẩy hàng 4 bánh tải trọng 300kg",
+      "quantity": 3,
+      "unitPrice": 2000000,
+      "amount": 6000000,
+      "taxRate": 10,
+      "taxAmount": 600000
+     }
+    ]
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_LINE_ITEM_MISMATCH: each line is internally consistent (qty x price = amount, 10% tax), but the lines sum to 12,600,000 + 1,260,000 = 13,860,000 while the header says 13,600,000 + 1,360,000 = 14,960,000. That is 1,000,000 pre-tax and 1,100,000 total apart, far over the 2,000 VND tolerance. The header is internally consistent, so arithmetic alone cannot tell which figure is true (a missing line, or a wrong header). Payment is known and the total is below 20M.",
+   "mention": "Recipient Kế toán trưởng. Tổng dòng hàng 13.860.000 ₫ (12.600.000 + 1.260.000) lệch header 14.960.000 ₫ (13.600.000 + 1.360.000), chênh 1.000.000 ₫ tiền hàng. A: theo dòng hàng, tổng 13.860.000 ₫, khấu trừ 1.260.000 ₫, yêu cầu NCC điều chỉnh header; B: theo header 14.960.000 ₫, yêu cầu NCC bổ sung dòng hàng còn thiếu trị giá 1.000.000 ₫ trước khi khấu trừ 1.360.000 ₫."
+  },
+  {
+   "id": "UN-04-blurry-image-otherwise-clean",
+   "invoice": {
+    "invoiceNumber": "00000517",
+    "invoiceDate": "2026-10-02",
+    "supplierTaxCode": "0401234568",
+    "supplierName": "Công ty TNHH Dịch vụ Ô tô Sông Hàn",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Bảo dưỡng định kỳ xe ô tô 7 chỗ mốc 40.000 km",
+    "preTaxAmount": 3200000,
+    "taxRate": 10,
+    "taxAmount": 320000,
+    "totalAmount": 3520000,
+    "isImageBlurry": true
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_IMAGE_BLURRY: an unverified blurry image always stops automation, even when the extracted numbers are internally consistent (3,200,000 + 320,000 = 3,520,000). The total is below 5M and 20M, so payment method and seller status are not required, and the expense is a normal vehicle-maintenance service. The only issue is that the source fields cannot be trusted.",
+   "mention": "Recipient Kế toán trưởng. Nói rõ ảnh hóa đơn bị mờ; yêu cầu đối chiếu các trường đọc được (số HĐ 00000517, MST 0401234568, tổng 3.520.000 ₫, thuế 320.000 ₫) với bản gốc/XML hoặc cổng tra cứu hóa đơn. A: khớp, xác nhận và khấu trừ 320.000 ₫; B: không khớp hoặc không đọc được, yêu cầu NCC gửi XML/bản rõ. Must NOT ask payment method or seller status."
+  },
+  {
+   "id": "UN-05-payment-unknown-at-5M-boundary",
+   "invoice": {
+    "invoiceNumber": "00003308",
+    "invoiceDate": "2026-09-29",
+    "supplierTaxCode": "0201789345",
+    "supplierName": "Công ty TNHH Thiết bị Phòng cháy Hải An",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Bình chữa cháy bột ABC 8kg và kệ đặt bình",
+    "preTaxAmount": 4545455,
+    "taxRate": 10,
+    "taxAmount": 454545,
+    "totalAmount": 5000000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "Boundary test. Total is exactly 5,000,000, which reaches the non-cash threshold (>= 5M), so paymentMethod is a required fact and here it is unknown (omitted). Tax 454,545 vs 10% x 4,545,455 = 454,545.5, within the 10 VND tolerance, so the amounts are consistent. Cash would make the 454,545 VAT non-deductible and a transfer would allow it, so the missing fact changes the outcome. Total < 20M, so seller status is not required. It is not OUT_OF_POLICY because cash payment is not a known fact.",
+   "mention": "Recipient Kế toán trưởng. Tổng 5.000.000 ₫ đạt ngưỡng không dùng tiền mặt 5.000.000 ₫; hỏi hình thức thanh toán. A: chuyển khoản (có ủy nhiệm chi/sao kê), khấu trừ 454.545 ₫; B: tiền mặt, loại 454.545 ₫ thuế GTGT khỏi khấu trừ. Must NOT ask seller tax-code status."
+  },
+  {
+   "id": "UN-06-bank-transfer-slip-unknown",
+   "invoice": {
+    "invoiceNumber": "00001942",
+    "invoiceDate": "2026-09-10",
+    "supplierTaxCode": "0312987654",
+    "supplierName": "Công ty Cổ phần Thiết bị Trình chiếu Sao Việt",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Máy chiếu Epson EB-X51 và màn chiếu treo tường 120 inch",
+    "preTaxAmount": 15000000,
+    "taxRate": 10,
+    "taxAmount": 1500000,
+    "totalAmount": 16500000,
+    "paymentMethod": "BANK_TRANSFER"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "STATUTORY_LAW_48 payment evidence: the total of 16,500,000 is >= 5M and the method is a bank transfer, so the bank slip (hasBankSlip) becomes required, and it is unknown (omitted). Per the SOP, missing evidence does not mean cash, so this is UNCERTAIN_INFO, not OUT_OF_POLICY. The amounts are consistent at 10%. The total is below 20M, so seller status is not required.",
+   "mention": "Recipient Kế toán trưởng. Tổng 16.500.000 ₫ ≥ 5.000.000 ₫, thanh toán chuyển khoản nhưng chưa rõ đã có ủy nhiệm chi/sao kê. A: có chứng từ chuyển khoản, khấu trừ 1.500.000 ₫; B: chưa có, tạm chưa khấu trừ 1.500.000 ₫ và yêu cầu bổ sung chứng từ. Should not conclude cash payment."
+  },
+  {
+   "id": "UN-07-seller-status-unknown-20M",
+   "invoice": {
+    "invoiceNumber": "00000378",
+    "invoiceDate": "2026-09-17",
+    "supplierTaxCode": "0108456723",
+    "supplierName": "Công ty TNHH Điện lạnh Thành Đạt",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Điều hòa Daikin inverter 2HP, đã gồm lắp đặt",
+    "preTaxAmount": 25000000,
+    "taxRate": 10,
+    "taxAmount": 2500000,
+    "totalAmount": 27500000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "UNKNOWN"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_DATA_QUALITY / seller status: a total of 27,500,000 is >= the 20M materiality threshold, so the seller tax-code status is required, and here it is explicitly UNKNOWN. A suspended or closed seller would block deduction, so the fact changes the outcome. Payment is a transfer with a slip, the amounts are consistent, and the total is well below the 200M CFO limit.",
+   "mention": "Recipient Kế toán trưởng. Tổng 27.500.000 ₫ ≥ ngưỡng trọng yếu 20.000.000 ₫; yêu cầu tra cứu trạng thái MST 0108456723 (Điện lạnh Thành Đạt) trên cổng cơ quan thuế. A: đang hoạt động, khấu trừ 2.500.000 ₫; B: tạm ngừng/đóng MST, giữ hồ sơ, chưa khấu trừ. Must NOT ask payment method."
+  },
+  {
+   "id": "UN-08-closed-seller-date-unknown",
+   "invoice": {
+    "invoiceNumber": "00000156",
+    "invoiceDate": "2026-09-05",
+    "supplierTaxCode": "3600123457",
+    "supplierName": "Công ty TNHH Vật tư Điện Phát Đạt Đồng Nai",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Dây cáp điện Cadivi CV 2.5mm2 (cuộn 100m)",
+    "preTaxAmount": 3000000,
+    "taxRate": 10,
+    "taxAmount": 300000,
+    "totalAmount": 3300000,
+    "sellerStatus": "CLOSED"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_SELLER_CLOSURE_DATE_UNKNOWN: the seller is known to be CLOSED, but sellerSuspensionDate is missing. Whether the invoice was issued after closure (blocked, Decree 254 rule) or before it (needs transaction proof) depends on that date, so the deciding fact is unknown and the case cannot be OUT_OF_POLICY yet. A known CLOSED status is checked even below 20M. The total is below 5M, so payment method is not required.",
+   "mention": "Recipient Kế toán trưởng. NCC MST 3600123457 đã đóng MST nhưng chưa rõ ngày đóng; hỏi ngày cơ quan thuế đóng MST so với ngày lập 05/09/2026. A: đóng sau ngày lập, bổ sung chứng minh giao dịch rồi đánh giá lại khoản thuế 300.000 ₫; B: đóng trước hoặc đúng ngày lập, không khấu trừ 300.000 ₫/từ chối hồ sơ."
+  },
+  {
+   "id": "UN-09-adjustment-without-original-ref",
+   "invoice": {
+    "invoiceNumber": "00000412",
+    "invoiceDate": "2026-10-06",
+    "supplierTaxCode": "0315678901",
+    "supplierName": "Công ty Cổ phần Vật liệu Xây dựng Bình Minh",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Điều chỉnh giảm đơn giá xi măng PCB40 theo biên bản thỏa thuận",
+    "preTaxAmount": -2000000,
+    "taxRate": 10,
+    "taxAmount": -200000,
+    "totalAmount": -2200000,
+    "isAdjustment": true
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_ADJUSTMENT_NO_ORIGINAL: an adjustment invoice (isAdjustment true, negative amounts) must reference the original invoice, and originalInvoiceRef is missing. The negative amounts are consistent (-2,000,000 + -200,000 = -2,200,000) and allowed because this is an adjustment. |total| 2.2M is below 5M and 20M, so payment method and seller status are not required. Adjustments are excluded from same-day cash aggregation.",
+   "mention": "Recipient Kế toán trưởng. Hóa đơn điều chỉnh giảm -2.200.000 ₫ (thuế -200.000 ₫) chưa có tham chiếu hóa đơn gốc; hỏi số/ký hiệu/ngày HĐ gốc của Bình Minh. A: cung cấp HĐ gốc, ghi giảm thuế đầu vào 200.000 ₫; B: không xác định được HĐ gốc, từ chối/giữ hồ sơ."
+  },
+  {
+   "id": "UN-10-conference-package-no-manifest",
+   "invoice": {
+    "invoiceNumber": "00002765",
+    "invoiceDate": "2026-09-25",
+    "supplierTaxCode": "0106543218",
+    "supplierName": "Công ty TNHH Sự kiện Ánh Dương",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Dịch vụ tổ chức hội nghị khách hàng trọn gói",
+    "preTaxAmount": 18000000,
+    "taxRate": 10,
+    "taxAmount": 1800000,
+    "totalAmount": 19800000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_MISSING_MANIFEST: a conference package ('hội nghị', trọn gói) with no line items needs a detailed manifest, and hasItemManifest is unknown (omitted). Without it the referee cannot rule out excluded items such as alcohol or gifts hidden in the package, so the fact changes the outcome. Nothing out of policy is known, so this is not OUT_OF_POLICY. Payment is a transfer with a slip, and the total of 19,800,000 is just below the 20M seller-status threshold.",
+   "mention": "Recipient Kế toán trưởng. Gói hội nghị 19.800.000 ₫ không có dòng hàng; hỏi đã có bảng kê chi tiết hạng mục (thuê hội trường, ăn uống, âm thanh ánh sáng) chưa. A: có bảng kê, không có đồ uống có cồn/quà tặng, khấu trừ 1.800.000 ₫; B: chưa có, tạm chưa khấu trừ 1.800.000 ₫ và yêu cầu NCC bổ sung. Must NOT ask seller status or payment method."
+  },
+  {
+   "id": "UN-11-odd-tax-rate-7pct",
+   "invoice": {
+    "invoiceNumber": "00000931",
+    "invoiceDate": "2026-10-01",
+    "supplierTaxCode": "0313246879",
+    "supplierName": "Công ty TNHH Văn phòng phẩm Gia Khang",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Văn phòng phẩm: bút bi, sổ tay, bìa hồ sơ",
+    "preTaxAmount": 2000000,
+    "taxRate": 7,
+    "taxAmount": 140000,
+    "totalAmount": 2140000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_DATA_QUALITY ('dữ kiện áp dụng chưa biết'): 7% is not a valid VAT rate (0/5/8/10), so the applicable rate, and with it the deductible tax, is unclear. The amounts are arithmetically consistent at 7%, which points to a seller or OCR error, not a policy violation. Stationery could lawfully be at 8% in the 2026 reduction period or at 10%. The total is below 5M, so payment method is not required. Auto-approving 140,000, or crashing with a 500 on the odd rate, is a FAIL. A clean field-level validation message is weaker than an escalation but is not a silent pass.",
+   "mention": "Recipient Kế toán trưởng. Thuế suất 7% trên hóa đơn không phải thuế suất GTGT hợp lệ (0/5/8/10). A: thuế suất đúng 8%, thuế 160.000 ₫ / tổng 2.160.000 ₫, yêu cầu NCC Gia Khang điều chỉnh; B: thuế suất 10%, thuế 200.000 ₫ / tổng 2.200.000 ₫, yêu cầu điều chỉnh; chưa khấu trừ 140.000 ₫ khi chưa xác nhận."
+  },
+  {
+   "id": "UN-12-uncertain-total-crossing-200M",
+   "invoice": {
+    "invoiceNumber": "00000088",
+    "invoiceDate": "2026-10-07",
+    "supplierTaxCode": "0105987612",
+    "supplierName": "Công ty Cổ phần Thiết bị Điện Hưng Thịnh",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Máy phát điện diesel 150kVA, đã gồm vận chuyển",
+    "preTaxAmount": 180000000,
+    "taxRate": 10,
+    "taxAmount": 18000000,
+    "totalAmount": 208000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": true,
+   "rationale": "Precedence test. Pre-tax + tax = 198,000,000 (below the 200M KTT limit), but the printed total is 208,000,000 (above it), a 10,000,000 contradiction. The authority finding is triggered only by the unverified total, so it must not be primary: the primary group is UNCERTAIN_INFO ('không kết luận trên dữ liệu nghi vấn'). The CFO flag follows the literal rule |totalAmount| >= 200M on the record as printed, so it is true. Escalating as EXCEED_AUTHORITY is a FAIL. Pre-tax is 180M, under 1B, so the K-factor rule does not apply. Payment, slip and seller status are all known.",
+   "mention": "Recipient Kế toán trưởng first (xác nhận số tiền), with CFO named as the next step only if B. Tổng in 208.000.000 ₫ lệch tiền hàng + thuế 198.000.000 ₫ (chênh 10.000.000 ₫). A: 198.000.000 ₫, sửa tổng; trong hạn mức KTT 200.000.000 ₫, khấu trừ 18.000.000 ₫; B: 208.000.000 ₫ như in, yêu cầu NCC Hưng Thịnh giải trình 10.000.000 ₫ chênh, và vì ≥ 200.000.000 ₫ thì chuyển CFO phê duyệt. Must not state 'vượt thẩm quyền' as the conclusion."
+  },
+  {
+   "id": "BR-01-blurry-450-or-480",
+   "invoice": {
+    "invoiceNumber": "0004517",
+    "invoiceDate": "2026-09-18",
+    "supplierTaxCode": "0315762481",
+    "supplierName": "Công ty TNHH Thiết bị Văn phòng Ánh Dương",
+    "itemName": "Hộp mực in laser HP 107A",
+    "preTaxAmount": 436364,
+    "taxRate": 10,
+    "taxAmount": 43636,
+    "totalAmount": 450000,
+    "isImageBlurry": true
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "This is the 'ambiguous new case' from the brief: a blurry photo where the total reads as 450.000 but could be 480.000. Two UNCERTAIN_INFO findings fire. RULE_IMAGE_BLURRY: 'Ảnh mờ chưa xác minh luôn dừng tự động hóa.' RULE_DATA_QUALITY: pre-tax + tax = 436.364 + 43.636 = 480.000, which differs from the printed total of 450.000 by 30.000, well over the 10 ₫ tolerance. No policy or authority rule applies: the total is under 5M, so payment method is not required, and under 20M, so seller status is not required. The decision cannot rest on the uncertain total. CFO is not needed because the total is far below 200M.",
+   "mention": "A single question to the Kế toán trưởng (KTT, not the CFO). It states that the image is blurry and the total is unclear. It gives both candidate totals: 450.000₫ as read, and 480.000₫ = 436.364₫ + 43.636₫. Two options. A: confirm 480.000₫ from the original or the seller's XML, then re-evaluate. B: keep 450.000₫ as printed and ask the seller to adjust or reissue. It may mention 43.636₫ VAT at stake. It must not call the case out-of-policy or over authority."
+  },
+  {
+   "id": "BR-02-client-dinner-alcohol",
+   "invoice": {
+    "invoiceNumber": "0012093",
+    "invoiceDate": "2026-09-25",
+    "supplierTaxCode": "0316408825",
+    "supplierName": "Công ty TNHH Ẩm thực Hoa Anh Đào",
+    "itemName": "Tiếp khách đối tác Nhật Bản - set menu và rượu sake",
+    "preTaxAmount": 6000000,
+    "taxRate": 10,
+    "taxAmount": 600000,
+    "totalAmount": 6600000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "hasItemManifest": true,
+    "buyerTaxCode": "0102030405"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "A client dinner that includes alcohol ('rượu sake'). Under INTERNAL_POLICY_GUEST_ENTERTAINMENT (Điều 2.1), 'Đồ uống có cồn, karaoke, massage, thuốc lá nằm ngoài nhóm chi được tự duyệt: hỏi mục đích.' The README classes the same rượu vang example as Ngoài quy định. Every other fact is complete. The total is ≥5M and was paid by bank transfer with a bank slip. A guest-entertainment item needs a manifest, and hasItemManifest=true. The buyer tax code matches the company, the rate is 10% (no 8% issue), and the total is under 20M, so seller status is not required. No precedent is given. CFO is not needed because 6.600.000 is below 200M.",
+   "mention": "A question to the KTT that names the item 'Tiếp khách đối tác Nhật Bản - set menu và rượu sake' and the total 6.600.000₫. It asks about the purpose of the expense. A: business entertainment under the internal regulation, approve and deduct 600.000₫ VAT. B: personal or non-business expense, exclude the 600.000₫ VAT. It must not ask about payment method, bank slip or manifest, since all are already provided."
+  },
+  {
+   "id": "BR-03-exactly-5m-bank-routine",
+   "invoice": {
+    "invoiceNumber": "0000871",
+    "invoiceDate": "2026-10-02",
+    "supplierTaxCode": "0109254163",
+    "supplierName": "Công ty TNHH Nội thất Văn phòng Hòa Bình Xanh",
+    "itemName": "Bàn làm việc gỗ MDF kèm ghế xoay (5 bộ)",
+    "preTaxAmount": 4629630,
+    "taxRate": 8,
+    "taxAmount": 370370,
+    "totalAmount": 5000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "buyerTaxCode": "0102030405"
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "A trap for over-escalation. A judge may assume a purchase of 5.000.000 or more needs senior sign-off. In the SOP, 5M is only the non-cash payment threshold (STATUTORY_LAW_48_CASH_PAYMENT, 'đạt ngưỡng' meaning ≥). At exactly 5.000.000 the payment facts become required, and they are present: BANK_TRANSFER with hasBankSlip=true, as refereeRequirements asks. The arithmetic is consistent: 8% × 4.629.630 = 370.370, and the sum is 5.000.000. Office furniture is not an 8%-excluded category, and the invoice date falls inside the 2025-07-01..2026-12-31 reduction window. The buyer tax code matches. Seller status is not required because the total is under 20M. The approval authority threshold is 200M, so the invoice is auto-approved and CFO is not needed.",
+   "mention": "No question. It should be auto-processed with 370.370₫ VAT approved and no handoff to the KTT or CFO."
+  },
+  {
+   "id": "BR-04-two-problems-telecom8-and-cash",
+   "invoice": {
+    "invoiceNumber": "0230456",
+    "invoiceDate": "2026-10-05",
+    "supplierTaxCode": "0314587209",
+    "supplierName": "Công ty Cổ phần Viễn thông Sao Bắc",
+    "itemName": "Cước viễn thông - Internet cáp quang doanh nghiệp quý 3/2026",
+    "preTaxAmount": 11000000,
+    "taxRate": 8,
+    "taxAmount": 880000,
+    "totalAmount": 11880000,
+    "paymentMethod": "CASH",
+    "buyerTaxCode": "0102030405"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "One invoice with two known OUT_OF_POLICY problems. (1) STATUTORY_RES_204_VAT_8_EXCLUDED (Điều 1.3): the item is telecom / Internet service ('VIỄN THÔNG', 'cước Internet'), which is excluded from the 8% reduction but was charged at 8%. (2) STATUTORY_LAW_48_CASH_PAYMENT (Điều 1.2): it was paid in CASH with a total of 11.880.000, at or above the 5.000.000 non-cash threshold. Both facts are stated explicitly, so neither finding rests on an unverified fact. The arithmetic is consistent, the total is under 20M so seller status is not required, and it is under 200M so no CFO.",
+   "mention": "One question to the KTT with two numbered items that can be answered in a single reply, such as '1A, 2B'. Item 1: 8% charged on telecom / Internet service, which is excluded. Options are to ask the seller to reissue at 10% (VAT 1.100.000₫) or to not deduct the 880.000₫. Item 2: a cash payment of 11.880.000₫, at or above 5.000.000₫. Options are to supply non-cash payment proof or to not deduct the 880.000₫ VAT. Recipient is the KTT, not the CFO."
+  },
+  {
+   "id": "BR-05-buyer-mst-wrong-and-over-limit",
+   "invoice": {
+    "invoiceNumber": "0001964",
+    "invoiceDate": "2026-09-30",
+    "supplierTaxCode": "0108836152",
+    "supplierName": "Công ty Cổ phần Tích hợp Hệ thống Bắc Việt",
+    "itemName": "Máy chủ Dell PowerEdge R760 kèm lắp đặt cấu hình",
+    "preTaxAmount": 230000000,
+    "taxRate": 10,
+    "taxAmount": 23000000,
+    "totalAmount": 253000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "buyerTaxCode": "0102030450"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": true,
+   "rationale": "Two problems in different groups. The buyer tax code on the invoice is 0102030450, a digit transposition of the company's 0102030405. That triggers RULE_BUYER_TAX_CODE_MISMATCH, an OUT_OF_POLICY rule. The total of 253.000.000 is ≥200.000.000, which triggers AUTHORITY_EXCEED_KTT_LIMIT, an EXCEED_AUTHORITY rule. Precedence is OUT_OF_POLICY > EXCEED_AUTHORITY, so the primary group is OUT_OF_POLICY. requiresCFO stays true because |total| ≥ 200M, and the rule matrix says 'người nhận vẫn là CFO nếu ... tổng tiền đạt trần quyền'. All other facts are complete: bank transfer with slip, seller ACTIVE at or above 20M materiality, IT at 10%, and pre-tax under 1B so no K-factor check.",
+   "mention": "One question routed to the CFO with numbered items. Item 1: the buyer tax code is 0102030450 but the company's is 0102030405. Options are to ask the seller to adjust or replace the invoice, or to exclude the 23.000.000₫ VAT. Item 2: the total of 253.000.000₫ is at or above the KTT limit of 200.000.000₫. Options are CFO approval or a hold to review the contract. It must make clear that CFO approval does not cure the tax-code mismatch."
+  },
+  {
+   "id": "BR-06-unchanged-invoice-seller-suspended",
+   "invoice": {
+    "invoiceNumber": "0003382",
+    "invoiceDate": "2026-10-07",
+    "supplierTaxCode": "0313904476",
+    "supplierName": "Công ty TNHH Thương mại Văn phòng phẩm Tân Phú Hưng",
+    "itemName": "Giấy in A4 Double A 70gsm (50 ram)",
+    "preTaxAmount": 3250000,
+    "taxRate": 8,
+    "taxAmount": 260000,
+    "totalAmount": 3510000,
+    "sellerStatus": "SUSPENDED",
+    "buyerTaxCode": "0102030405"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "Every typed field is a clean, routine stationery purchase: consistent arithmetic, paper at 8% inside the reduction window, a matching buyer tax code, and a total under 5M so payment method is not required. The only change is that the seller is SUSPENDED. Under RULE_SELLER_SUSPENDED (Điều 2.2), 'Chuyển người phụ trách xác minh trạng thái bên bán', and the rule matrix maps it to UNCERTAIN_INFO for the KTT. The total is below the 20M materiality threshold, but refereeRequirements says a known closed or suspended status 'vẫn luôn được kiểm tra'. A referee that skips seller status under 20M would wrongly auto-approve this. This is not OUT_OF_POLICY because no suspension date is given that would put the invoice inside the suspension period. CFO is not needed.",
+   "mention": "A question to the KTT. It states that seller MST 0313904476 shows Tạm ngừng (suspended) and asks the KTT to check whether the seller was operating on 07/10/2026, for example via tracuunnt. A: the seller was active or had resumed on the invoice date (with a source), so deduct the 260.000₫ VAT. B: the invoice was issued during the suspension, so hold or do not deduct the 260.000₫ and ask the supplier. It must not ask about payment method."
+  },
+  {
+   "id": "BR-07-it-laptops-440m-authority-only",
+   "invoice": {
+    "invoiceNumber": "0000528",
+    "invoiceDate": "2026-09-22",
+    "supplierTaxCode": "0316127790",
+    "supplierName": "Công ty TNHH Giải pháp Công nghệ Minh Phát",
+    "itemName": "Máy tính xách tay Dell Latitude 5450",
+    "preTaxAmount": 400000000,
+    "taxRate": 10,
+    "taxAmount": 40000000,
+    "totalAmount": 440000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "buyerTaxCode": "0102030405",
+    "items": [
+     {
+      "lineNumber": 1,
+      "itemName": "Máy tính xách tay Dell Latitude 5450 Core i7/16GB/512GB",
+      "quantity": 20,
+      "unitPrice": 20000000,
+      "amount": 400000000,
+      "taxRate": 10,
+      "taxAmount": 40000000
+     }
+    ]
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "EXCEED_AUTHORITY",
+   "expectedRequiresCFO": true,
+   "rationale": "A routine-looking IT purchase where every condition is met. IT is billed at 10%, so there is no 8% exclusion issue. It was paid by bank transfer with a slip, the seller is ACTIVE (required at or above 20M), the buyer tax code matches, and the line item reconciles exactly (20 × 20.000.000 = 400.000.000; tax 40.000.000). The only trigger is AUTHORITY_EXCEED_KTT_LIMIT (Điều 3.3): |total| 440.000.000 ≥ 200.000.000, so it goes to the CFO. Pre-tax is under 1 tỷ, so AUTHORITY_K_FACTOR_RED does not apply. With no policy or uncertainty finding, the primary group is EXCEED_AUTHORITY.",
+   "mention": "A question to the CFO. It states that the total of 440.000.000₫ is at or above the KTT limit of 200.000.000₫. A: the CFO approves and 40.000.000₫ VAT is deducted. B: hold to review the contract or goods receipt. It must not raise any data or policy problem, since the invoice is otherwise clean."
+  },
+  {
+   "id": "BR-08-staff-paid-cash-reimbursed",
+   "invoice": {
+    "invoiceNumber": "0007715",
+    "invoiceDate": "2026-10-09",
+    "supplierTaxCode": "0311459827",
+    "supplierName": "Công ty TNHH Điện máy Phúc An",
+    "itemName": "Máy in laser Brother HL-L2366DW (2 chiếc)",
+    "preTaxAmount": 7000000,
+    "taxRate": 10,
+    "taxAmount": 700000,
+    "totalAmount": 7700000,
+    "paymentMethod": "CASH",
+    "isStaffReimbursed": true,
+    "buyerTaxCode": "0102030405"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "An employee paid the seller in cash and was then reimbursed. STATUTORY_LAW_48_CASH_PAYMENT (Điều 1.2) checks the amount, the payment form and the payment evidence, with isStaffReimbursed as one of its facts. Staff reimbursement is allowed (allowStaffReimbursement), but it does not turn a cash payment to the seller into a non-cash one. The total is 7.700.000, at or above the 5.000.000 threshold, and paymentMethod is explicitly CASH, a known fact that violates the deduction condition, so the case is OUT_OF_POLICY. The missing hasBankSlip (required when isStaffReimbursed is true) adds a secondary UNCERTAIN item, but OUT_OF_POLICY outranks it. The total is under 20M (no seller status needed) and under 200M (no CFO).",
+   "mention": "A question to the KTT. It says the employee paid 7.700.000₫ in cash, which is at or above 5.000.000₫, and that reimbursing the employee does not count as non-cash payment to the seller. A: supply proof that the employee paid the seller from a personal bank account under the reimbursement regulation, then deduct the 700.000₫ VAT. B: no non-cash proof, so do not deduct the 700.000₫ VAT (the cost may still be recorded). It may also request the bank slip."
+  },
+  {
+   "id": "BR-09-staff-reimbursed-bank-slip-routine",
+   "invoice": {
+    "invoiceNumber": "0019342",
+    "invoiceDate": "2026-09-15",
+    "supplierTaxCode": "0310683514",
+    "supplierName": "Công ty TNHH Máy tính Thành Công Sài Gòn",
+    "itemName": "Màn hình Dell UltraSharp U2724D (2 chiếc)",
+    "preTaxAmount": 14000000,
+    "taxRate": 10,
+    "taxAmount": 1400000,
+    "totalAmount": 15400000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "isStaffReimbursed": true,
+    "buyerTaxCode": "0102030405"
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "The positive counterpart of BR-08. The employee paid the seller by bank transfer, was reimbursed under the internal regulation (allowStaffReimbursement defaults to true), and the bank slip is present. refereeRequirements requires hasBankSlip when the total is at or above 5M and isStaffReimbursed is true, and it is true here. The arithmetic is consistent, IT monitors are correctly billed at 10%, and the buyer tax code matches. The total of 15.400.000 is under the 20M seller-status materiality threshold, so no seller status is needed, and under 200M. No rule fires, so the invoice must not be over-escalated.",
+   "mention": "No question. It should be auto-processed with 1.400.000₫ VAT approved. Escalating only because the payment was a staff reimbursement would be an unnecessary forward."
+  },
+  {
+   "id": "BR-10-blurry-high-value-amount-first",
+   "invoice": {
+    "invoiceNumber": "0000316",
+    "invoiceDate": "2026-09-28",
+    "supplierTaxCode": "0107751348",
+    "supplierName": "Công ty Cổ phần Cơ điện lạnh Đông Á",
+    "itemName": "Hệ thống điều hòa trung tâm VRV lắp đặt văn phòng tầng 5",
+    "preTaxAmount": 240000000,
+    "taxRate": 10,
+    "taxAmount": 24000000,
+    "totalAmount": 264000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "buyerTaxCode": "0102030405",
+    "isImageBlurry": true
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": true,
+   "rationale": "A high-value invoice read from a blurry image. RULE_IMAGE_BLURRY (UNCERTAIN_INFO) fires, and AUTHORITY_EXCEED_KTT_LIMIT would fire on 264.000.000 ≥ 200.000.000. The precedence exception applies: the exceed-authority finding rests on the total, which is unverified because the image is blurry. The README says 'nếu số tiền chưa chắc, hệ thống không nói vượt quyền ... nó hỏi xác nhận số tiền trước', so the primary group is UNCERTAIN_INFO, not EXCEED_AUTHORITY. requiresCFO is true by the |total| ≥ 200M definition, and the matrix keeps the CFO as recipient when the total reaches the authority ceiling; once the amount is confirmed at this level it still needs the CFO. Payment evidence and seller status are complete, so the only open fact is the amounts' legibility.",
+   "mention": "The first item asks to confirm the amounts from the original or the XML: total 264.000.000₫, pre-tax 240.000.000₫, VAT 24.000.000₫, because the image is blurry. A: the amounts are confirmed, then continue to CFO approval. B: request a clear copy or the XML from the seller and hold. It should note that the CFO must approve once the amount is confirmed (at or above 200.000.000₫), and must not state as a conclusion that the invoice exceeds authority before the amount is verified."
+  },
+  {
+   "id": "RT-01-tiny-minimal",
+   "invoice": {
+    "invoiceNumber": "00000317",
+    "invoiceDate": "2026-03-09",
+    "supplierTaxCode": "0314567897",
+    "supplierName": "Công ty TNHH Thương mại Văn phòng phẩm Minh Châu",
+    "itemName": "Bút bi Thiên Long TL-027 (hộp 20 cây)",
+    "preTaxAmount": 50000,
+    "taxRate": 10,
+    "taxAmount": 5000,
+    "totalAmount": 55000
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Only the 9 core fields are given. 50.000 + 10% = 55.000 matches. Total 55.000 ₫ is below the 5.000.000 ₫ non-cash threshold, so paymentMethod does not change the outcome (refereeRequirements: paymentMethod is required only when total >= threshold). It is also below the 20.000.000 ₫ materiality level, so sellerStatus is not required. Ordinary office supply, no manifest keyword, no excluded or out-of-scope category, far below 200.000.000 ₫.",
+   "mention": "No question. Any request for payment method, bank slip or seller tax-code status is an over-escalation."
+  },
+  {
+   "id": "RT-02-cash-4999999",
+   "invoice": {
+    "invoiceNumber": "00002288",
+    "invoiceDate": "2026-04-14",
+    "supplierTaxCode": "0105982346",
+    "supplierName": "Công ty TNHH Điện lạnh Phúc An",
+    "itemName": "Vệ sinh, bảo dưỡng định kỳ 15 máy lạnh văn phòng",
+    "preTaxAmount": 4545454,
+    "taxRate": 10,
+    "taxAmount": 454545,
+    "totalAmount": 4999999,
+    "paymentMethod": "CASH"
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Cash payment of 4.999.999 ₫, one đồng under the 5.000.000 ₫ non-cash threshold (STATUTORY_LAW_48_CASH_PAYMENT applies only at or above the threshold). There is no same-day invoice from the same supplier, so no aggregation applies. 4.545.454 × 10% = 454.545,4, so tax 454.545 is within the 10 ₫ tolerance and the total matches. Below 20.000.000 ₫, so sellerStatus is not needed. Maintenance service has no manifest keyword.",
+   "mention": "No question. Flagging cash here, or asking for a bank slip, means the threshold is wrongly applied as > 4.999.999 instead of >= 5.000.000."
+  },
+  {
+   "id": "RT-03-exact-5m-bank-slip-8pct",
+   "invoice": {
+    "invoiceNumber": "00000945",
+    "invoiceDate": "2026-05-21",
+    "supplierTaxCode": "0401872632",
+    "supplierName": "Công ty TNHH May mặc Phương Nam Việt",
+    "itemName": "Áo sơ mi đồng phục nhân viên (100 chiếc)",
+    "preTaxAmount": 4629630,
+    "taxRate": 8,
+    "taxAmount": 370370,
+    "totalAmount": 5000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Total is exactly 5.000.000 ₫, so the non-cash rule applies, and both required facts are known: BANK_TRANSFER with hasBankSlip=true. Garments are not on the NQ 204/2025 excluded list. 8% falls in the reduction period (invoice date 2026-05-21). 4.629.630 × 8% = 370.370,4, which reconciles. The total is below the 20.000.000 ₫ materiality level, so an unknown sellerStatus must not block auto-processing.",
+   "mention": "No question. Asking for seller tax-code status at 5.000.000 ₫ is an over-escalation (materiality starts at 20.000.000 ₫)."
+  },
+  {
+   "id": "RT-04-19999999-no-seller-status",
+   "invoice": {
+    "invoiceNumber": "00001506",
+    "invoiceDate": "2026-06-11",
+    "supplierTaxCode": "0203451784",
+    "supplierName": "Công ty CP Nội thất Hòa Bình Xanh",
+    "itemName": "Ghế xoay văn phòng lưng lưới (40 chiếc)",
+    "preTaxAmount": 18518518,
+    "taxRate": 8,
+    "taxAmount": 1481481,
+    "totalAmount": 19999999,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "19.999.999 ₫ is one đồng under the 20.000.000 ₫ seller-status materiality level (refereeRequirements: sellerStatus is required only when |total| >= sellerStatusMaterialityVnd), so omitting sellerStatus is acceptable. Payment facts are complete: bank transfer with slip. Office furniture is eligible for 8% in the period. 18.518.518 × 8% = 1.481.481,44, which reconciles.",
+   "mention": "No question. Asking for seller tax-code status here means the 20-million materiality threshold is applied with off-by-one."
+  },
+  {
+   "id": "RT-05-exact-20m-active-seller",
+   "invoice": {
+    "invoiceNumber": "00003172",
+    "invoiceDate": "2026-07-07",
+    "supplierTaxCode": "3701123485",
+    "supplierName": "Công ty TNHH Thiết bị Điện máy Tân Phú Thịnh",
+    "itemName": "Máy lạnh treo tường Inverter 2HP (04 bộ, gồm công lắp đặt)",
+    "preTaxAmount": 18181818,
+    "taxRate": 10,
+    "taxAmount": 1818182,
+    "totalAmount": 20000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE"
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Total is exactly 20.000.000 ₫, which reaches the materiality level, and every fact that level requires is given: sellerStatus=ACTIVE, BANK_TRANSFER and hasBankSlip=true. 18.181.818 × 10% = 1.818.181,8, so tax 1.818.182 reconciles and the total matches. 10% has no excluded-category issue. Far below the 200.000.000 ₫ KTT limit.",
+   "mention": "No question. Every threshold-triggered fact (payment method, bank slip, seller status) is already supplied."
+  },
+  {
+   "id": "RT-06-199999999-all-evidence",
+   "invoice": {
+    "invoiceNumber": "00000088",
+    "invoiceDate": "2026-09-18",
+    "invoiceSeries": "1K26TVT",
+    "signingDate": "2026-09-18",
+    "supplierTaxCode": "3601987450",
+    "supplierName": "Công ty TNHH Thiết bị Nâng hạ Việt Tín",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Xe nâng điện 2 tấn, chiều cao nâng 4,5 m (02 chiếc)",
+    "preTaxAmount": 181818181,
+    "taxRate": 10,
+    "taxAmount": 18181818,
+    "totalAmount": 199999999,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE",
+    "isImageBlurry": false
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "|total| = 199.999.999 ₫, one đồng under the 200.000.000 ₫ chief-accountant limit (AUTHORITY_EXCEED_KTT_LIMIT triggers at >= the limit), so CFO approval is not needed. Pre-tax 181.818.181 ₫ is far below the 1 billion ₫ K-factor check. All evidence is present: buyer tax code equals the company (0102030405), seller ACTIVE, bank transfer with slip, image not blurry. The series 1K26TVT is a K (no tax-authority code) series, so no MCCQT is required, and its year 26 matches 2026. Signing date equals the invoice date. 181.818.181 × 10% = 18.181.818,1, which reconciles.",
+   "mention": "No question and no CFO routing. Routing to the CFO or saying 'vượt thẩm quyền' at 199.999.999 ₫ is an off-by-one over-escalation."
+  },
+  {
+   "id": "RT-07-zero-rate-intl-freight",
+   "invoice": {
+    "invoiceNumber": "00004417",
+    "invoiceDate": "2026-08-03",
+    "supplierTaxCode": "0316098739",
+    "supplierName": "Công ty CP Giao nhận Vận tải Quốc tế Hải Âu",
+    "itemName": "Cước vận tải biển quốc tế container 40 feet tuyến Hải Phòng - Busan",
+    "preTaxAmount": 12000000,
+    "taxRate": 0,
+    "taxAmount": 0,
+    "totalAmount": 12000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "International sea freight at 0%. Tax 0 is consistent with rate 0 and the total equals pre-tax. The 8% excluded-category and Internet-charge checks apply only to taxRate 8, so the word 'Cước' at 0% must not trigger them. Total 12.000.000 ₫ is at or above the payment threshold, and bank transfer with slip is supplied. It is below 20.000.000 ₫, so sellerStatus is not required.",
+   "mention": "No question. Flagging 0% VAT or the word 'cước' as suspicious is an over-escalation."
+  },
+  {
+   "id": "RT-08-kct-software-minimal",
+   "invoice": {
+    "invoiceNumber": "00000623",
+    "invoiceDate": "2026-01-15",
+    "supplierTaxCode": "0107219468",
+    "supplierName": "Công ty CP Phần mềm Kế toán An Phát",
+    "itemName": "Bản quyền phần mềm kế toán 12 tháng (không chịu thuế GTGT)",
+    "preTaxAmount": 3500000,
+    "taxRate": 0,
+    "taxAmount": 0,
+    "totalAmount": 3500000
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Software licence that is not subject to VAT, entered as rate 0 with tax 0 (the closest the schema allows). The amounts reconcile. Total 3.500.000 ₫ is below both the 5.000.000 ₫ payment threshold and the 20.000.000 ₫ seller-status materiality level, so the missing paymentMethod and sellerStatus do not change the outcome. Software is an IT item, but the excluded-category rule needs rate 8%.",
+   "mention": "No question. Asking for payment method or seller status under the thresholds, or treating software at 0% as excluded-category, is an over-escalation."
+  },
+  {
+   "id": "RT-09-five-pct-water-minimal",
+   "invoice": {
+    "invoiceNumber": "00098214",
+    "invoiceDate": "2026-10-05",
+    "supplierTaxCode": "0318745205",
+    "supplierName": "Công ty CP Cấp nước Phú Hòa Tân",
+    "itemName": "Nước sạch sinh hoạt kỳ tháng 9/2026",
+    "preTaxAmount": 2250000,
+    "taxRate": 5,
+    "taxAmount": 112500,
+    "totalAmount": 2362500
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Clean water at the 5% rate. 2.250.000 × 5% = 112.500, total 2.362.500, which is exact. Below the payment and seller-status thresholds, so only the core fields are needed. No policy rule is triggered.",
+   "mention": "No question."
+  },
+  {
+   "id": "RT-10-eight-pct-paper-minimal",
+   "invoice": {
+    "invoiceNumber": "00001190",
+    "invoiceDate": "2026-02-24",
+    "supplierTaxCode": "2301987658",
+    "supplierName": "Công ty TNHH Giấy Bình Minh Sài Gòn",
+    "itemName": "Giấy in A4 Double A 70gsm (40 ram)",
+    "preTaxAmount": 3200000,
+    "taxRate": 8,
+    "taxAmount": 256000,
+    "totalAmount": 3456000
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Printing paper is not in the NQ 204/2025 excluded list (telecom, finance, banking, securities, insurance, real estate, metals, mining, chemicals, excise goods). Invoice date 2026-02-24 is inside the 8% period 2025-07-01..2026-12-31. 3.200.000 × 8% = 256.000, which is exact. Below the payment and materiality thresholds, so minimal fields are enough.",
+   "mention": "No question. Asking whether the item really qualifies for 8% is an over-escalation for plain office paper."
+  },
+  {
+   "id": "RT-11-items-reconcile-line-rounding",
+   "invoice": {
+    "invoiceNumber": "00002731",
+    "invoiceDate": "2026-09-29",
+    "supplierTaxCode": "1802567349",
+    "supplierName": "Công ty TNHH Văn phòng phẩm Thiên Ân",
+    "buyerTaxCode": "0102030405",
+    "itemName": "Văn phòng phẩm quý 3/2026",
+    "preTaxAmount": 5717055,
+    "taxRate": 10,
+    "taxAmount": 571706,
+    "totalAmount": 6288761,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "items": [
+     {
+      "lineNumber": 1,
+      "itemName": "Giấy in A4 Double A 70gsm",
+      "quantity": 25,
+      "unitPrice": 82500,
+      "amount": 2062500,
+      "taxRate": 10,
+      "taxAmount": 206250
+     },
+     {
+      "lineNumber": 2,
+      "itemName": "Mực in HP 107A chính hãng",
+      "quantity": 3,
+      "unitPrice": 645455,
+      "amount": 1936365,
+      "taxRate": 10,
+      "taxAmount": 193637
+     },
+     {
+      "lineNumber": 3,
+      "itemName": "Bìa còng nhựa Thiên Long 7cm",
+      "quantity": 45,
+      "unitPrice": 38182,
+      "amount": 1718190,
+      "taxRate": 10,
+      "taxAmount": 171819
+     }
+    ]
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Every line reconciles: 25×82.500=2.062.500, 3×645.455=1.936.365, 45×38.182=1.718.190. Line taxes are rounded half-up: 193.636,5 becomes 193.637, within the 1 ₫ line tolerance. Line sums equal the header: pre-tax 5.717.055 and tax 571.706. Header 5.717.055 × 10% = 571.705,5, a 0,5 ₫ gap from the summed line taxes and well within the 10 ₫ tolerance. Total 6.288.761 ₫ is at or above the payment threshold, and bank transfer with slip is supplied. Buyer tax code matches the company. Below 20.000.000 ₫. Normal per-line VAT rounding must not count as inconsistent totals.",
+   "mention": "No question. Raising 'tổng không khớp' or a line-item mismatch over a 0,5 ₫ rounding gap is an over-escalation."
+  },
+  {
+   "id": "RT-12-consulting-with-manifest",
+   "invoice": {
+    "invoiceNumber": "00000412",
+    "invoiceDate": "2026-03-31",
+    "supplierTaxCode": "0108631579",
+    "supplierName": "Công ty TNHH Kiểm toán và Tư vấn Thuế Đại Việt",
+    "itemName": "Dịch vụ tư vấn quyết toán thuế TNDN năm 2025",
+    "preTaxAmount": 15000000,
+    "taxRate": 10,
+    "taxAmount": 1500000,
+    "totalAmount": 16500000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "hasItemManifest": true
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "A consulting service (TƯ VẤN) without line items needs a detailed manifest (RULE_MISSING_MANIFEST, refereeRequirements.needsItemManifest). The judge states hasItemManifest=true, so that requirement is met. Tax consulting is not an out-of-scope category (sponsorship, charity, fines, gifts, personal, gold/forex/securities) and is not entertainment. Payment facts are complete for 16.500.000 ₫. Below 20.000.000 ₫, so sellerStatus is not required. 15.000.000 × 10% = 1.500.000, which is exact.",
+   "mention": "No question. Asking for the manifest again (it is already declared) or questioning the purpose of tax consulting is an over-escalation."
+  },
+  {
+   "id": "RT-13-small-positive-adjustment-with-ref",
+   "invoice": {
+    "invoiceNumber": "00000531",
+    "invoiceDate": "2026-08-20",
+    "supplierTaxCode": "3302198760",
+    "supplierName": "Công ty TNHH Thương mại Bao bì Phước Lộc",
+    "itemName": "Điều chỉnh tăng đơn giá băng keo đóng thùng theo hóa đơn gốc số 00000412",
+    "preTaxAmount": 400000,
+    "taxRate": 10,
+    "taxAmount": 40000,
+    "totalAmount": 440000,
+    "isAdjustment": true,
+    "originalInvoiceRef": "1K26TPL-00000412"
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Small positive adjustment invoice. The only extra requirement for adjustments (RULE_ADJUSTMENT_NO_ORIGINAL, refereeRequirements: isAdjustment means originalInvoiceRef is required) is met by originalInvoiceRef. Amounts are positive and reconcile: 400.000 + 10% = 440.000. Below the payment and seller-status thresholds. Packaging tape has no manifest keyword and no excluded category.",
+   "mention": "No question. Asking for the original invoice reference (already given), or treating any adjustment as needing a human, is an over-escalation."
+  },
+  {
+   "id": "RT-14-telecom-at-ten-pct",
+   "invoice": {
+    "invoiceNumber": "09102611",
+    "invoiceDate": "2026-10-02",
+    "supplierTaxCode": "0402563813",
+    "supplierName": "Công ty CP Viễn thông Sóng Việt",
+    "itemName": "Cước dịch vụ viễn thông di động trả sau tháng 9/2026",
+    "preTaxAmount": 1500000,
+    "taxRate": 10,
+    "taxAmount": 150000,
+    "totalAmount": 1650000
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Telecom is an NQ 204/2025 excluded category, but this invoice correctly uses the standard 10% rate. STATUTORY_RES_204_VAT_8_EXCLUDED fires only when an excluded item carries 8%, so a correct 10% telecom bill must pass. 1.500.000 × 10% = 150.000, which is exact. Below the payment and seller-status thresholds, so minimal fields are enough.",
+   "mention": "No question. Raising the 8% excluded-category rule on a 10% telecom invoice is a keyword-only false positive."
+  },
+  {
+   "id": "OP-01-cash-exactly-5m",
+   "invoice": {
+    "invoiceNumber": "00001245",
+    "invoiceDate": "2026-09-18",
+    "supplierTaxCode": "0312345673",
+    "supplierName": "Công ty TNHH Văn phòng phẩm Minh Phát",
+    "itemName": "Văn phòng phẩm: giấy in A4, bút bi, bìa hồ sơ",
+    "preTaxAmount": 4545455,
+    "taxRate": 10,
+    "taxAmount": 454545,
+    "totalAmount": 5000000,
+    "paymentMethod": "CASH"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "Boundary test. Total 5,000,000 (4,545,455 + 454,545; tax differs from 10% by 0.5 VND, within the 10 VND tolerance) is AT the non-cash threshold (config nonCashThreshold 5,000,000, rule 'đạt ngưỡng' = >=). paymentMethod is required (total >= threshold) and known = CASH, so STATUTORY_LAW_48_CASH_PAYMENT (Điều 1.2) fires on a known fact -> OUT_OF_POLICY. sellerStatus not required (< 20M), no manifest keyword, < 200M -> no CFO. An off-by-one (> instead of >=) engine would wrongly mark this ROUTINE.",
+   "mention": "Recipient KTT. States total 5,000,000₫ paid in cash reaches (is not below) the 5,000,000₫ non-cash threshold; VAT at stake 454,545₫. Two options: A = provide non-cash payment proof (UNC/bank statement) if it was actually paid by transfer, then deduct 454,545₫; B = exclude 454,545₫ VAT from deduction (expense only)."
+  },
+  {
+   "id": "OP-02-cash-264m-needs-cfo",
+   "invoice": {
+    "invoiceNumber": "00000387",
+    "invoiceDate": "2026-09-22",
+    "supplierTaxCode": "0106572310",
+    "supplierName": "Công ty Cổ phần Thiết bị Điện Hoàng Long",
+    "itemName": "Máy phát điện diesel 250 kVA",
+    "preTaxAmount": 240000000,
+    "taxRate": 10,
+    "taxAmount": 24000000,
+    "totalAmount": 264000000,
+    "paymentMethod": "CASH",
+    "sellerStatus": "ACTIVE"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": true,
+   "rationale": "Two known-fact findings: cash payment 264,000,000 >= 5,000,000 (STATUTORY_LAW_48_CASH_PAYMENT, OUT_OF_POLICY) and |total| 264,000,000 >= kttApprovalLimit 200,000,000 (AUTHORITY_EXCEED_KTT_LIMIT, EXCEED_AUTHORITY). Precedence OUT_OF_POLICY > EXCEED_AUTHORITY, and both facts are verified (amounts consistent, payment method stated), so the primary group is OUT_OF_POLICY while requiresCFO = true per the executable summary ('Mọi hóa đơn có trị tuyệt đối tổng tiền >= 200.000.000 ₫ cần CFO'). sellerStatus given (required >= 20M). preTax < 1 billion, so the K-factor rule does not apply. Tests that the CFO flag survives when the primary group is not EXCEED_AUTHORITY.",
+   "mention": "Recipient CFO (KTT may be listed as well). Numbered items answerable in one reply: (1) cash payment 264,000,000₫ ≥ 5,000,000₫ threshold, VAT 24,000,000₫ at stake, A = supply non-cash proof / B = exclude 24,000,000₫ VAT; (2) total 264,000,000₫ ≥ the 200,000,000₫ KTT limit, so the CFO approves or holds the payment. Must not imply that CFO approval cures the cash-payment violation."
+  },
+  {
+   "id": "OP-03-same-day-split-cash",
+   "invoice": {
+    "invoiceNumber": "00002102",
+    "invoiceDate": "2026-09-10",
+    "supplierTaxCode": "0308456123",
+    "supplierName": "Công ty TNHH Vật tư Kim khí Tân Phú",
+    "itemName": "Bản lề inox và tay nắm cửa",
+    "preTaxAmount": 2000000,
+    "taxRate": 10,
+    "taxAmount": 200000,
+    "totalAmount": 2200000,
+    "paymentMethod": "CASH"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "Split-purchase evasion. Each invoice alone is below 5M (3,300,000 and 2,200,000; the history invoice should itself be ROUTINE), but both are positive, non-adjustment invoices from the same supplier MST on the same day with different numbers (not a duplicate). Same-day total 5,500,000 >= 5,000,000 and the payment is cash -> STATUTORY_SAME_DAY_CASH_5M (Điều 1.2) -> OUT_OF_POLICY. refereeRequirements makes paymentMethod required via sameDayTotal; it is known (CASH), so this is not UNCERTAIN_INFO. Under 20M and 200M.",
+   "mention": "Recipient KTT. Names both invoices 00002101 (3,300,000₫) and 00002102 (2,200,000₫), same supplier 0308456123, same day 10/09/2026, same-day total 5,500,000₫ ≥ 5,000,000₫, all paid in cash; VAT at stake 200,000₫ on this invoice (and the 300,000₫ already recorded on 00002101 should be flagged for review). A = provide non-cash payment proof; B = exclude the VAT from deduction.",
+   "context": {
+    "history": [
+     {
+      "invoiceNumber": "00002101",
+      "invoiceDate": "2026-09-10",
+      "supplierTaxCode": "0308456123",
+      "supplierName": "Công ty TNHH Vật tư Kim khí Tân Phú",
+      "itemName": "Bulông, ốc vít inox M10",
+      "preTaxAmount": 3000000,
+      "taxRate": 10,
+      "taxAmount": 300000,
+      "totalAmount": 3300000,
+      "paymentMethod": "CASH"
+     }
+    ]
+   }
+  },
+  {
+   "id": "OP-04-same-day-mixed-transfer-and-cash",
+   "invoice": {
+    "invoiceNumber": "00000561",
+    "invoiceDate": "2026-09-15",
+    "supplierTaxCode": "0402135783",
+    "supplierName": "Công ty TNHH Bao bì Đà Nẵng Xanh",
+    "itemName": "Băng keo dán thùng và màng PE quấn pallet",
+    "preTaxAmount": 1500000,
+    "taxRate": 10,
+    "taxAmount": 150000,
+    "totalAmount": 1650000,
+    "paymentMethod": "CASH"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "Harder aggregation. The earlier invoice (4,180,000) was paid by bank transfer with a slip; the current one (1,650,000) is cash. The policy text of STATUTORY_SAME_DAY_CASH_5M aggregates ALL positive non-adjustment purchases from the same MST on the same day regardless of payment method ('Tổng đạt ngưỡng theo ngày và còn tiền mặt cần chuyển tiếp'). Total 5,830,000 >= 5,000,000 and a cash portion remains -> OUT_OF_POLICY. An engine that sums only cash invoices (1,650,000) would wrongly mark this ROUTINE. paymentMethod is required via sameDayTotal and known.",
+   "mention": "Recipient KTT. Same-day total from supplier 0402135783 on 15/09/2026 is 5,830,000₫ (00000560: 4,180,000₫ by transfer + 00000561: 1,650,000₫ in cash) ≥ 5,000,000₫; only the cash invoice is at issue, VAT at stake 150,000₫. A = provide non-cash proof for 00000561; B = exclude 150,000₫ VAT.",
+   "context": {
+    "history": [
+     {
+      "invoiceNumber": "00000560",
+      "invoiceDate": "2026-09-15",
+      "supplierTaxCode": "0402135783",
+      "supplierName": "Công ty TNHH Bao bì Đà Nẵng Xanh",
+      "itemName": "Thùng carton 5 lớp 60x40x40",
+      "preTaxAmount": 3800000,
+      "taxRate": 10,
+      "taxAmount": 380000,
+      "totalAmount": 4180000,
+      "paymentMethod": "BANK_TRANSFER",
+      "hasBankSlip": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "OP-05-internet-at-8pct",
+   "invoice": {
+    "invoiceNumber": "00045821",
+    "invoiceDate": "2026-10-01",
+    "supplierTaxCode": "0316789045",
+    "supplierName": "Công ty Cổ phần Viễn thông Sao Việt",
+    "itemName": "Cước Internet cáp quang doanh nghiệp tháng 09/2026",
+    "preTaxAmount": 1500000,
+    "taxRate": 8,
+    "taxAmount": 120000,
+    "totalAmount": 1620000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "STATUTORY_RES_204_VAT_8_EXCLUDED (Điều 1.3) names 'cước Internet' explicitly; telecom (VIỄN THÔNG) is an excluded category for the 8% reduction, so 8% on an Internet subscription is a known-fact violation -> OUT_OF_POLICY. Date is within 2025-07-01..2026-12-31, so the period rule does not fire. Total 1,620,000 < 5M (payment method not needed) and < 20M (seller status not needed). Arithmetic is internally consistent at 8%, so this is not a data-quality issue.",
+   "mention": "Recipient KTT. Internet service is excluded from the 8% reduction, so the correct rate is 10%: VAT should be 150,000₫, not 120,000₫ (30,000₫ difference). A = ask supplier 0316789045 to issue an adjusting/replacement invoice at 10%; B = keep the invoice as issued (deduct only 120,000₫, or exclude the VAT per SOP)."
+  },
+  {
+   "id": "OP-06-mobile-telecom-8pct-no-keyword",
+   "invoice": {
+    "invoiceNumber": "00128734",
+    "invoiceDate": "2026-10-05",
+    "supplierTaxCode": "0801324670",
+    "supplierName": "Tổng Công ty Viễn thông Phương Nam",
+    "itemName": "Cước điện thoại di động trả sau tháng 09/2026 (25 thuê bao)",
+    "preTaxAmount": 3750000,
+    "taxRate": 8,
+    "taxAmount": 300000,
+    "totalAmount": 4050000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "Mobile phone charges are telecom services, an excluded VIỄN THÔNG category for the 8% reduction (STATUTORY_RES_204_VAT_8_EXCLUDED, Điều 1.3) -> OUT_OF_POLICY. Unlike OP-05, the item name contains neither 'viễn thông' nor 'Internet' (only the supplier name does), which probes whether the excluded-category match is substring-only on itemName. Total 4,050,000 < 5M and < 20M, so there is no other required fact; arithmetic consistent; date inside the reduction period.",
+   "mention": "Recipient KTT. Mobile telecom service at 8% is not eligible for the reduction; it should be 10% = 375,000₫ VAT instead of 300,000₫ (75,000₫ difference). A = request reissue/adjustment at 10% from 0801324670; B = do not deduct the misstated VAT (or deduct only 300,000₫ as printed, per SOP)."
+  },
+  {
+   "id": "OP-07-wrong-buyer-tax-code-lookalike",
+   "invoice": {
+    "invoiceNumber": "00003390",
+    "invoiceDate": "2026-09-25",
+    "supplierTaxCode": "0602259137",
+    "supplierName": "Công ty TNHH Nội thất Phúc An",
+    "itemName": "Ghế xoay văn phòng lưng lưới",
+    "preTaxAmount": 12000000,
+    "taxRate": 10,
+    "taxAmount": 1200000,
+    "totalAmount": 13200000,
+    "buyerTaxCode": "0102030451",
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "buyerTaxCode 0102030451 is a well-formed, checksum-valid MST that only looks like the company's 0102030405 (same first 8 digits, last two differ). RULE_BUYER_TAX_CODE_MISMATCH (Điều 1.1) compares it with the configured companyTaxCode -> a known mismatch means the invoice was not issued to this company -> OUT_OF_POLICY. Payment facts are complete (>= 5M: BANK_TRANSFER + slip); < 20M, so seller status is not needed; < 200M.",
+   "mention": "Recipient KTT. Quotes the buyer MST on the invoice (0102030451) against the company MST (0102030405); VAT at stake 1,200,000₫ on total 13,200,000₫. A = ask supplier 0602259137 for an adjusting/replacement invoice with the correct buyer MST before deducting; B = exclude 1,200,000₫ VAT / reject the invoice."
+  },
+  {
+   "id": "OP-08-karaoke-and-alcohol",
+   "invoice": {
+    "invoiceNumber": "00000915",
+    "invoiceDate": "2026-09-27",
+    "supplierTaxCode": "0108453728",
+    "supplierName": "Công ty TNHH Giải trí Ánh Sao",
+    "itemName": "Phòng hát karaoke VIP 3 giờ kèm bia và rượu",
+    "preTaxAmount": 3800000,
+    "taxRate": 10,
+    "taxAmount": 380000,
+    "totalAmount": 4180000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "INTERNAL_POLICY_GUEST_ENTERTAINMENT (Điều 2.1): karaoke and alcoholic drinks are outside the auto-approvable spending group, so a human must clarify the purpose even though the numbers are valid -> OUT_OF_POLICY. Total 4,180,000 < 5M (payment not needed), < 20M, no manifest keyword, no precedent supplied. 10% is the correct rate (karaoke is subject to special consumption tax and not eligible for 8%), so no rate finding.",
+   "mention": "Recipient KTT. Names the item (karaoke + beer/wine) and total 4,180,000₫, VAT 380,000₫. Asks the business purpose in one reply: A = client entertainment under the internal policy with supporting documents (deduct 380,000₫); B = personal/non-business expense (exclude 380,000₫ VAT)."
+  },
+  {
+   "id": "OP-09-gift-to-partners-33m",
+   "invoice": {
+    "invoiceNumber": "00001876",
+    "invoiceDate": "2026-09-20",
+    "supplierTaxCode": "0315928465",
+    "supplierName": "Công ty TNHH Bánh kẹo Phú Quý",
+    "itemName": "Quà biếu Trung thu đối tác - hộp bánh cao cấp",
+    "preTaxAmount": 30000000,
+    "taxRate": 10,
+    "taxAmount": 3000000,
+    "totalAmount": 33000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_SCOPE_NOT_COVERED (Điều 2.3): 'quà biếu' (gifts) has no auto-approval rule in the SOP, so it always goes to a person with authority even when every number is valid -> OUT_OF_POLICY. All other required facts are present and clean: total >= 5M with BANK_TRANSFER + slip, >= 20M with sellerStatus ACTIVE, consistent 10% arithmetic, < 200M. The case checks that a fully documented, arithmetically perfect invoice is still stopped on scope alone.",
+   "mention": "Recipient KTT (or the authorized approver). Names 'Quà biếu Trung thu đối tác' and total 33,000,000₫, VAT 3,000,000₫, and states that the SOP does not cover gifts. A = confirm a business purpose (e.g. documented customer gifts/promotion) and deduct 3,000,000₫; B = treat as a non-deductible gift and exclude 3,000,000₫ VAT."
+  },
+  {
+   "id": "OP-10-gold-bars-306m",
+   "invoice": {
+    "invoiceNumber": "00000214",
+    "invoiceDate": "2026-09-29",
+    "supplierTaxCode": "0201365787",
+    "supplierName": "Công ty TNHH Vàng bạc Đá quý Kim Ngân",
+    "itemName": "Vàng miếng 999.9 - 2 lượng",
+    "preTaxAmount": 306000000,
+    "taxRate": 0,
+    "taxAmount": 0,
+    "totalAmount": 306000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": true,
+   "rationale": "RULE_SCOPE_NOT_COVERED (Điều 2.3) lists gold (vàng) as a category the SOP never auto-approves -> OUT_OF_POLICY. |total| 306,000,000 >= 200,000,000 -> AUTHORITY_EXCEED_KTT_LIMIT also fires, so requiresCFO = true. Precedence OUT_OF_POLICY > EXCEED_AUTHORITY, both facts verified. Payment (transfer + slip) and seller status are complete; taxRate 0 / taxAmount 0 is internally consistent, so no data-quality issue. preTax < 1 billion, so the K-factor rule does not apply. Second OP+CFO combination, here with a scope trigger instead of a statutory one.",
+   "mention": "Recipient CFO. Numbered items: (1) a gold-bar purchase of 306,000,000₫ is outside the SOP (an investment/asset, not a routine input purchase); A = CFO confirms purpose and accounting treatment, B = reject/route out of the input-VAT process; (2) 306,000,000₫ ≥ the 200,000,000₫ KTT limit. Should note VAT at stake is 0₫, so the decision is about scope and authority, not a deduction amount."
+  },
+  {
+   "id": "OP-11-vat8-dated-2027",
+   "invoice": {
+    "invoiceNumber": "00000047",
+    "invoiceDate": "2027-01-12",
+    "supplierTaxCode": "0307124598",
+    "supplierName": "Công ty TNHH Giấy Bình Minh",
+    "itemName": "Giấy in A4 70gsm (50 ram)",
+    "preTaxAmount": 4000000,
+    "taxRate": 8,
+    "taxAmount": 320000,
+    "totalAmount": 4320000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "RULE_SCOPE_VAT8_PERIOD (Điều 1.3): 8% on an invoice dated after 31/12/2026, when NQ 204/2025/QH15 has ended, must be reissued at 10% or the extra tax removed -> OUT_OF_POLICY. Paper is a normally eligible good, so only the period triggers (not the excluded-category rule). The date is a valid calendar date and the policy rule exists precisely for post-2026 dates, so it is treated as a known fact, not as uncertain. Total 4,320,000 < 5M and < 20M; no invoiceSeries, so no series-year check.",
+   "mention": "Recipient KTT. Invoice dated 12/01/2027 is after the 8% reduction ended (31/12/2026); the correct rate is 10% = 400,000₫ VAT instead of 320,000₫ (80,000₫ difference). A = ask supplier 0307124598 to issue an adjusting/replacement invoice at 10%; B = do not deduct the misstated tax / exclude it per SOP."
+  },
+  {
+   "id": "OP-12-invoice-after-seller-closure",
+   "invoice": {
+    "invoiceNumber": "00001532",
+    "invoiceDate": "2026-08-12",
+    "supplierTaxCode": "0703451285",
+    "supplierName": "Công ty TNHH Thép Hưng Thịnh",
+    "itemName": "Thép hộp mạ kẽm 40x80x1.4mm",
+    "preTaxAmount": 25000000,
+    "taxRate": 10,
+    "taxAmount": 2500000,
+    "totalAmount": 27500000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "CLOSED",
+    "sellerSuspensionDate": "2026-06-30"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "sellerStatus CLOSED with a known closure date of 2026-06-30, and the invoice is dated 2026-08-12, after closure -> STATUTORY_DECREE_254_CLOSED_SELLER (Điều 2.2; NĐ 254/2026 applies from 2026-07-01) -> OUT_OF_POLICY. The closure date is supplied, so RULE_SELLER_CLOSURE_DATE_UNKNOWN (an uncertain-info path) must NOT be primary. Payment is complete (transfer + slip), total 27,500,000 >= 20M with status known, < 200M. 10% on steel is correct.",
+   "mention": "Recipient KTT. States the invoice date 12/08/2026 is after supplier 0703451285's MST closed on 30/06/2026; VAT at stake 2,500,000₫ on total 27,500,000₫. A = reject the invoice / exclude 2,500,000₫ VAT; B = hold and obtain evidence (tax-authority status record, contract and delivery documents) before re-evaluating. The bank transfer must not be treated as curing the problem."
+  },
+  {
+   "id": "TR-01",
+   "invoice": {
+    "invoiceNumber": "00012034",
+    "invoiceDate": "2026-03-12",
+    "supplierTaxCode": "0312845676",
+    "supplierName": "Công ty TNHH Văn Phòng Phẩm Minh Khoa",
+    "itemName": "BÌA CÒNG HỒ SƠ 7CM, BÌA LÁ A4 VÀ SỔ BIÊN LAI 2 LIÊN",
+    "preTaxAmount": 1850000,
+    "taxRate": 8,
+    "taxAmount": 148000,
+    "totalAmount": 1998000,
+    "ghiChu": "Mua cho phòng kế toán - bìa đựng hồ sơ quyết toán",
+    "maDuAn": "KT-2026-Q1",
+    "nguoiDeNghi": "Nguyễn Thị Lan"
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Uppercase stationery: 'BÌA' (file folder) and 'BIÊN LAI' (receipt book) are not beer. If the engine strips diacritics, 'BÌA' turns into 'BIA', which is exactly the false positive this case tests. Plastic folders and paper receipt books are not in any 8%-excluded category, and 2026-03-12 is inside the 8% reduction period. Amounts check out: 1,850,000 x 8% = 148,000, total 1,998,000. That is below 5,000,000, so payment method is not required, and below 20,000,000, so seller status is not required. Three unknown fields (ghiChu, maDuAn, nguoiDeNghi) must be ignored: no schema rejection, no keyword scan of free-text notes (the note also contains 'bìa'), and no escalation. A careful accountant auto-approves the 148,000 VAT.",
+   "mention": "No question expected. The routine explanation should approve 148,000 VAT on a 1,998,000 total. It must not mention beer, alcohol or entertainment, and must not complain about the extra fields."
+  },
+  {
+   "id": "TR-02",
+   "invoice": {
+    "invoiceNumber": "00004581",
+    "invoiceDate": "2026-04-03",
+    "supplierTaxCode": "0317359246",
+    "supplierName": "Công ty TNHH Thương mại Dịch vụ An Phú Gia",
+    "itemName": "Vật tư đóng gói và văn phòng phẩm",
+    "preTaxAmount": 3300000,
+    "taxRate": 10,
+    "taxAmount": 330000,
+    "totalAmount": 3630000,
+    "items": [
+     {
+      "lineNumber": 1,
+      "itemName": "Bìa cứng carton 3 lớp 60x40cm",
+      "quantity": 200,
+      "unitPrice": 8000,
+      "amount": 1600000,
+      "taxRate": 10,
+      "taxAmount": 160000
+     },
+     {
+      "lineNumber": 2,
+      "itemName": "Đá mài bavia 100mm",
+      "quantity": 20,
+      "unitPrice": 25000,
+      "amount": 500000,
+      "taxRate": 10,
+      "taxAmount": 50000
+     },
+     {
+      "lineNumber": 3,
+      "itemName": "rượu vang đỏ Đà Lạt 750ml",
+      "quantity": 4,
+      "unitPrice": 300000,
+      "amount": 1200000,
+      "taxRate": 10,
+      "taxAmount": 120000
+     }
+    ]
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "The header name is harmless. The alcohol is hidden in line 3, typed in lowercase ('rượu vang'). It sits next to two decoys: 'Bìa cứng carton' (cardboard, not beer) and 'Đá mài bavia' (deburring stone, not beer). The guest-entertainment rule (INTERNAL_POLICY_GUEST_ENTERTAINMENT, Điều 2.1) explicitly scans line items for alcoholic drinks, so this is OUT_OF_POLICY. All line math is exact: 1,600,000 + 500,000 + 1,200,000 = 3,300,000 and VAT 160,000 + 50,000 + 120,000 = 330,000, so there is no line-item mismatch or UNCERTAIN_INFO. The total of 3,630,000 is below 5,000,000 and below 20,000,000, so payment method and seller status are not needed. All lines at 10% raise no 8% issue. It goes to KTT, not CFO.",
+   "mention": "Recipient KTT. The question must name line 3 'rượu vang đỏ Đà Lạt 750ml', 1,200,000 pre-tax, VAT 120,000, and ask its purpose. A: business entertainment under the internal regulation, deduct the full 330,000. B: personal or not for business, exclude the 120,000 VAT on the wine line and deduct the remaining 210,000. It must NOT flag the 'bìa cứng' or 'bavia' lines."
+  },
+  {
+   "id": "TR-03",
+   "invoice": {
+    "invoiceNumber": "00007716",
+    "invoiceDate": "2026-05-20",
+    "supplierTaxCode": "0315678913",
+    "supplierName": "Công ty TNHH Phân phối Đồ uống Nam Việt",
+    "itemName": "BIA LON SÀI GÒN 330ML (THÙNG 24) VÀ RƯỢU SOJU 360ML",
+    "preTaxAmount": 4000000,
+    "taxRate": 8,
+    "taxAmount": 320000,
+    "totalAmount": 4320000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "This is the real-beer counterpart of TR-01. It uses uppercase 'BIA' (beer) and uppercase 'RƯỢU' (soju, typed with diacritics). Two OUT_OF_POLICY findings apply. (1) Alcoholic drinks fall outside the auto-approved expense group, so the purpose must be asked (Điều 2.1). (2) Beer and spirits are special-consumption-tax goods (TIÊU THỤ ĐẶC BIỆT is in excludedVat8Categories), so the 8% rate does not apply even inside the 2025-07-01..2026-12-31 period (STATUTORY_RES_204_VAT_8_EXCLUDED, Điều 1.3). The item name never says 'tiêu thụ đặc biệt', so a careful accountant has to know that beer and spirits are TTĐB goods. The amounts are internally consistent at 8%: 4,000,000 x 8% = 320,000, total 4,320,000. That is below 5,000,000 and below 20,000,000, so no payment or seller-status question. It goes to KTT, not CFO.",
+   "mention": "One question for KTT with two numbered items. (1) Purpose of the beer and soju, 4,000,000 pre-tax: A, entertainment under the internal regulation; B, personal, exclude the VAT. (2) The 8% rate is not valid for TTĐB goods: VAT should be 400,000 at 10%, not 320,000. A: ask the supplier to reissue or adjust at 10% (total 4,400,000). B: do not deduct the 320,000 until corrected. It should name the total 4,320,000."
+  },
+  {
+   "id": "TR-04",
+   "invoice": {
+    "invoiceNumber": "00000932",
+    "invoiceDate": "2026-04-08",
+    "supplierTaxCode": "0316248159",
+    "supplierName": "Công ty TNHH Thực phẩm Nhập khẩu Hoàng Kim",
+    "itemName": "Rượu vang đỏ Chile Cabernet Sauvignon 750ml (6 chai)",
+    "preTaxAmount": 3000000,
+    "taxRate": 10,
+    "taxAmount": 300000,
+    "totalAmount": 3300000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "The itemName is in decomposed Unicode (NFD): R, u+U+031B, o+U+031B+U+0323, u, ' vang ', U+0111, o+U+0309. It looks identical to 'Rượu vang đỏ' on screen but is a different byte sequence, so a raw match against NFC 'RƯỢU' fails unless the engine normalizes (NFC plus case fold) first. Read by a human, it is wine bought by the company: alcoholic drinks are outside the auto-approved group, so OUT_OF_POLICY (INTERNAL_POLICY_GUEST_ENTERTAINMENT). The supplier name is deliberately neutral (no 'rượu'), so only the NFD item name can trigger the rule. 10% is the correct rate for TTĐB goods. Amounts: 3,000,000 + 300,000 = 3,300,000. That is below 5,000,000 and below 20,000,000. This mirrors the README example amounts exactly.",
+   "mention": "Recipient KTT. It must show the item name readably (normalized, not garbled), the total 3,300,000 and VAT 300,000. A: business entertainment under the regulation, approve and deduct 300,000. B: personal expense, exclude the 300,000 VAT."
+  },
+  {
+   "id": "TR-05",
+   "invoice": {
+    "invoiceNumber": "00031502",
+    "invoiceDate": "2026-02-28",
+    "supplierTaxCode": "0310987650",
+    "supplierName": "Ngân hàng TMCP Hưng Thịnh Việt Nam",
+    "itemName": "Phí dịch vụ Internet Banking tháng 02/2026",
+    "preTaxAmount": 300000,
+    "taxRate": 10,
+    "taxAmount": 30000,
+    "totalAmount": 330000
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "A bank e-banking service fee at the standard 10% is correct: banking and financial services are excluded from the 8% reduction, so they must stay at 10%. The words 'Internet' and 'Ngân hàng' only matter for STATUTORY_RES_204_VAT_8_EXCLUDED when the rate is 8%; at 10% there is nothing to flag. Amounts: 300,000 x 10% = 30,000, total 330,000. That is below 5,000,000 (no payment method needed) and below 20,000,000 (no seller status needed). A keyword-happy engine that escalates on 'Internet' or 'Banking' regardless of rate fails this case.",
+   "mention": "No question expected. The routine explanation should approve 30,000 VAT. It must not claim an 8% or telecom issue."
+  },
+  {
+   "id": "TR-06",
+   "invoice": {
+    "invoiceNumber": "00034877",
+    "invoiceDate": "2026-03-31",
+    "supplierTaxCode": "0310987650",
+    "supplierName": "Ngân hàng TMCP Hưng Thịnh Việt Nam",
+    "itemName": "Phí dịch vụ Internet Banking tháng 03/2026",
+    "preTaxAmount": 300000,
+    "taxRate": 8,
+    "taxAmount": 24000,
+    "totalAmount": 324000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "This is the same bank fee as TR-05, but billed at 8%. Banking and financial services (NGÂN HÀNG / TÀI CHÍNH, plus the Internet keyword) are excluded from the NQ 204/2025 reduction, so the 8% rate is wrong: STATUTORY_RES_204_VAT_8_EXCLUDED, Điều 1.3, OUT_OF_POLICY. The item name has no 'ngân hàng' or 'tài chính', only 'Internet Banking'. A careful accountant recognises a banking service anyway, and the policy text explicitly covers Internet charges at 8%. The amounts are internally consistent at 8% (300,000 x 8% = 24,000), so there is no data-quality question. The total of 324,000 is below every payment and materiality threshold. It goes to KTT, not CFO.",
+   "mention": "Recipient KTT. It must say the 8% rate is not applicable to a banking or financial service (or to Internet charges) and give both figures: VAT 24,000 at 8% versus 30,000 at 10% (total 330,000). A: ask the bank to issue an adjusting or replacement invoice at 10%. B: do not deduct the 24,000 until a correct invoice arrives."
+  },
+  {
+   "id": "TR-07",
+   "invoice": {
+    "invoiceNumber": "00001268",
+    "invoiceDate": "2026-06-15",
+    "supplierTaxCode": "0314567826",
+    "supplierName": "Công ty Cổ phần Nước uống Tinh khiết Suối Mát",
+    "itemName": "Bình giữ nhiệt in logo – quà tặng khách hàng chương trình khuyến mại (hàng khuyến mại không thu tiền)",
+    "preTaxAmount": 0,
+    "taxRate": 8,
+    "taxAmount": 0,
+    "totalAmount": 0
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "The supplier issued a zero-value promotional-goods invoice to us as its customer ('hàng khuyến mại không thu tiền'). This is standard Vietnamese practice for a registered promotion. 'Quà tặng khách hàng khuyến mại' is a supplier promotion received by the company. It is not 'quà biếu', the courtesy gift the company gives that RULE_SCOPE_NOT_COVERED (Điều 2.3) targets. No money and no VAT are at stake: 0 x 8% = 0, and 0 + 0 = 0 is arithmetically consistent. 0 is below every payment and materiality threshold, so no fact could change the outcome. The engine must not divide by zero (for example tax/preTax), call 0 'missing' or 'inconsistent', or fire on the substring 'quà'. A careful accountant files it as routine with 0 VAT. Escalating here is a pure over-escalation.",
+   "mention": "No question expected. The routine result should show approved VAT 0 and total 0 without errors, NaN or an 'amount missing' message. Any escalation is a false positive."
+  },
+  {
+   "id": "TR-08",
+   "invoice": {
+    "invoiceNumber": "00002519",
+    "invoiceDate": "2026-01-20",
+    "supplierTaxCode": "0108234564",
+    "supplierName": "Công ty TNHH Đặc sản Ba Miền",
+    "itemName": "Hộp quà biếu Tết đối tác (trà Thái Nguyên, bánh, hạt điều)",
+    "preTaxAmount": 15000000,
+    "taxRate": 8,
+    "taxAmount": 1200000,
+    "totalAmount": 16200000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "This is the counterpart of TR-07: the company buys 'quà biếu' (courtesy gifts) for partners. RULE_SCOPE_NOT_COVERED (Điều 2.3) lists quà biếu as an expense the SOP has no auto-approval rule for, so it is always forwarded even when the numbers are valid: OUT_OF_POLICY. The box contents (tea, cakes, cashews) are deliberately non-alcoholic so the entertainment rule does not muddy the label. Food gift boxes are eligible for 8% in January 2026. Amounts: 20 x 750,000 = 15,000,000, VAT 1,200,000, total 16,200,000. The total is at or above 5,000,000, but payment is by bank transfer with a slip, so payment is satisfied. It is below 20,000,000, so seller status is not required. It is below 200,000,000, so KTT handles it, not CFO.",
+   "mention": "Recipient KTT. It must say the SOP does not cover quà biếu (gifts to partners) and give the total 16,200,000 and VAT 1,200,000. A: approved business gift with a director's decision and recipient list, deduct 1,200,000. B: not supported or not for business, exclude the 1,200,000 VAT. It must not ask about payment method or seller status."
+  },
+  {
+   "id": "TR-09",
+   "invoice": {
+    "invoiceNumber": "00000457",
+    "invoiceDate": "2026-07-10",
+    "supplierTaxCode": "0302765439",
+    "supplierName": "Công ty Cổ phần Vận tải Biển Phương Nam",
+    "itemName": "Phí phạt chậm thanh toán hợp đồng vận chuyển số 15/2026/HĐVC",
+    "preTaxAmount": 2000000,
+    "taxRate": 10,
+    "taxAmount": 200000,
+    "totalAmount": 2200000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "A contract late-payment penalty is 'tiền phạt'. RULE_SCOPE_NOT_COVERED (Điều 2.3) has no auto-approval rule for it, so it must be forwarded: OUT_OF_POLICY. A careful accountant also notes that contract penalties are compensation, not a VAT-able supply, so a VAT line of 200,000 on it should not be deducted. The word 'Phí' (fee) in front must not disguise the penalty. Amounts: 2,000,000 + 200,000 = 2,200,000, below 5,000,000 and below 20,000,000. It goes to KTT, not CFO.",
+   "mention": "Recipient KTT. It must identify the item as a contract penalty (tiền phạt) outside the SOP, total 2,200,000, VAT 200,000. A: record the penalty as an expense under the contract but do not deduct the 200,000 VAT, and ask the supplier to remove or adjust the VAT. B: reject or return the invoice."
+  },
+  {
+   "id": "TR-10",
+   "invoice": {
+    "invoiceNumber": "00002315",
+    "invoiceDate": "2026-12-31",
+    "supplierTaxCode": "0106543214",
+    "supplierName": "Công ty TNHH Kỹ thuật Điện Hưng Long",
+    "itemName": "Bảo dưỡng định kỳ máy phát điện dự phòng 250kVA",
+    "preTaxAmount": 6000000,
+    "taxRate": 8,
+    "taxAmount": 480000,
+    "totalAmount": 6480000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true
+   },
+   "expectedStatus": "ROUTINE",
+   "expectedRiskGroup": null,
+   "expectedRequiresCFO": false,
+   "rationale": "Three traps, all of which should pass. (1) 'máy phát điện' contains 'phát'. With diacritics stripped, 'phát' and 'phạt' (fine) both become 'phat', so the fines rule must not fire. (2) 'Bảo dưỡng' starts with 'bảo' but is maintenance, not 'BẢO HIỂM' (insurance). (3) 2026-12-31 is the last day of the NQ 204/2025/QH15 reduction period (2025-07-01..2026-12-31), so 8% is valid. Equipment maintenance is not an excluded category. Amounts: 6,000,000 x 8% = 480,000, total 6,480,000. That is at or above 5,000,000, but payment is by bank transfer with a slip, so the cash rule is satisfied. It is below 20,000,000, so no seller status is needed. Note: there is no future-date rule in the SOP, so the boundary is judged on the invoice date alone.",
+   "mention": "No question expected. The routine explanation should approve 480,000 VAT and must not mention a penalty, insurance or an expired 8% period."
+  },
+  {
+   "id": "TR-11",
+   "invoice": {
+    "invoiceNumber": "00000001",
+    "invoiceDate": "2027-01-01",
+    "supplierTaxCode": "0106543214",
+    "supplierName": "Công ty TNHH Kỹ thuật Điện Hưng Long",
+    "itemName": "Bảo dưỡng định kỳ máy phát điện dự phòng 250kVA",
+    "preTaxAmount": 6000000,
+    "taxRate": 8,
+    "taxAmount": 480000,
+    "totalAmount": 6480000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "OUT_OF_POLICY",
+   "expectedRequiresCFO": false,
+   "rationale": "This is identical to TR-10 except the invoice is dated one day later (first invoice of the new year). On 2027-01-01 the NQ 204/2025 reduction has ended, so 8% is no longer valid: RULE_SCOPE_VAT8_PERIOD, Điều 1.3, says the supplier must reissue at 10% or the excess must be excluded. That makes it OUT_OF_POLICY. Everything else is clean: payment by bank transfer with a slip, below 20,000,000, below 200,000,000. The pair TR-10/TR-11 checks for off-by-one errors in the period end (< vs <=, or time zone shifting the date). The SOP has no future-date rule, so the case is judged on the invoice date.",
+   "mention": "Recipient KTT. It must cite the 8% period ending 2026-12-31 and the invoice date 2027-01-01, and give both figures: VAT 480,000 at 8% versus 600,000 at 10% (total 6,600,000). A: ask the supplier to reissue or adjust at 10%. B: do not deduct the VAT (or the excess) until corrected."
+  },
+  {
+   "id": "TR-12",
+   "invoice": {
+    "invoiceNumber": "00000388",
+    "invoiceDate": "2026-08-05",
+    "supplierTaxCode": "0313334441",
+    "supplierName": "Công ty TNHH Thiết bị Văn phòng Kim Long",
+    "itemName": "Máy hủy tài liệu văn phòng",
+    "preTaxAmount": -2000000,
+    "taxRate": 8,
+    "taxAmount": -160000,
+    "totalAmount": -2160000
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "The amounts are negative but the judge did not mark isAdjustment and gave no originalInvoiceRef. RULE_DATA_QUALITY says a negative amount not marked as an adjustment stops automation, and refereeRequirements makes originalInvoiceRef required whenever totalAmount < 0. A careful accountant cannot tell whether this is a genuine reduction of an earlier invoice (and which one) or a sign-entry error. Either answer changes the outcome (reverse 160,000 of deducted VAT, or approve +160,000), so it is UNCERTAIN_INFO, not OUT_OF_POLICY. The signs are internally consistent (-2,000,000 x 8% = -160,000). |total| of 2,160,000 is below 5,000,000, so payment method is not asked. Not CFO.",
+   "mention": "Recipient KTT. It must show the negative total -2,160,000 (VAT -160,000) and ask what it is. A: an adjusting (reducing) invoice; give the original invoice number, and 160,000 of previously deducted VAT is reversed. B: sign entered wrongly; the true total is +2,160,000 (VAT +160,000), correct and re-evaluate. It must not call it a policy violation."
+  },
+  {
+   "id": "TR-13",
+   "invoice": {
+    "invoiceNumber": "00000066",
+    "invoiceDate": "2026-09-15",
+    "supplierTaxCode": "0109876540",
+    "supplierName": "Công ty Cổ phần Cơ khí Chế tạo Máy Đông Á",
+    "itemName": "Dây chuyền ép nhựa tự động 3.000 tấn (trọn bộ, gồm lắp đặt và chạy thử)",
+    "preTaxAmount": 1000000000000,
+    "taxRate": 10,
+    "taxAmount": 100000000000,
+    "totalAmount": 1100000000000,
+    "paymentMethod": "BANK_TRANSFER",
+    "hasBankSlip": true,
+    "sellerStatus": "ACTIVE"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "EXCEED_AUTHORITY",
+   "expectedRequiresCFO": true,
+   "rationale": "A very large number: 1,100,000,000,000 VND (1,100 billion), still exactly representable in a double. All data-quality facts are supplied (bank transfer with slip, seller ACTIVE, exact arithmetic at 10%, no excluded keyword), so the only stop is authority. |total| is far above the 200,000,000 KTT limit (AUTHORITY_EXCEED_KTT_LIMIT, Điều 3.3). In addition, pre-tax is at or above 1 billion on a non-adjustment purchase, which also triggers the K-factor check (AUTHORITY_K_FACTOR_RED, Điều 4.3). Both are EXCEED_AUTHORITY, so CFO is required. The test also catches number formatting and overflow bugs: no 1.1e12 notation, no rounding, no int32 overflow, no string truncation in the question.",
+   "mention": "Recipient CFO. It must state the total in full, 1.100.000.000.000 ₫, against the 200.000.000 ₫ KTT limit, with VAT 100.000.000.000 ₫. It may add a K-factor warning. A: CFO approves, deduct 100.000.000.000 ₫. B: hold to verify the contract, delivery and acceptance. No scientific notation."
+  },
+  {
+   "id": "TR-14",
+   "invoice": {
+    "invoiceNumber": "00001903",
+    "invoiceDate": "2026-04-22",
+    "supplierName": "Công ty TNHH In ấn Quảng cáo Sao Việt",
+    "itemName": "In danh thiếp nhân viên (10 hộp)",
+    "preTaxAmount": "1000000",
+    "taxRate": 8,
+    "taxAmount": "80000",
+    "totalAmount": "1080000"
+   },
+   "expectedStatus": "ESCALATED",
+   "expectedRiskGroup": "UNCERTAIN_INFO",
+   "expectedRequiresCFO": false,
+   "rationale": "Two parsing traps. (a) supplierTaxCode is omitted. It is a core decision field: without the seller MST the invoice cannot be tied to a registered seller, duplicates cannot be checked, and VAT cannot be safely deducted, so UNCERTAIN_INFO. (b) The amounts are JSON strings ('1000000', '80000', '1080000'). Their meaning is unambiguous (1,000,000 x 8% = 80,000, total 1,080,000), so a careful accountant would not treat them as uncertain. The system should coerce them, or give a clear field-level message, but must not crash, silently read 0, or ask the user to 'confirm the amount'. The total is below 5,000,000 and below 20,000,000, so no payment or seller-status questions. The only outcome-changing gap is the MST.",
+   "mention": "Recipient KTT. It must ask for the seller's MST (10 or 13 digits as printed on the invoice) of 'Công ty TNHH In ấn Quảng cáo Sao Việt', total 1,080,000, VAT 80,000. A: enter the MST and re-evaluate. B: the invoice has no MST, so ask the supplier to reissue and do not deduct the 80,000. It must NOT ask to confirm the amounts."
+  }
+ ]
+}

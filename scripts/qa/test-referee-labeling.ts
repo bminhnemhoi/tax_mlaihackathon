@@ -10,7 +10,9 @@ function main():void{
  const labeledAt=new Date().toISOString();
  const cases=Array.from({length:20},(_,i)=>({id:`QA-LABEL-${i}`,name:'Mock labeling workflow only',invoice:{...challengeCases[0].invoice,id:`QA-INVOICE-${i}`,invoiceNumber:`QA-INVOICE-${i}`,supplierName:`Nhà cung cấp mô phỏng nhãn ${i}`},expectedStatus:'ROUTINE',expectedRequiresCFO:false,rationale:'Khoản thường quy theo SOP chỉ dùng để kiểm tra công cụ nhãn.',labeledBy:'QA_SIMULATED_NOT_HUMAN',labeledAt,provenance:'SYNTHETIC_LABEL_WORKFLOW_TEST: not independent accuracy evidence'}));
  fs.writeFileSync(draft,JSON.stringify({status:'AWAITING_HUMAN_LABELS',companyTaxCode:'0102030405',cases}));
- const run=(name:string,args:string[]):string=>execFileSync('npm',['run',name,'--',...args],{encoding:'utf8',env:{...process.env,SHOPAIKEY_API_KEY:'',AI_API_KEY:'',OPENROUTER_API_KEY:'',TAX_REFEREE_DB_PATH:':memory:'},stdio:['ignore','pipe','pipe']});
+ const scripts:Record<string,string>={'labels:lock':'lock-referee-labels.ts','evaluate:independent':'evaluate-independent.ts','score:referee-questions':'score-referee-questions.ts'};
+ const tsxCli=path.join(process.cwd(),'node_modules','tsx','dist','cli.mjs');
+ const run=(name:string,args:string[]):string=>execFileSync(process.execPath,[tsxCli,path.join('scripts','qa',scripts[name]),...args],{encoding:'utf8',env:{...process.env,SHOPAIKEY_API_KEY:'',AI_API_KEY:'',OPENROUTER_API_KEY:'',TAX_REFEREE_DB_PATH:':memory:'},stdio:['ignore','pipe','pipe']});
  assert.match(run('labels:lock',[draft,locked]),/Đã khóa 20 nhãn/);assert.ok(fs.existsSync(locked+'.sha256'));
  assert.throws(()=>run('labels:lock',[draft,locked]));
  const report=path.join(directory,'evaluation.json');run('evaluate:independent',[locked,'--out',report]);

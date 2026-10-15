@@ -10,6 +10,11 @@ export async function POST(req: NextRequest) {
   if (hasRole && !['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'].includes(body.role)) {
     return NextResponse.json({ error: 'Vai trò không hợp lệ' }, { status: 400 });
   }
+  // Workspace nội bộ dùng chung: chọn vai trò không cần mật khẩu sẽ cho phép bất kỳ ai thành CFO và tự duyệt.
+  // Chỉ bật khi vận hành viên chủ động đặt cờ; giám khảo/khách dùng phiên demo riêng (/api/demo/session).
+  if (hasRole && process.env.TAX_REFEREE_ALLOW_INTERNAL_ROLE_LOGIN !== '1') {
+    return NextResponse.json({ error: 'Workspace nội bộ cần email và mật khẩu. Hãy mở "demo riêng" để thử với vai trò mô phỏng.' }, { status: 403 });
+  }
   // Internal login intentionally ignores the demo cookie: this workspace is shared.
   const result = hasRole ? switchRole(body.role as AppRole) : login(String(body.email || ''), String(body.password || ''));
   if (!result) return NextResponse.json({ error: 'Email hoặc mật khẩu không đúng' }, { status: 401 });

@@ -1,0 +1,29 @@
+{
+  "_huongDan": "Sao chép thành responses.json và điền ĐÚNG câu trả lời do người dùng tự viết. Không điền thay, không ước đoán. decision: AUTO (tự duyệt) | ESCALATE (phải hỏi). group: UNCERTAIN_INFO | OUT_OF_POLICY | EXCEED_AUTHORITY | null. consent: NAME_AND_TITLE | TITLE_ONLY | NONE. Likert 1-5. Ô chưa có để null.",
+  "studyDate": "2026-10-16",
+  "coordinator": "BTC MLAI Hackathon 2026 (Track VNG)",
+  "participants": [
+    {
+      "id": "P1",
+      "name": "",
+      "title": "",
+      "organization": "",
+      "consent": "NONE",
+      "yearsExperience": null,
+      "invoicesPerMonth": null,
+      "baseline": { "minutesPerInvoice": null, "percentAskOthers": null, "askChannel": "" },
+      "decisions": {
+        "U1": { "decision": null, "group": null, "seconds": null, "note": "" },
+        "U2": { "decision": null, "group": null, "seconds": null, "note": "" },
+        "U3": { "decision": null, "group": null, "seconds": null, "note": "" },
+        "U4": { "decision": null, "group": null, "seconds": null, "note": "" },
+        "U5": { "decision": null, "group": null, "seconds": null, "note": "" }
+      },
+      "answeredInOneReply": { "U3": null, "U4": null, "U5": null },
+      "likert": { "q4": null, "q5": null, "q6": null, "q8": null, "q12": null, "q13": null, "q16": null },
+      "q9WillRecheck": "",
+      "learningMinutes": null,
+      "quotes": { "q7": "", "q10": "", "q11": "", "q15": "", "q17": "", "q18": "", "q19": "", "q20": "" }
+    }
+  ]
+}

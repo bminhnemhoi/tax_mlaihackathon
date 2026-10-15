@@ -1,5 +1,8 @@
 # Runbook Chung kết Đề A
 
+> 📌 **Ảnh chụp lịch sử** — số liệu và tên quy tắc trong file này có thể đã cũ. Số liệu hiện hành: [README](../README.md), trang `/verify`, `/sop` và `docs/evidence/`.
+
+
 ## Clone sạch và kiểm tra
 
 Yêu cầu: Node 22, npm; Python 3 + PyMuPDF + Pillow cho PDF/ảnh. Chạy từ thư mục repo:
@@ -8,19 +11,19 @@ Yêu cầu: Node 22, npm; Python 3 + PyMuPDF + Pillow cho PDF/ảnh. Chạy từ
 npm ci
 cp .env.example .env.local
 npm run typecheck
-npm run test:acceptance
+npm test
 npm run build
 npm start
 ```
 
-Verify chạy bằng quy tắc tất định, không cần AI key. Mở `/verify`, chọn 4 ca chung / 5 ca Đề A / 15 ca hồi quy rồi chạy. Ba tập có ca trùng nhau; không cộng thành 24 ca độc lập. Fixture là dữ liệu tổng hợp; MST thử nghiệm 0102030405. Bộ 5 gồm 3 thường quy và 2 chuyển tiếp. MST sai được giữ ở ca âm riêng.
+Verify chạy bằng quy tắc tất định, không cần AI key. Mở `/verify`, chế độ mặc định chạy 9 ca (4 ca chung + 5 ca Đề A) kèm thời điểm từng ca; có thể chọn riêng 4 / 5 / 15 / 60 ca. Ba tập có ca trùng nhau; không cộng thành 24 ca độc lập. Fixture là dữ liệu tổng hợp; MST thử nghiệm 0102030405. Bộ 5 gồm 3 thường quy và 2 chuyển tiếp. MST sai được giữ ở ca âm riêng.
 
-Trang đầu → “Thử dữ liệu mới” mở phiên demo riêng, không cần tài khoản. Mỗi phiên có database riêng; cookie 8 giờ. Demo dùng dữ liệu giả lập và cho chuyển vai trò. Database demo lưu trên volume, tối đa 40 kết nối trong bộ nhớ; phiên hết hạn bị loại khỏi cache. Cần dọn file demo/artifact hết hạn theo chính sách lưu trữ sau đợt thi. Khi tải hóa đơn mới, sử dụng MST người mua theo policy của workspace (mặc định 0100109106), không theo MST fixture Verify.
+Trang đầu → “② Mở hộp chuyển tiếp — demo riêng” mở phiên demo riêng, không cần tài khoản (mặc định vai Kế toán viên). Mỗi phiên có database riêng; cookie 8 giờ. Chỉ trong demo mới đổi được vai trò mô phỏng. Database demo lưu trên volume; tối đa 200 kết nối mở (`TAX_REFEREE_DEMO_CACHE`), quá ngưỡng thì đóng phiên ít dùng nhất thay vì từ chối người mới. Cần dọn file demo/artifact hết hạn theo chính sách lưu trữ sau đợt thi. Khi tải hóa đơn mới, sử dụng MST người mua theo policy của workspace (mặc định 0100109106), không theo MST fixture Verify.
 
 ## Triển khai VPS
 
 1. Cài Docker Compose, Nginx, Certbot; cấu hình DNS tới VPS.
-2. Tạo `.env.production` từ `.env.example`; MVP đăng nhập nội bộ bằng cách chọn vai trò, không cần mật khẩu. AI key chỉ đặt phía server. Đặt `TAX_REFEREE_DATA_DIR=/app/data/runtime`, `TAX_REFEREE_DB_PATH=/app/data/runtime/tax_referee.db`. Không đưa file này vào Git.
+2. Tạo `.env.production` từ `.env.example`; đặt mật khẩu 3 tài khoản nội bộ (`TAX_REFEREE_*_PASSWORD`) và `GIT_COMMIT_SHA` (hiện ở `/api/health` và Verify). AI key chỉ đặt phía server. Đặt `TAX_REFEREE_DATA_DIR=/app/data/runtime`, `TAX_REFEREE_DB_PATH=/app/data/runtime/tax_referee.db`. Không đưa file này vào Git.
 3. `docker compose up -d --build` rồi `curl --fail http://127.0.0.1:3000/api/health`.
 4. Thay domain mẫu trong `deployment/nginx.conf`, cấp chứng chỉ trước khi bật khối HTTPS, kiểm tra `nginx -t` rồi reload.
 5. Kiểm tra `/api/health`, `/verify` và nhập mới qua domain HTTPS. Giới hạn 15MB và 30 request/phút/IP được đặt ở Nginx. Node chỉ bind host loopback qua Compose.

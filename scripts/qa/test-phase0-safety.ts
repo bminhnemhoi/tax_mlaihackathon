@@ -350,11 +350,11 @@ async function runTests() {
     'Hóa đơn mua bia rượu được gắn cờ ESCALATED để xác minh nghiệp vụ'
   );
   assert(
-    alcoholDecision.riskGroup === 'UNCERTAIN_INFO',
-    'Rủi ro rượu bia xếp vào UNCERTAIN_INFO (chưa đủ thông tin mục đích chi), không gán tuyệt đối OUT_OF_POLICY'
+    alcoholDecision.riskGroup === 'OUT_OF_POLICY',
+    'Rượu bia/tiếp khách nằm ngoài nhóm chi được tự duyệt → OUT_OF_POLICY (đúng ví dụ của đề bài), vẫn cho phép tiền lệ CFO'
   );
   assert(
-    alcoholDecision.actionableQuestion.includes('Khoản chi này phục vụ tiếp khách đối tác nào hay phúc lợi nhân viên? Có quy chế không?'),
+    alcoholDecision.actionableQuestion.includes('Tiếp khách đối tác theo quy chế') && alcoholDecision.actionableQuestion.includes('Chi cá nhân/ngoài quy chế'),
     'Câu hỏi hành động hướng dẫn kế toán kiểm tra quy chế và mục đích chi hợp lý theo luật thuế'
   );
   const alcoholFinding = alcoholDecision.findings?.find(f => f.ruleId === 'INTERNAL_POLICY_GUEST_ENTERTAINMENT');

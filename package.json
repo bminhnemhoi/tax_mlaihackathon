@@ -2,6 +2,9 @@
   "name": "tax-referee",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
@@ -18,14 +21,17 @@
     "test:comprehensive": "tsx scripts/qa/test-comprehensive-suites.ts",
     "test:manifest": "tsx scripts/qa/test-regression-manifest.ts",
     "demo:reset": "tsx scripts/ops/reset-demo-data.ts",
+    "test": "tsx scripts/qa/run-all.ts",
+    "test:unit": "node --import tsx --test tests/unit/*.test.ts",
+    "test:fixtures": "tsx scripts/qa/qa-fixtures.ts",
     "typecheck": "tsc --noEmit",
     "test:workflow": "tsx scripts/qa/test-workflow-safety.ts",
-    "test:acceptance": "npm run test:manifest && npm run test:supplier-inference && npm run test:official-supplier && npm run test:workflow && npm run test:ai-fallback && npm run test:review-regressions && npm run test:receipt-entities && npm run test:qa && npm run test:challenge-a",
+    "test:acceptance": "tsx scripts/qa/run-all.ts",
     "test:api": "tsx scripts/qa/test-api-smoke.ts",
     "test:capture": "tsx scripts/qa/test-capture-session.ts",
     "test:receipt-entities": "tsx scripts/qa/test-receipt-entities.ts",
     "test:image-preflight": "tsx scripts/qa/test-image-preflight.ts",
-    "test:supplier-inference": "TAX_REFEREE_DB_PATH=:memory: tsx scripts/qa/test-supplier-inference-safety.ts",
+    "test:supplier-inference": "tsx scripts/qa/run-all.ts supplier-inference",
     "test:official-supplier": "tsx scripts/qa/test-official-supplier-lookup.ts && tsx scripts/qa/test-supplier-identity-resolver.ts",
     "evaluate:supplier-samples": "tsx scripts/qa/evaluate-camera-supplier-extraction.ts",
     "evaluate:independent": "tsx scripts/qa/evaluate-independent.ts",
@@ -37,9 +43,9 @@
     "test:referee-labels": "tsx scripts/qa/test-referee-labeling.ts",
     "test:recovery": "tsx scripts/qa/test-standalone-recovery.ts",
     "test:ai-fallback": "tsx scripts/qa/test-ai-fallback.ts",
-    "test:review-regressions": "TAX_REFEREE_DB_PATH=:memory: tsx scripts/qa/test-review-regressions.ts",
-    "test:qa": "TAX_REFEREE_DB_PATH=:memory: DOCUMENT_IMAGE_ENGINE=vision OPENROUTER_API_KEY=qa-mocked-only QWEN_API_KEY=qa-mocked-only TAX_REFEREE_DATA_DIR=$(mktemp -d) tsx scripts/qa/test-qa-regressions.ts",
-    "test:challenge-a": "OPENROUTER_API_KEY=qa-mocked-only tsx scripts/qa/test-challenge-a-improvements.ts",
+    "test:review-regressions": "tsx scripts/qa/run-all.ts review-regressions",
+    "test:qa": "tsx scripts/qa/run-all.ts qa-regressions",
+    "test:challenge-a": "tsx scripts/qa/run-all.ts challenge-a",
     "test:workspace-ui": "tsx scripts/qa/test-workspace-ui.ts"
   },
   "dependencies": {

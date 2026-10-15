@@ -1,5 +1,8 @@
 # Đánh giá năng lực chuyển tiếp theo đề A
 
+> 📌 **Ảnh chụp lịch sử** — số liệu và tên quy tắc trong file này có thể đã cũ. Số liệu hiện hành: [README](../README.md), trang `/verify`, `/sop` và `docs/evidence/`.
+
+
 Đợt cải tiến này chuẩn bị kỹ thuật. Bộ phát triển có 60 tình huống tổng hợp với nhãn từ SOP: 24 thường quy và 12 cho mỗi nhóm ngoại lệ. Bộ Verify/hồi quy và bộ phát triển được xem là dữ liệu đã dùng để sửa chương trình, không được đưa vào tập độc lập.
 
 ## Kiểm tra tại local

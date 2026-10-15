@@ -48,7 +48,7 @@ async function main() {
 
   try {
     await start();
-    const login = await fetch(`${origin}/api/auth/login`, {
+    const login = await fetch(`${origin}/api/demo/session`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'ACCOUNTANT' })
     });
     assert.equal(login.status, 200);
@@ -62,13 +62,15 @@ async function main() {
     const token = qr.searchParams.get('token');
     assert.ok(token && Date.parse(expiresAt) > Date.now());
     assert.match(qr.pathname, new RegExp(`/capture/${id}$`));
+    assert.equal(qr.searchParams.get('demo'), null, 'QR must not leak the demo session id');
+    const demoId = cookie.split('; ').find((part) => part.startsWith('tax_referee_demo='))!.split('=')[1];
 
     const png = await createInvoiceImageFixture();
-    const upload = async (activeToken: string, image: Buffer = png, type = 'image/png', filename = 'camera.png') => {
+    const upload = async (activeToken: string, image: Buffer = png, type = 'image/png', filename = 'camera.png', sessionId = id) => {
       const form = new FormData();
       form.append('token', activeToken);
       form.append('file', new Blob([image], { type }), filename);
-      return request('/api/capture-sessions/upload', { method: 'POST', body: form });
+      return request(`/api/capture-sessions/upload?session=${encodeURIComponent(sessionId)}`, { method: 'POST', body: form });
     };
 
     const invalid = await upload('not-a-real-token');
@@ -76,7 +78,7 @@ async function main() {
     const wrongType = new FormData();
     wrongType.append('token', token!);
     wrongType.append('file', new Blob(['plain text'], { type: 'text/plain' }), 'invoice.txt');
-    assert.equal((await request('/api/capture-sessions/upload', { method: 'POST', body: wrongType })).response.status, 415);
+    assert.equal((await request(`/api/capture-sessions/upload?session=${id}`, { method: 'POST', body: wrongType })).response.status, 415);
 
     const tiny = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j0ioAAAAASUVORK5CYII=', 'base64');
     assert.equal((await upload(token!, tiny)).response.status, 422);
@@ -111,11 +113,11 @@ async function main() {
     const readySession = await request('/api/capture-sessions', { method: 'POST', headers: { cookie } });
     const readyId = (readySession.body as { id: string }).id;
     const readyToken = new URL((readySession.body as { captureUrl: string }).captureUrl).searchParams.get('token')!;
-    assert.equal((await upload(readyToken)).response.status, 201);
+    assert.equal((await upload(readyToken, png, 'image/png', 'camera.png', readyId)).response.status, 201);
     assert.equal((await request(`/api/capture-sessions/${readyId}`, { method: 'PATCH', headers: authHeaders, body: JSON.stringify({ status: 'PROCESSING' }) })).response.status, 200);
     assert.equal((await request(`/api/capture-sessions/${readyId}`, { method: 'PATCH', headers: authHeaders, body: JSON.stringify({ status: 'READY' }) })).response.status, 200);
 
-    const nextPhoto = await upload(readyToken);
+    const nextPhoto = await upload(readyToken, png, 'image/png', 'camera.png', readyId);
     assert.equal(nextPhoto.response.status, 201, 'the active QR should accept a follow-up photo after the first one is ready');
     assert.equal(((await request(`/api/capture-sessions/${readyId}`, { headers: { cookie } })).body as { status: string }).status, 'UPLOADED');
     const nextProcessing = await request(`/api/capture-sessions/${readyId}`, {
@@ -129,11 +131,11 @@ async function main() {
 
     const failedSession = await request('/api/capture-sessions', { method: 'POST', headers: { cookie } });
     const failedId = (failedSession.body as { id: string }).id;
-    const db = new Database(path.join(runtime, 'internal.sqlite'));
+    const db = new Database(path.join(runtime, 'demo', `${demoId}.sqlite`));
     db.prepare('UPDATE capture_sessions SET expires_at=? WHERE id=?').run(new Date(Date.now() - 1000).toISOString(), failedId);
     db.close();
     const failedUrl = new URL((failedSession.body as { captureUrl: string }).captureUrl);
-    const expiredUpload = await upload(failedUrl.searchParams.get('token')!);
+    const expiredUpload = await upload(failedUrl.searchParams.get('token')!, png, 'image/png', 'camera.png', failedId);
     assert.equal(expiredUpload.response.status, 410);
 
     const cancelled = await request(`/api/capture-sessions/${failedId}`, { method: 'DELETE', headers: { cookie } });

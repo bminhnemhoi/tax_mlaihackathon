@@ -5,6 +5,8 @@ import { SystemPolicyConfigSchema } from '@/lib/schemas';
 import { executablePolicySummary, policyRuleMatrix } from '@/data/policyContract';
 import { PolicyRuleReference } from '@/components/PolicyRuleReference';
 
+export const dynamic='force-dynamic';
+
 export default function SopPage():ReactElement {
   const config=SystemPolicyConfigSchema.parse(DEFAULT_POLICY_CONFIG);
   return <main className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6">

@@ -419,34 +419,15 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                   </div>
                 </div>
 
-                {/* Knob 4: Staff Reimbursement Exception */}
-                <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-3 shadow-none">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                      <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
-                      4. Ngoại lệ hoàn ứng nhân viên
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-semibold border font-numeric ${
-                      dynamicConfig.allowStaffReimbursement
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        : 'bg-rose-50 text-rose-800 border-rose-200'
-                    }`}>
-                      {dynamicConfig.allowStaffReimbursement ? 'BẬT' : 'TẮT'}
-                    </span>
-                  </div>
+                {/* Knob 4: Staff reimbursement — informational (no exception to the cash rule) */}
+                <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-2 shadow-none">
+                  <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5 text-slate-500" />
+                    4. Nhân viên ứng tiền hộ
+                  </span>
                   <p className="text-xs text-slate-600 leading-relaxed">
-                    Cho phép nhân viên tạm ứng thẻ cá nhân kèm ủy nhiệm chi hoàn ứng hợp lệ:
+                    Nhân viên trả <strong>tiền mặt</strong> cho bên bán từ 5 triệu vẫn là thanh toán tiền mặt (không khấu trừ), kể cả khi công ty hoàn ứng qua ngân hàng; tách thành nhiều hóa đơn cùng ngày cũng bị gộp. Nếu nhân viên chuyển khoản/quẹt thẻ cá nhân, chọn hình thức <strong>Chuyển khoản</strong> và đính kèm chứng từ.
                   </p>
-                  <button
-                    onClick={() => setDynamicConfig({ ...dynamicConfig, allowStaffReimbursement: !dynamicConfig.allowStaffReimbursement })}
-                    className={`w-full py-2 px-3 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-none ${
-                      dynamicConfig.allowStaffReimbursement
-                        ? 'bg-slate-900 text-white hover:bg-slate-800'
-                        : 'bg-slate-100/60 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>{dynamicConfig.allowStaffReimbursement ? '✓ Đang cho phép hoàn ứng hợp lệ' : '✕ Chỉ chấp nhận tài khoản công ty'}</span>
-                  </button>
                 </div>
 
               </div>

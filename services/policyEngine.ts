@@ -8,6 +8,57 @@ import { checkSameDayMultipleInvoicesRule } from '@/services/bankMatcherService'
 import { getDatabase } from '@/lib/server/db';
 import {missingBusinessFacts,needsItemManifest,paymentThreshold} from '@/lib/refereeRequirements';
 import {buildHandoff,describeRuleEvidence} from './handoffService';
+import {concreteIssue} from './questionBuilder';
+import {groupOf,orderFindings,riskGroupsOf} from '@/lib/riskTaxonomy';
+import {fieldLabels} from '@/lib/workflowPresentation';
+
+/** Hàng hóa/dịch vụ không được giảm thuế 8% (NQ 204/2025/QH15): viễn thông, công nghệ thông tin… */
+const VAT8_EXCLUDED_PHRASES=['CƯỚC INTERNET','INTERNET','CÁP QUANG','CƯỚC DI ĐỘNG','THUÊ BAO DI ĐỘNG','ĐIỆN THOẠI DI ĐỘNG','CƯỚC ĐIỆN THOẠI','ĐIỆN THOẠI','4G','5G','CÔNG NGHỆ THÔNG TIN','PHẦN MỀM','MÁY TÍNH','LAPTOP','THÉP','SẮT THÉP','ỐNG ĐỒNG','DÂY ĐỒNG','ĐỒNG THAU','NHÔM','INOX','XĂNG','XĂNG DẦU','DẦU DIESEL','DẦU DO','DẦU MAZUT','NHIÊN LIỆU','BIA','RƯỢU','THUỐC LÁ','Ô TÔ','THAN ĐÁ','QUẶNG'];
+/** Cụm từ chứa từ khóa loại trừ nhưng là hàng hóa thông thường (VD "mũ bảo hiểm" không phải dịch vụ bảo hiểm). */
+const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HIỂM','GĂNG TAY BẢO HIỂM'];
+/** So khớp nguyên cụm từ (không khớp giữa từ) với danh mục cấu hình + cụm từ viễn thông/CNTT. */
+function isVat8Excluded(textUpper:string,categories:string[]):boolean {
+  const text=VAT8_NOT_EXCLUDED.reduce((acc,phrase)=>acc.split(phrase).join(' '),textUpper);
+  return [...categories,...VAT8_EXCLUDED_PHRASES].some(phrase=>matchesKeyword(text,phrase));
+}
+/** Chi tiếp khách/đồ uống có cồn/giải trí (SOP: cần làm rõ mục đích). So khớp nguyên từ để "BAVIA" hay "BÌA" không bị nhầm với "BIA". */
+const SENSITIVE_ITEMS=['RƯỢU','BIA','WHISKY','WHISKEY','WINE','VODKA','CHAMPAGNE','BEER','LIQUOR','COCKTAIL','SOJU','SAKE','THUỐC LÁ','CIGAR','KARAOKE','MASSAGE','NHẬU','TIẾP KHÁCH'];
+const isSensitiveText=(textUpper:string)=>SENSITIVE_ITEMS.some(k=>matchesKeyword(textUpper,k));
+/** Khoản chi SOP không bao phủ → không tự duyệt (ngoài phạm vi quy định), dù số liệu hợp lệ. */
+// So khớp nguyên từ: "PHẠT" bắt mọi khoản phạt (tiền phạt, phí phạt chậm thanh toán…) mà không nhầm với "PHÁT".
+// Không thêm "tiệc cưới/người thân" trước buổi thử 16/10: ca U2 là ca bẫy đã công bố trong Proposal để đo mức tin máy quá mức.
+export const SCOPE_NOT_COVERED_DEFAULT=['TÀI TRỢ','TỪ THIỆN','ỦNG HỘ','QUYÊN GÓP','PHẠT','TIỀN PHẠT','PHÍ PHẠT','NỘP PHẠT','PHẠT CHẬM','PHẠT VI PHẠM','BỒI THƯỜNG','QUÀ BIẾU','BIẾU','QUÀ TẶNG','QUÀ TẾT','GIỎ QUÀ','HỘP QUÀ','QUÀ SINH NHẬT','CHI PHÍ CÁ NHÂN','CHI CÁ NHÂN','MỤC ĐÍCH CÁ NHÂN','SỬ DỤNG CÁ NHÂN','MỸ PHẨM','DU LỊCH GIA ĐÌNH','CHO GIA ĐÌNH','GIA ĐÌNH GIÁM ĐỐC','HỌC PHÍ','ĐỒ CHƠI','MUA VÀNG','VÀNG MIẾNG','NGOẠI TỆ','CỔ PHIẾU','TRÁI PHIẾU','CHARITY','DONATION','SPONSORSHIP','SPONSOR','GIFT','GIFTS','PENALTY'];
+const AMOUNT_TOLERANCE=10;
+const isWordChar=(c:string|undefined)=>c!==undefined && /[\p{L}\p{N}]/u.test(c);
+/** Tìm nguyên cụm từ (không khớp giữa từ khác). */
+/**
+ * Dữ kiện tiền chưa chắc: ảnh mờ, hoặc tổng in trên hóa đơn và (tiền hàng + thuế) là hai giá trị khác nhau nằm hai phía
+ * một ngưỡng quyết định (hạn mức KTT, ngưỡng tiền mặt). Khi đó không được kết luận "vượt quyền"/"vi phạm" — hỏi số đúng trước.
+ */
+export function unverifiedAmountFacts(inv:Pick<InvoiceInput,'isImageBlurry'|'totalAmount'|'preTaxAmount'|'taxAmount'>,thresholds:number[]):string[] {
+  if(inv.isImageBlurry)return ['preTaxAmount','taxAmount','totalAmount'];
+  const printed=Math.abs(inv.totalAmount),computed=Math.abs(inv.preTaxAmount+inv.taxAmount);
+  if(Math.abs(printed-computed)<=AMOUNT_TOLERANCE)return [];
+  const low=Math.min(printed,computed),high=Math.max(printed,computed);
+  return thresholds.some(t=>low<t && high>=t)?['totalAmount']:[];
+}
+function containsWord(text:string,word:string):boolean {
+  for(let i=text.indexOf(word);i>=0;i=text.indexOf(word,i+1))if(!isWordChar(text[i-1]) && !isWordChar(text[i+word.length]))return true;
+  return false;
+}
+const stripMarks=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/Đ/g,'D').replace(/đ/g,'d').normalize('NFC');
+/**
+ * Khớp nguyên cụm từ. Người dùng gõ không dấu ("tiep khach ruou") thì so thêm dạng bỏ dấu của từ khóa;
+ * văn bản có dấu vẫn so chính xác để "BÌA" không bị nhầm thành "BIA".
+ */
+// Từ mà bỏ dấu sẽ trùng từ thông dụng khác (PHẠT/phát, BIẾU/biểu): chỉ khớp khi có dấu; dạng không dấu dùng cụm rõ nghĩa (TIỀN PHẠT…).
+const AMBIGUOUS_WITHOUT_MARKS=new Set(['PHẠT','BIẾU']);
+export function matchesKeyword(textUpper:string,keyword:string):boolean {
+  if(containsWord(textUpper,keyword))return true;
+  if(AMBIGUOUS_WITHOUT_MARKS.has(keyword))return false;
+  const plain=stripMarks(textUpper);
+  return plain===textUpper.normalize('NFC') && containsWord(plain,stripMarks(keyword));
+}
 
 // 0. IMP-08: Hàm Đối soát Chi tiết Dòng hàng & Đa Thuế suất (Line-item Validation Engine)
 export interface LineItemValidationResult {
@@ -48,8 +99,6 @@ export function validateLineItems(
     'BẤT ĐỘNG SẢN', 'KIM LOẠI', 'KHAI KHOÁNG', 'HÓA CHẤT', 'TIÊU THỤ ĐẶC BIỆT'
   ]).map(c => c.trim().toLocaleUpperCase('vi-VN'));
 
-  const sensitiveKeywords = ['RƯỢU', 'BIA', 'WHISKY', 'WINE', 'THUỐC LÁ', 'CIGAR', 'KARAOKE', 'MASSAGE'];
-
   const warnings: string[] = [];
   let flaggedCount = 0;
   let sumAmount = 0;
@@ -61,7 +110,7 @@ export function validateLineItems(
   for (const item of items) {
     sumAmount += item.amount;
     sumTax += item.taxAmount;
-    const nameUpper = item.itemName.toLocaleUpperCase('vi-VN');
+    const nameUpper = item.itemName.normalize('NFC').toLocaleUpperCase('vi-VN');
 
     // 1. Kiểm tra tính toán số học từng dòng (dung sai làm tròn 1.000đ)
     const expectedAmount = item.quantity * item.unitPrice - (item.discountAmount || 0);
@@ -72,14 +121,14 @@ export function validateLineItems(
       item.flaggedReason = 'Lệch số học thành tiền';
     }
     const expectedItemTax=Math.round(item.amount*item.taxRate/100);
-    if(Math.abs(item.taxAmount-expectedItemTax)>1){
+    if(Math.abs(item.taxAmount-expectedItemTax)>AMOUNT_TOLERANCE){
       lineArithmeticMismatch=true;flaggedCount++;
       warnings.push(`Dòng ${item.lineNumber} [${item.itemName}]: Tiền thuế ${item.taxAmount.toLocaleString('vi-VN')}₫ lệch so với thành tiền × thuế suất (${expectedItemTax.toLocaleString('vi-VN')}₫).`);
     }
 
     // 2. Rà soát danh mục loại trừ thuế suất 8% (Nghị quyết 204/2025/QH15)
     if (item.taxRate === 8) {
-      const isExcluded = excluded.some(cat => nameUpper.includes(cat)) || /CƯỚC INTERNET|INTERNET|CƯỚC DI ĐỘNG/i.test(nameUpper);
+      const isExcluded = isVat8Excluded(nameUpper, excluded);
       if (isExcluded) {
         warnings.push(`Dòng ${item.lineNumber} [${item.itemName}]: Mặt hàng thuộc danh mục loại trừ nhưng đang áp thuế suất ưu đãi 8% thay vì 10% (NQ 204/2025/QH15).`);
         flaggedCount++;
@@ -90,7 +139,7 @@ export function validateLineItems(
     }
 
     // 3. Phát hiện chi phí nhạy cảm không phục vụ SXKD
-    const isSensitive = sensitiveKeywords.some(kw => nameUpper.includes(kw));
+    const isSensitive = isSensitiveText(nameUpper);
     if (isSensitive) {
       warnings.push(`Dòng ${item.lineNumber} [${item.itemName}]: Chi phí nhạy cảm (rượu/bia/thuốc lá/giải trí) - cần kèm quy chế tiếp khách.`);
       flaggedCount++;
@@ -171,7 +220,6 @@ function evaluateInvoiceLocallyInternal(
   const kttApprovalLimit = config?.kttApprovalLimit ?? 200_000_000;
   const kSafeMin = config?.kFactorSafeMin ?? 1.05;
   const kSafeMax = config?.kFactorSafeMax ?? 1.25;
-  const allowStaffReimbursement = config?.allowStaffReimbursement ?? true;
   const isExceedKtt = Math.abs(inv.totalAmount) >= kttApprovalLimit;
   const registeredSupplier=getSupplier(inv.supplierTaxCode);
   if(registeredSupplier && ['CLOSED','SUSPENDED'].includes(registeredSupplier.status))inv.sellerStatus=registeredSupplier.status as 'CLOSED'|'SUSPENDED';
@@ -249,7 +297,8 @@ function evaluateInvoiceLocallyInternal(
   }
 
   // 3. DATA_QUALITY: Kiểm tra chất lượng dữ liệu nguồn
-  const issue = getDataQualityIssue(inv,config,sameDayPurchaseTotal(inv,contextInvoices));
+  const dailyTotal = sameDayPurchaseTotal(inv,contextInvoices);
+  const issue = getDataQualityIssue(inv,config,dailyTotal);
   if (issue) {
     evaluatedFindings.push({
       ruleId: 'RULE_DATA_QUALITY',
@@ -270,8 +319,8 @@ function evaluateInvoiceLocallyInternal(
         },
         {
           id: 'B',
-          label: 'Tạm dừng xử lý',
-          actionDescription: 'Không đưa hóa đơn vào đề xuất khấu trừ cho đến khi có bằng chứng hợp lệ.',
+          label: 'Không đủ căn cứ — không khấu trừ hóa đơn này',
+          actionDescription: 'Không đưa hóa đơn vào đề xuất khấu trừ; lưu lý do.',
           resultingAction: 'REJECT_TAX_DEDUCTION'
         }
       ],
@@ -528,9 +577,9 @@ function evaluateInvoiceLocallyInternal(
 
   // 10. STATUTORY: Hóa đơn từ 5 triệu thanh toán tiền mặt (Luật Thuế GTGT 48/2024/QH15)
   const isCashPayment = inv.paymentMethod === 'CASH';
+  // Nhân viên trả tiền mặt cho bên bán rồi được công ty hoàn ứng qua ngân hàng vẫn là thanh toán tiền mặt với bên bán.
   if (inv.totalAmount >= nonCashThreshold && isCashPayment) {
-    const isStaffException = allowStaffReimbursement && inv.isStaffReimbursed && inv.hasBankSlip===true;
-    if (!isStaffException) {
+    {
       evaluatedFindings.push({
         ruleId: 'STATUTORY_LAW_48_CASH_PAYMENT',
         kind: 'STATUTORY',
@@ -621,8 +670,8 @@ function evaluateInvoiceLocallyInternal(
     'VIỄN THÔNG', 'TÀI CHÍNH', 'NGÂN HÀNG', 'CHỨNG KHOÁN', 'BẢO HIỂM',
     'BẤT ĐỘNG SẢN', 'KIM LOẠI', 'KHAI KHOÁNG', 'HÓA CHẤT', 'TIÊU THỤ ĐẶC BIỆT'
   ]).map((value) => value.trim().toLocaleUpperCase('vi-VN')).filter(Boolean);
-  const normalizedItemName = inv.itemName.toLocaleUpperCase('vi-VN');
-  const isExcludedItem = excludedCategories.some((category) => normalizedItemName.includes(category)) || /CƯỚC INTERNET/.test(normalizedItemName);
+  const normalizedItemName = inv.itemName.normalize('NFC').toLocaleUpperCase('vi-VN');
+  const isExcludedItem = isVat8Excluded(normalizedItemName, excludedCategories);
   if ((isExcludedItem && inv.taxRate === 8) || lineItemResult.hasExcludedVat8Item) {
     const flagMsg = lineItemResult.hasExcludedVat8Item
       ? 'Dòng hàng có thuế suất 8% trong danh mục loại trừ đang cấu hình; cần đối chiếu ngành hàng và nguồn quy định'
@@ -657,14 +706,14 @@ function evaluateInvoiceLocallyInternal(
   }
 
   // 13. INTERNAL_POLICY: Quy chế nội bộ & Chi phí nhạy cảm (Rượu bia tiếp khách, viết lại theo P0-2/P0-3)
-  const SENSITIVE_ALCOHOL_REGEX = /(?:^|\s|[.,;_\-/])(rượu|bia|whisky|whiskey|wine|vodka|champagne|karaoke|massage)(?:$|\s|[.,;_\-/])/i;
-  const isAlcohol = SENSITIVE_ALCOHOL_REGEX.test(inv.itemName) || lineItemResult.hasSensitiveItem;
+  // Cùng một mẫu nguyên từ cho tên hàng và dòng hàng (gồm thuốc lá; ngoặc/dấu câu không làm lọt từ khóa).
+  const isAlcohol = isSensitiveText(normalizedItemName) || lineItemResult.hasSensitiveItem;
   if (isAlcohol) {
     evaluatedFindings.push({
       ruleId: 'INTERNAL_POLICY_GUEST_ENTERTAINMENT',
       kind: 'INTERNAL_POLICY',
       severity: 'MEDIUM',
-      riskGroup: 'UNCERTAIN_INFO',
+      riskGroup: 'OUT_OF_POLICY',
       flaggedReason: 'Khoản chi có đồ uống có cồn/tiếp khách: Cần làm rõ mục đích phục vụ sản xuất kinh doanh hay phúc lợi nhân viên theo quy chế tài chính (Luật Thuế TNDN)',
       plainExplanation: 'Hóa đơn có đồ uống có cồn hoặc chi phí tiếp khách/giải trí. Theo quy định thuế TNDN, chi phí này chỉ được trừ và khấu trừ thuế khi phục vụ trực tiếp SXKD, có quy chế tiếp khách, danh sách đối tác hoặc thỏa mãn trần chi phúc lợi.',
       legalBasis: 'Điều 2.1 Quy chế Tax-SOP-2026 & Khoản 1 Điều 9 Luật Thuế TNDN 67/2025/QH15',
@@ -683,6 +732,44 @@ function evaluateInvoiceLocallyInternal(
           actionDescription: 'Lưu chi phí nội bộ và lý do không duyệt thuế trong hồ sơ này.',
           resultingAction: 'REJECT_TAX_DEDUCTION'
         }
+      ],
+      requiresCFO: isExceedKtt
+    });
+  }
+
+  // 13b. SCOPE: Khoản chi SOP không bao phủ (tài trợ, từ thiện, tiền phạt, quà biếu, chi cá nhân, tài sản tài chính)
+  const scopeKeywords=(config?.scopeNotCoveredCategories ?? SCOPE_NOT_COVERED_DEFAULT).map(k=>k.trim().toLocaleUpperCase('vi-VN')).filter(Boolean);
+  const scopeTexts=[inv.itemName,...(inv.items||[]).map(i=>i.itemName)].map(t=>t.toLocaleUpperCase('vi-VN'));
+  // Hóa đơn 0 đồng (VD hàng khuyến mại bên bán tặng) không có tiền/thuế nào cần quyết định: không chuyển tiếp vì từ khóa.
+  const nothingAtStake=Math.abs(inv.totalAmount)===0 && Math.abs(inv.taxAmount)===0;
+  const scopeHit=nothingAtStake ? undefined : scopeKeywords.find(k=>scopeTexts.some(t=>matchesKeyword(t,k)));
+  if (scopeHit) {
+    evaluatedFindings.push({
+      ruleId: 'RULE_SCOPE_NOT_COVERED', kind: 'INTERNAL_POLICY', severity: 'HIGH', riskGroup: 'OUT_OF_POLICY',
+      flaggedReason: `Nội dung “${inv.itemName}” thuộc nhóm “${scopeHit.toLocaleLowerCase('vi-VN')}” — SOP chưa có quy tắc tự duyệt cho loại chi này.`,
+      plainExplanation: 'Khoản chi này không nằm trong các nhóm chi phí mà quy chế cho phép hệ thống tự duyệt. Hệ thống không tự kết luận được hay không được khấu trừ, nên chuyển người có thẩm quyền quyết định.',
+      legalBasis: 'Điều 2.3 Quy chế Tax-SOP-2026 (Phạm vi tự động hóa)', sopClause: 'Điều 2.3 Quy chế Tax-SOP-2026',
+      actionableQuestion: `Khoản chi “${inv.itemName}” nằm ngoài phạm vi tự duyệt. ${isExceedKtt ? 'CFO' : 'KTT'} quyết định?`,
+      options: [
+        {id:'A',label:'Có hợp đồng/chứng từ phục vụ SXKD — duyệt khấu trừ',actionDescription:'Người có thẩm quyền xác nhận kèm hợp đồng/chứng từ chứng minh.',resultingAction:'ACCEPT_WITH_DOCS'},
+        {id:'B',label:'Không phục vụ SXKD — loại thuế, chỉ ghi nhận chi phí',actionDescription:'Không kê khai khấu trừ; lưu lý do.',resultingAction:'REJECT_TAX_DEDUCTION'}
+      ],
+      requiresCFO: isExceedKtt
+    });
+  }
+
+  // 13c. SCOPE: Thuế suất 8% ngoài thời gian giảm thuế đã cấu hình (NQ 204/2025/QH15 hết hiệu lực sau 31/12/2026)
+  const usesVat8=inv.taxRate===8 || (inv.items||[]).some(i=>i.taxRate===8);
+  if (usesVat8 && !regInfo.hasVatReductionPolicy && (inv.invoiceDate>'2026-12-31' || inv.invoiceDate<'2022-02-01')) {
+    evaluatedFindings.push({
+      ruleId: 'RULE_SCOPE_VAT8_PERIOD', kind: 'STATUTORY', severity: 'HIGH', riskGroup: 'OUT_OF_POLICY',
+      flaggedReason: `Hóa đơn ngày ${inv.invoiceDate} áp thuế suất 8% ngoài thời gian giảm thuế GTGT đã cấu hình.`,
+      plainExplanation: 'Mức thuế 8% chỉ áp dụng trong thời gian có nghị quyết giảm thuế GTGT. Hóa đơn lập ngoài thời gian này phải dùng thuế suất phổ thông 10%.',
+      legalBasis: 'Điều 1.3 Quy chế Tax-SOP-2026 & Nghị quyết 204/2025/QH15', sopClause: 'Điều 1.3 Quy chế Tax-SOP-2026',
+      actionableQuestion: `Hóa đơn ${inv.invoiceNumber} áp 8% ngoài thời gian giảm thuế. ${isExceedKtt ? 'CFO' : 'KTT'} xử lý thế nào?`,
+      options: [
+        {id:'A',label:'Yêu cầu NCC xuất lại hóa đơn 10%',actionDescription:'Giữ hồ sơ, chưa khấu trừ cho đến khi có hóa đơn đúng thuế suất.',resultingAction:'REQUEST_SUPPLIER_REISSUE'},
+        {id:'B',label:'Không khấu trừ phần thuế sai',actionDescription:'Ghi nhận chi phí nội bộ, loại phần thuế sai.',resultingAction:'REJECT_TAX_DEDUCTION'}
       ],
       requiresCFO: isExceedKtt
     });
@@ -954,53 +1041,31 @@ function evaluateInvoiceLocallyInternal(
     };
   }
 
-  // 3. Nếu còn finding -> ESCALATED
-  // Sắp xếp theo thứ tự ưu tiên: STATUTORY (1) > DATA_QUALITY (2) > INTERNAL_POLICY (3) > AUTHORITY (4)
-  const KIND_PRIORITY: Record<RuleKind, number> = {
-    STATUTORY: 1,
-    DATA_QUALITY: 2,
-    INTERNAL_POLICY: 3,
-    AUTHORITY: 4
-  };
-  const SEVERITY_PRIORITY: Record<'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW', number> = {
-    CRITICAL: 1,
-    HIGH: 2,
-    MEDIUM: 3,
-    LOW: 4
-  };
-
-  activeFindings.sort((a, b) => {
-    const kDiff = KIND_PRIORITY[a.kind] - KIND_PRIORITY[b.kind];
-    if (kDiff !== 0) return kDiff;
-    return SEVERITY_PRIORITY[a.severity] - SEVERITY_PRIORITY[b.severity];
-  });
-
-  const primaryFinding = activeFindings[0];
-  const requiresCFO = isExceedKtt || activeFindings.some(f => f.requiresCFO || f.kind === 'AUTHORITY');
-  const genericQuestion = /(?:KTT(?:\/CFO)? xử lý thế nào\?|CFO phê duyệt chiến lược xử lý\?|KTT quyết định\?|CFO phê duyệt ghi nhận\?)$/i;
-  const question = primaryFinding.actionableQuestion.trim();
-  const actionableQuestion = genericQuestion.test(question)
-    ? `${question.replace(genericQuestion, '').trim()} ${requiresCFO ? 'CFO' : 'Kế toán trưởng'} chọn phương án: ${primaryFinding.options.map(option => option.label).join(' / ')}.`
-    : question;
-
-  // Tính toán tách thuế: deductibleTax vs nonDeductibleTax
-  let deductibleTax = 0;
-  let nonDeductibleTax = inv.taxAmount;
-  const hasStatutory = activeFindings.some(f => f.kind === 'STATUTORY');
-  if (!hasStatutory && activeFindings.every(f => f.kind === 'AUTHORITY')) {
-    deductibleTax = inv.taxAmount;
-    nonDeductibleTax = 0;
+  // 3. Còn phát hiện → ESCALATED. Mỗi phát hiện được viết lại thành câu hỏi đóng có số liệu cụ thể và hệ quả ₫;
+  // nhóm chính lấy từ bảng phân loại duy nhất (lib/riskTaxonomy), không phụ thuộc thứ tự khai báo quy tắc.
+  const questionContext = { config, nonCashThreshold, kttLimit: kttApprovalLimit, dailyTotal };
+  for (const finding of activeFindings) {
+    finding.riskGroup = groupOf(finding.ruleId, finding.kind);
+    const concrete = concreteIssue(finding, inv, questionContext);
+    if (concrete) {
+      finding.flaggedReason = concrete.reason;
+      finding.actionableQuestion = concrete.ask;
+      if (concrete.options) finding.options = concrete.options;
+    }
   }
+  const ordered = orderFindings(activeFindings, unverifiedAmountFacts(inv, [kttApprovalLimit, nonCashThreshold]));
+  const primaryFinding = ordered[0];
+  const requiresCFO = isExceedKtt || ordered.some(f => f.requiresCFO || f.kind === 'AUTHORITY');
 
   let combinedReason = primaryFinding.flaggedReason;
-  if (activeFindings.length > 1) {
-    const otherCount = activeFindings.length - 1;
-    combinedReason += ` (đồng thời phát hiện thêm ${otherCount} rủi ro: ${activeFindings.slice(1).map(f => f.flaggedReason.slice(0, 60)).join('; ')}...)`;
+  if (ordered.length > 1) {
+    combinedReason += ` (đồng thời còn ${ordered.length - 1} phát hiện: ${ordered.slice(1).map(f => f.flaggedReason).join('; ')})`;
   }
 
   return {
     status: 'ESCALATED',
-    riskGroup: primaryFinding.riskGroup,
+    riskGroup: groupOf(primaryFinding.ruleId, primaryFinding.kind),
+    riskGroups: riskGroupsOf(ordered),
     invoiceId: inv.id,
     supplierName: inv.supplierName,
     totalAmount: inv.totalAmount,
@@ -1008,12 +1073,12 @@ function evaluateInvoiceLocallyInternal(
     flaggedReason: combinedReason,
     plainExplanation: primaryFinding.plainExplanation,
     sopClause: primaryFinding.sopClause,
-    actionableQuestion: `Hóa đơn ${inv.invoiceNumber} · Người xử lý: ${requiresCFO ? 'CFO' : 'Kế toán trưởng'}. ${actionableQuestion}${activeFindings.length > 1 ? ` Cần xử lý đủ ${activeFindings.length} phát hiện: ${activeFindings.map(f=>f.flaggedReason).join('; ')}. Giải quyết một phát hiện không tự giải tỏa các phát hiện còn lại.` : ''}`,
+    actionableQuestion: primaryFinding.actionableQuestion,
     options: primaryFinding.options,
     requiresCFO,
     lineItemAnalysis,
     duplicateInfo: duplicate.isDuplicate ? duplicate : undefined,
-    findings: activeFindings.map(f => ({
+    findings: ordered.map(f => ({
       ruleId: f.ruleId,
       kind: f.kind,
       severity: f.severity,
@@ -1040,7 +1105,12 @@ export function evaluateInvoiceLocally(
 ): RefereeDecision {
   const regInfo = getApplicableRegulations(inv.invoiceDate);
   const applicableDecreeCodes = regInfo.applicableRegulations.map((d) => d.code);
-  const decision = evaluateInvoiceLocallyInternal(structuredClone(inv), customConfig, macroState, contextInvoices);
+  // Chuẩn hóa Unicode (NFC): chữ Việt gõ dạng tổ hợp (NFD) vẫn khớp từ khóa quy tắc.
+  const normalized = structuredClone(inv);
+  normalized.itemName = normalized.itemName.normalize('NFC');
+  normalized.supplierName = normalized.supplierName.normalize('NFC');
+  normalized.items = normalized.items?.map(line => ({ ...line, itemName: line.itemName.normalize('NFC') }));
+  const decision = evaluateInvoiceLocallyInternal(normalized, customConfig, macroState, contextInvoices);
   const decorated={
     ...decision,
     applicableRegulations: applicableDecreeCodes,
@@ -1063,45 +1133,16 @@ export function sameDayPurchaseTotal(inv:Partial<InvoiceInput>,context?:InvoiceI
 function getDataQualityIssue(inv: InvoiceInput,config?:Partial<SystemPolicyConfig>,dailyTotal=0): string | null {
   const date = new Date(`${inv.invoiceDate}T00:00:00Z`);
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== inv.invoiceDate) return 'Ngày hóa đơn không hợp lệ hoặc không thể đối chiếu văn bản có hiệu lực.';
+  // Ngày lập muộn hơn hôm nay quá 6 tháng gần như chắc chắn là nhập sai năm: không tự duyệt trên ngày đó.
+  if (date.getTime() - Date.now() > 183 * 24 * 60 * 60 * 1000) return `Ngày lập ${inv.invoiceDate} muộn hơn hôm nay hơn 6 tháng — có thể nhập sai năm; cần xác nhận ngày trên chứng từ.`;
   const expectedTax = Math.round(inv.preTaxAmount * inv.taxRate / 100);
   const expectedTotal = inv.preTaxAmount + inv.taxAmount;
-  if (Math.abs(inv.taxAmount - expectedTax) > 1 || Math.abs(inv.totalAmount - expectedTotal) > 1) {
+  if (Math.abs(inv.taxAmount - expectedTax) > AMOUNT_TOLERANCE || Math.abs(inv.totalAmount - expectedTotal) > AMOUNT_TOLERANCE) {
     return 'Các số tiền trên hóa đơn không nhất quán với tiền trước thuế và thuế suất; cần xác nhận lại chứng từ gốc.';
   }
-  if (inv.isImageBlurry) return 'Ảnh hóa đơn bị mờ, chưa thể xác nhận chính xác dữ liệu thực tế.';
   if(inv.totalAmount<0 && !inv.isAdjustment)return 'Giá trị âm chưa được xác định là hóa đơn điều chỉnh.';
   const missing=missingBusinessFacts(inv,config,dailyTotal);
-  if(missing.length)return `Thiếu dữ kiện cần cho quy tắc: ${missing.join(', ')}. Cần bổ sung nguồn xác minh.`;
+  if(missing.length)return `Thiếu dữ kiện cần cho quy tắc: ${missing.map(field=>fieldLabels[field] || field).join(', ')}. Cần bổ sung nguồn xác minh.`;
   return null;
 }
 
-function uncertainDecision(inv: InvoiceInput, reason: string, timestamp: string): RefereeDecision {
-  return {
-    status: 'ESCALATED',
-    riskGroup: 'UNCERTAIN_INFO',
-    invoiceId: inv.id,
-    supplierName: inv.supplierName,
-    totalAmount: inv.totalAmount,
-    taxRate: inv.taxRate,
-    flaggedReason: reason,
-    plainExplanation: 'Hệ thống chưa đủ dữ liệu chắc chắn để khẳng định hóa đơn hợp lệ. Cần người phụ trách kiểm tra và xác nhận trước khi xử lý tiếp.',
-    sopClause: 'Quy trình kiểm soát dữ liệu đầu vào Tax-SOP-2026',
-    actionableQuestion: `Hóa đơn ${inv.invoiceNumber} từ ${inv.supplierName} cần xác minh: ${reason} KTT chọn tiếp tục bổ sung hồ sơ hay tạm dừng xử lý?`,
-    options: [
-      {
-        id: 'A',
-        label: 'Bổ sung và xác nhận hồ sơ',
-        actionDescription: 'Tạm treo quyết định và yêu cầu bổ sung dữ liệu/chứng từ còn thiếu.',
-        resultingAction: 'REQUEST_INFORMATION'
-      },
-      {
-        id: 'B',
-        label: 'Tạm dừng xử lý',
-        actionDescription: 'Không đưa hóa đơn vào đề xuất khấu trừ cho đến khi có bằng chứng hợp lệ.',
-        resultingAction: 'REJECT_TAX_DEDUCTION'
-      }
-    ],
-    requiresCFO: false,
-    timestamp
-  };
-}

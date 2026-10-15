@@ -1,5 +1,8 @@
 # Bảng đối chiếu SOP và quy tắc thực thi
 
+> 📌 **Ảnh chụp lịch sử** — số liệu và tên quy tắc trong file này có thể đã cũ. Số liệu hiện hành: [README](../README.md), trang `/verify`, `/sop` và `docs/evidence/`.
+
+
 Snapshot profile mặc định ngày 12/10/2026, contract `referee-contract-2026-10-12`. Nguồn: `data/policyContract.ts`; trang `/sop` và API policy tạo bảng từ cùng registry. Ghi chú tự do không thay đổi thuật toán. Policy đang lưu của người dùng vẫn được giữ nguyên; thay cấu hình cần draft, kiểm tra và publish.
 
 Ngưỡng mặc định: thẩm quyền KTT 200.000.000 ₫ (đạt ngưỡng cần CFO); thanh toán 5.000.000 ₫ từ 01/07/2025, trước đó profile lịch sử 20.000.000 ₫. Dữ kiện trọng yếu chưa xác minh luôn chặn tự duyệt; trường không liên quan không tạo chuyển tiếp dư. Xác minh tên/MST không chứng minh bên bán hoạt động.

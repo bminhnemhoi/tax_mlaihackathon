@@ -24,7 +24,10 @@ export function validatePolicySafety(config:SystemPolicyConfig,version:string):{
       {name:'LIMIT-NEGATIVE',invoice:{...amount(-config.kttApprovalLimit),isAdjustment:true,originalInvoiceRef:'ORIGINAL-GATE'},group:'EXCEED_AUTHORITY',cfo:true},
       {name:'MONEY',invoice:{...base,totalAmount:base.totalAmount+100},group:'UNCERTAIN_INFO',cfo:base.totalAmount>=config.kttApprovalLimit},
       {name:'BLUR',invoice:{...base,isImageBlurry:true},group:'UNCERTAIN_INFO',cfo:base.totalAmount>=config.kttApprovalLimit},
-      {name:'UNKNOWN-SELLER',invoice:{...base,sellerStatus:'UNKNOWN'},group:'UNCERTAIN_INFO',cfo:base.totalAmount>=config.kttApprovalLimit},
+      {name:'UNKNOWN-SELLER',invoice:{...amount(Math.max(1,config.sellerStatusMaterialityVnd ?? 20_000_000)),sellerStatus:'UNKNOWN'},group:'UNCERTAIN_INFO',cfo:Math.max(1,config.sellerStatusMaterialityVnd ?? 20_000_000)>=config.kttApprovalLimit},
+      // Không chuyển tiếp thừa: dưới ngưỡng trọng yếu/ngưỡng tiền mặt, dữ kiện chưa biết không đổi kết quả.
+      ...(base.totalAmount<(config.sellerStatusMaterialityVnd ?? 20_000_000) && base.totalAmount<config.nonCashThreshold && base.totalAmount<config.kttApprovalLimit
+        ? [{name:'UNKNOWN-FACTS-BELOW-THRESHOLDS',invoice:{...base,sellerStatus:'UNKNOWN' as const,paymentMethod:undefined,hasBankSlip:undefined}}] : []),
       {name:'CASH-AT',invoice:{...amount(Math.max(1,config.nonCashThreshold)),paymentMethod:'CASH',hasBankSlip:false},group:'OUT_OF_POLICY',cfo:Math.max(1,config.nonCashThreshold)>=config.kttApprovalLimit},
       {name:'BANK-MISSING',invoice:{...amount(Math.max(1,config.nonCashThreshold)),hasBankSlip:undefined},group:'UNCERTAIN_INFO',cfo:Math.max(1,config.nonCashThreshold)>=config.kttApprovalLimit},
     ];

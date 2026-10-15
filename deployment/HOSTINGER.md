@@ -11,7 +11,7 @@ Domain: `limegreen-salamander-517622.hostingersite.com`. Đây là Node.js Web A
 ## Các vị trí trên server
 
 ```text
-/home/u575108238/domains/limegreen-salamander-517622.hostingersite.com/
+/home/$SSH_USER/domains/limegreen-salamander-517622.hostingersite.com/
   hbuilds/config/.env             # secret, chmod 600; không đưa vào Git
   hbuilds/versions/<release>/nodejs
   hbuilds/current                 # symlink tới release đang chạy
@@ -22,7 +22,7 @@ Domain: `limegreen-salamander-517622.hostingersite.com`. Đây là Node.js Web A
   runtime/python/                # PyMuPDF, Pillow, pypdf
 ```
 
-MVP hiện cho đăng nhập nội bộ bằng cách chọn một trong ba vai trò, không yêu cầu mật khẩu; có thể đổi vai trò trong workspace. Đây là cơ chế trình diễn, không xác minh danh tính. API email/mật khẩu cũ vẫn tương thích với secret riêng trong `hbuilds/config/.env`. Profile live là Vision; worker OCR local chỉ nằm trong Compose dành cho môi trường có Docker.
+Workspace nội bộ đăng nhập bằng email/mật khẩu (đặt `TAX_REFEREE_*_PASSWORD` trong `hbuilds/config/.env`). Giám khảo/khách dùng **demo riêng**: database của phiên, đổi vai trò mô phỏng tự do, không cần tài khoản. Script đóng gói ghi `.git-commit` để `/api/health` và Verify hiển thị commit đang chạy. Profile live là Vision; worker OCR local chỉ nằm trong Compose dành cho môi trường có Docker.
 
 ## Đóng gói và cập nhật
 
@@ -31,10 +31,10 @@ Trên máy local:
 ```sh
 npm ci
 npm run typecheck
-npm run test:acceptance
+npm test
 npm run build
 python3 deployment/pack-hostinger.py /tmp/tax-referee-production.tgz
-scp -P 65002 /tmp/tax-referee-production.tgz u575108238@145.79.25.163:/home/u575108238/
+scp -P "$SSH_PORT" /tmp/tax-referee-production.tgz "$SSH_USER@$SSH_HOST:/home/$SSH_USER/"
 ```
 
 Tạo release mới trên host, giải nén vào `nodejs`. Dùng Node `/opt/alt/alt-nodejs22/root/usr/bin/node`; cài `npm ci` với PATH tương ứng hoặc dùng dependency của release trước nếu lockfile không đổi. **Không sao chép node_modules macOS**. Tạo symlink `.next/standalone/node_modules` tới `../../node_modules`; tạo `server.js` với `require('./deployment/hostinger-bootstrap.cjs');`, thư mục `tmp` và `tmp/restart.txt`.

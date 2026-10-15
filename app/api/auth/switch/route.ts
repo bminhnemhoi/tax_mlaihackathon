@@ -1,4 +1,4 @@
-import { withRequestDatabase } from '@/lib/server/db';
+import { isSandbox, withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { appendAuditEvent } from '@/lib/server/audit';
 import { AppRole, getRequestUser, switchRole } from '@/lib/server/auth';
@@ -8,7 +8,9 @@ export const dynamic = 'force-dynamic';
 async function handlePOST(req: NextRequest) {
   const currentUser = getRequestUser(req);
   if (!currentUser) return NextResponse.json({ error: 'Vui lòng đăng nhập trước khi chuyển vai trò' }, { status: 401 });
-  // Luôn cho phép chuyển vai trò theo yêu cầu (không bao giờ khóa)
+  // Vai trò mô phỏng chỉ đổi được trong demo riêng (database của phiên). Workspace nội bộ phải đăng nhập
+  // đúng tài khoản để nguyên tắc bất kiêm nhiệm và cột "ai làm" trong audit có ý nghĩa.
+  if (!isSandbox()) return NextResponse.json({ error: 'Chỉ đổi vai trò được trong demo riêng. Workspace nội bộ cần đăng nhập đúng tài khoản.' }, { status: 403 });
   const body = await req.json().catch(() => ({}));
   const role = body.role as AppRole;
   if (!['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'].includes(role)) {
