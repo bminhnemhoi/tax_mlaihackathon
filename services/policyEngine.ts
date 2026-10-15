@@ -1067,7 +1067,7 @@ function evaluateInvoiceLocallyInternal(
 
   // 3. Còn phát hiện → ESCALATED. Mỗi phát hiện được viết lại thành câu hỏi đóng có số liệu cụ thể và hệ quả ₫;
   // nhóm chính lấy từ bảng phân loại duy nhất (lib/riskTaxonomy), không phụ thuộc thứ tự khai báo quy tắc.
-  const questionContext = { config, nonCashThreshold, kttLimit: kttApprovalLimit, dailyTotal, splitTotal };
+  const questionContext = { config, nonCashThreshold, kttLimit: kttApprovalLimit, dailyTotal, splitTotal, duplicateOf: duplicate.isDuplicate && duplicate.originalInvoiceId ? { id: duplicate.originalInvoiceId, invoiceNumber: duplicate.originalInvoiceNumber || '' } : undefined };
   for (const finding of activeFindings) {
     finding.riskGroup = groupOf(finding.ruleId, finding.kind);
     const concrete = concreteIssue(finding, inv, questionContext);

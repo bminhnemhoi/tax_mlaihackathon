@@ -26,7 +26,7 @@ type Option = ActionOption;
 const option = (id: 'A' | 'B', label: string, actionDescription: string, resultingAction: Option['resultingAction']): Option => ({ id, label, actionDescription, resultingAction });
 
 export interface ConcreteIssue { reason: string; ask: string; options?: [Option, Option] }
-export interface QuestionContext { config?: Partial<SystemPolicyConfig>; nonCashThreshold: number; dailyTotal?: number; splitTotal?: number; kttLimit: number }
+export interface QuestionContext { config?: Partial<SystemPolicyConfig>; nonCashThreshold: number; dailyTotal?: number; splitTotal?: number; kttLimit: number; duplicateOf?: { id: string; invoiceNumber: string } }
 
 export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReason'>, inv: InvoiceInput, ctx: QuestionContext): ConcreteIssue | null {
   const tax = vnd(inv.taxAmount), total = vnd(inv.totalAmount), item = `“${inv.itemName}”`;
@@ -140,7 +140,7 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
       };
     case 'RULE_DUPLICATE_INVOICE':
       return {
-        reason: `Trùng với hóa đơn đã tiếp nhận (cùng MST ${inv.supplierTaxCode} + ký hiệu + số ${inv.invoiceNumber}).`,
+        reason: `Trùng với hóa đơn đã tiếp nhận${ctx.duplicateOf ? ` [${ctx.duplicateOf.id}]` : ''} (cùng MST ${inv.supplierTaxCode} + ký hiệu + số ${inv.invoiceNumber}${ctx.duplicateOf && ctx.duplicateOf.invoiceNumber !== inv.invoiceNumber ? `, hồ sơ gốc ghi số "${ctx.duplicateOf.invoiceNumber}"` : ''}).`,
         ask: 'Đây là bản trùng hay hóa đơn thay thế?',
         options: [option('A', 'Bản trùng — từ chối, không kê khai lần hai', 'Hủy tiếp nhận bản trùng để tránh kê khai trùng thuế.', 'REJECT_TAX_DEDUCTION'),
           option('B', 'Hóa đơn thay thế — bổ sung biên bản và số HĐ gốc rồi đánh giá lại', 'Giữ hồ sơ chờ biên bản thay thế và tham chiếu hóa đơn gốc.', 'REQUEST_INFORMATION')]
