@@ -101,6 +101,37 @@ export function auditHead(): { count: number; headHash: string | null; keyed: bo
   return { count: row.n, headHash: row.head, keyed: Boolean(auditKey()) };
 }
 
+export type AuditAnchor = { count: number; headHash: string | null; createdAt: string; signature: string | null; signed: boolean };
+const anchorBody = (a: { count: number; headHash: string | null; createdAt: string }) => `${a.count}|${a.headHash || ''}|${a.createdAt}`;
+
+/**
+ * Điểm neo nhật ký (theo tinh thần Certificate Transparency / Crosby–Wallach): số sự kiện + hash cuối + thời điểm, ký HMAC
+ * nếu có khóa. Lưu điểm neo ra ngoài hệ thống (email, ticket, file) để sau này phát hiện nhật ký bị cắt đuôi hoặc viết lại.
+ */
+export function auditAnchor(): AuditAnchor {
+  const head = auditHead(), createdAt = new Date().toISOString(), key = auditKey();
+  const body = anchorBody({ count: head.count, headHash: head.headHash, createdAt });
+  return { count: head.count, headHash: head.headHash, createdAt, signature: key ? crypto.createHmac('sha256', key).update(body).digest('hex') : null, signed: Boolean(key) };
+}
+
+/** Đối chiếu nhật ký hiện tại với một điểm neo đã lưu: không được ít hơn (cắt đuôi), sự kiện tại vị trí neo phải đúng hash (viết lại). */
+export function verifyAgainstAnchor(anchor: { count: number; headHash: string | null; createdAt?: string; signature?: string | null }): { valid: boolean; currentCount: number; signatureChecked: boolean; error?: string } {
+  const db = getDatabase(), key = auditKey();
+  let signatureChecked = false;
+  if (anchor.signature && anchor.createdAt && key) {
+    const expected = crypto.createHmac('sha256', key).update(anchorBody({ count: anchor.count, headHash: anchor.headHash, createdAt: anchor.createdAt })).digest('hex');
+    if (expected !== anchor.signature) return { valid: false, currentCount: 0, signatureChecked: true, error: 'Chữ ký của điểm neo không hợp lệ: điểm neo bị sửa hoặc không do hệ thống này cấp.' };
+    signatureChecked = true;
+  }
+  const total = (db.prepare('SELECT COUNT(*) n FROM audit_events').get() as { n: number }).n;
+  if (total < anchor.count) return { valid: false, currentCount: total, signatureChecked, error: `Nhật ký chỉ còn ${total} sự kiện, ít hơn điểm neo (${anchor.count}): bị cắt đuôi.` };
+  if (anchor.count > 0) {
+    const row = db.prepare('SELECT event_hash h FROM audit_events ORDER BY rowid ASC LIMIT 1 OFFSET ?').get(anchor.count - 1) as { h: string } | undefined;
+    if (!row || row.h !== anchor.headHash) return { valid: false, currentCount: total, signatureChecked, error: 'Sự kiện tại vị trí neo không khớp hash đã neo: nhật ký bị viết lại.' };
+  }
+  return { valid: true, currentCount: total, signatureChecked };
+}
+
 export function verifyAuditChain(): { valid: boolean; checked: number; legacy: boolean; keyed: boolean; macVerified: number; warning?: string; error?: string } {
   const db = getDatabase();
   const checkpoint = db.prepare('SELECT cutoff_rowid, anchor_hash FROM audit_chain_checkpoints ORDER BY id DESC LIMIT 1').get() as { cutoff_rowid?: number; anchor_hash?: string } | undefined;

@@ -66,3 +66,26 @@ test('có khóa HMAC: tính lại toàn bộ chuỗi hash mà không có khóa v
     if (saved === undefined) delete process.env.TAX_REFEREE_AUDIT_KEY; else process.env.TAX_REFEREE_AUDIT_KEY = saved;
   }
 });
+
+test('điểm neo nhật ký: phát hiện cắt đuôi và viết lại; ghi thêm sau điểm neo vẫn hợp lệ; điểm neo giả bị từ chối', async () => {
+  const { auditAnchor, verifyAgainstAnchor } = await import('../../lib/server/audit');
+  const saved = process.env.TAX_REFEREE_AUDIT_KEY;
+  process.env.TAX_REFEREE_AUDIT_KEY = 'a'.repeat(40);
+  try {
+    await runIsolated(async () => {
+      for (let i = 0; i < 5; i++) appendAuditEvent({ eventType: 'TEST_EVENT', entityId: `ANC-${i}`, payload: { i } });
+      const anchor = auditAnchor();
+      assert.equal(anchor.count, 5); assert.equal(anchor.signed, true);
+      appendAuditEvent({ eventType: 'TEST_EVENT', entityId: 'ANC-later', payload: { later: true } });
+      assert.equal(verifyAgainstAnchor(anchor).valid, true, 'ghi thêm sau điểm neo vẫn hợp lệ');
+      assert.match(verifyAgainstAnchor({ ...anchor, count: anchor.count + 1 }).error || '', /Chữ ký/);
+      const db = getDatabase();
+      db.exec('DROP TRIGGER audit_events_no_delete');
+      db.prepare('DELETE FROM audit_events WHERE rowid IN (SELECT rowid FROM audit_events ORDER BY rowid DESC LIMIT 3)').run();
+      const cut = verifyAgainstAnchor(anchor);
+      assert.equal(cut.valid, false); assert.match(cut.error || '', /cắt đuôi/);
+    });
+  } finally {
+    if (saved === undefined) delete process.env.TAX_REFEREE_AUDIT_KEY; else process.env.TAX_REFEREE_AUDIT_KEY = saved;
+  }
+});
