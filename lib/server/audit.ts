@@ -147,6 +147,7 @@ export function verifyAuditChain(): { valid: boolean; checked: number; legacy: b
     return { valid: false, checked: 0, legacy: true, keyed: Boolean(key), macVerified: 0, error: 'Điểm mốc audit bao trùm sự kiện đã ký: mốc giả.' };
   let previousMac = checkpoint?.cutoff_rowid ? ((db.prepare('SELECT event_mac FROM audit_events WHERE rowid <= ? ORDER BY rowid DESC LIMIT 1').get(checkpoint.cutoff_rowid) as { event_mac?: string | null } | undefined)?.event_mac || '') : '';
   let signingStarted = false;
+  const signedSince = process.env.TAX_REFEREE_AUDIT_SIGNED_SINCE && !Number.isNaN(Date.parse(process.env.TAX_REFEREE_AUDIT_SIGNED_SINCE)) ? new Date(process.env.TAX_REFEREE_AUDIT_SIGNED_SINCE).toISOString() : '';
   for (const row of rows) {
     const expected = crypto.createHash('sha256')
       .update([previous, row.eventType, row.entityId, row.actorId || '', row.payload, row.createdAt].join('|'))
@@ -155,6 +156,9 @@ export function verifyAuditChain(): { valid: boolean; checked: number; legacy: b
       return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), keyed: Boolean(key), macVerified, error: 'Chuỗi hash audit không hợp lệ' };
     }
     if (row.eventMac) signingStarted = true;
+    // Chống hạ cấp: từ mốc TAX_REFEREE_AUDIT_SIGNED_SINCE (đặt ngoài DB, trong env), mọi sự kiện phải có HMAC. Không có mốc này,
+    // người ghi được DB có thể xóa hết MAC rồi tính lại chuỗi hash mà chuỗi vẫn "hợp lệ kèm cảnh báo".
+    else if (key && signedSince && String(row.createdAt) >= signedSince) return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), keyed: true, macVerified, error: 'Sự kiện sau mốc bắt buộc ký thiếu chữ ký HMAC: chữ ký bị xóa (hạ cấp)' };
     else if (signingStarted) return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), keyed: Boolean(key), macVerified, error: 'Sự kiện thiếu chữ ký HMAC sau khi đã bật khóa: chữ ký bị xóa' };
     if (key && row.eventMac) {
       if (row.eventMac !== macOf(key, previousMac, String(row.eventHash))) return { valid: false, checked: rows.indexOf(row) + 1, legacy: Boolean(checkpoint), keyed: true, macVerified, error: 'Chữ ký HMAC audit không khớp: chuỗi đã bị tính lại hoặc sửa' };

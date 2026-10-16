@@ -23,7 +23,10 @@ export function vatReductionAt(invoiceDate: string): VatReductionPeriod | null {
 }
 
 /** Luôn bị loại khỏi diện giảm 8% ở mọi kỳ: viễn thông, kim loại, hàng chịu TTĐB (trừ xăng), khai khoáng (trừ than). */
-export const VAT8_EXCLUDED_ALWAYS = ['CƯỚC INTERNET', 'INTERNET', 'CÁP QUANG', 'CƯỚC DI ĐỘNG', 'THUÊ BAO DI ĐỘNG', 'CƯỚC ĐIỆN THOẠI', '4G', '5G',
+// Viễn thông nhận diện theo cụm "dịch vụ" (cước, gói, thuê bao, data, sim), không theo chữ "INTERNET"/"4G"/"5G" đứng riêng —
+// "quảng cáo trên Internet", "điện thoại 5G" không phải dịch vụ viễn thông.
+export const VAT8_EXCLUDED_ALWAYS = ['CƯỚC INTERNET', 'DỊCH VỤ INTERNET', 'THUÊ BAO INTERNET', 'GÓI INTERNET', 'INTERNET CÁP QUANG', 'CÁP QUANG', 'CƯỚC DI ĐỘNG', 'THUÊ BAO DI ĐỘNG', 'CƯỚC ĐIỆN THOẠI',
+  'CƯỚC 4G', 'CƯỚC 5G', 'GÓI 4G', 'GÓI 5G', 'DATA 4G', 'DATA 5G', 'SIM 4G', 'SIM 5G', 'GÓI CƯỚC', 'CƯỚC VIỄN THÔNG',
   'THÉP', 'SẮT THÉP', 'ỐNG ĐỒNG', 'DÂY ĐỒNG', 'ĐỒNG THAU', 'NHÔM', 'INOX', 'BIA', 'RƯỢU', 'THUỐC LÁ', 'Ô TÔ', 'QUẶNG'];
 
 /**

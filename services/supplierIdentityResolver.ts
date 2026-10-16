@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { getDatabase } from '@/lib/server/db';
+import { allowGroundingCall } from '@/lib/server/aiBudget';
 import { SupplierIdentity, SupplierIdentitySchema } from '@/lib/schemas';
 import { normalizeTaxCodeFormat, validateTaxCode } from '@/lib/taxCode';
 import { lookupByTaxCode, normalizeCompanyName, SupplierLookupResult } from './taxLookupService';
@@ -12,6 +13,13 @@ export type IdentityProviders = {
   candidates: (name: string) => Promise<Candidate[]>;
 };
 const POSITIVE_TTL = 7 * 24 * 60 * 60 * 1000;
+/** Khóa ngân sách theo DB của phiên (mỗi phiên demo một DB), không lộ đường dẫn file. */
+const sessionKeys = new WeakMap<Database.Database, string>();
+function sessionKey(db: Database.Database): string {
+  let key = sessionKeys.get(db);
+  if (!key) { key = Math.random().toString(36).slice(2) + Date.now().toString(36); sessionKeys.set(db, key); }
+  return key;
+}
 const states = new WeakMap<Database.Database, {
   pending: Map<string, Promise<SupplierIdentity>>;
   failures: Map<string, { result: SupplierIdentity; until: number }>;
@@ -170,6 +178,8 @@ async function resolveFresh(input: SupplierIdentityQuery, search: Search, provid
       if (identity?.supplierTaxCode === matches[0].taxCode && normalizeCompanyName(identity.legalName || '') === name) return identity;
     }
   }
+  // Ngân sách tra cứu có grounding (OWASP LLM10): một điểm chặn cho mọi đường (file, văn bản dán, tra cứu MST). Vượt trần thì fail-closed.
+  if (!allowGroundingCall(sessionKey(getDatabase()))) return { status: 'SOURCE_UNAVAILABLE', sources: [], message: 'Đã vượt hạn mức tra cứu trực tuyến trong giờ; cần xác minh thủ công.', lookupMethod: 'SEARCH_GROUNDING' };
   const result = await search(input).catch((): SupplierIdentity => ({ status: 'SOURCE_UNAVAILABLE', sources: [], message: 'Chưa truy cập được nguồn tra cứu.' }));
   return { ...result, lookupMethod: 'SEARCH_GROUNDING', verifiedAt: result.status === 'VERIFIED' ? new Date().toISOString() : undefined };
 }

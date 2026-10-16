@@ -89,3 +89,24 @@ test('điểm neo nhật ký: phát hiện cắt đuôi và viết lại; ghi th
     if (saved === undefined) delete process.env.TAX_REFEREE_AUDIT_KEY; else process.env.TAX_REFEREE_AUDIT_KEY = saved;
   }
 });
+
+test('chống hạ cấp HMAC: xóa hết chữ ký rồi tính lại chuỗi — hợp lệ kèm cảnh báo nếu không có mốc, bị bắt khi đặt mốc bắt buộc ký ngoài DB', async () => {
+  const saved = { key: process.env.TAX_REFEREE_AUDIT_KEY, since: process.env.TAX_REFEREE_AUDIT_SIGNED_SINCE };
+  process.env.TAX_REFEREE_AUDIT_KEY = 'd'.repeat(40);
+  try {
+    await runIsolated(async () => {
+      for (let i = 0; i < 3; i++) appendAuditEvent({ eventType: 'TEST_EVENT', entityId: `DOWNGRADE-${i}`, payload: { i } });
+      const db = getDatabase();
+      db.exec('DROP TRIGGER audit_events_no_update');
+      db.prepare('UPDATE audit_events SET event_mac = NULL').run();
+      delete process.env.TAX_REFEREE_AUDIT_SIGNED_SINCE;
+      assert.equal(verifyAuditChain().valid, true, 'không có mốc: kẻ gian hạ cấp được (giới hạn đã biết)');
+      process.env.TAX_REFEREE_AUDIT_SIGNED_SINCE = '2020-01-01T00:00:00Z';
+      const r = verifyAuditChain();
+      assert.equal(r.valid, false);
+      assert.match(r.error || '', /hạ cấp/);
+    });
+  } finally {
+    for (const [k, v] of [['TAX_REFEREE_AUDIT_KEY', saved.key], ['TAX_REFEREE_AUDIT_SIGNED_SINCE', saved.since]] as const) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+});

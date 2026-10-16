@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Inbox, FileText, ClipboardCheck, History, Building2, Landmark, Scale, Bell, BookOpen, ArrowUpRight, Menu, LogOut, PanelLeftClose, PanelLeftOpen, MoreHorizontal } from 'lucide-react';
+import { Inbox, FileText, ClipboardCheck, History, Building2, Landmark, Scale, Bell, BookOpen, ArrowUpRight, Menu, LogOut, PanelLeftClose, PanelLeftOpen, MoreHorizontal, ShieldCheck } from 'lucide-react';
 import { BrandMark } from '@/components/BrandMark';
 import { Dialog,DialogContent,DialogTitle,DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,7 @@ export function WorkspaceShell({children,view,user,demo,counts,onRoleChange,onLo
       <nav aria-label="Điều hướng chính" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
         {primary.map(link)}
         <details className="workspace-tools mt-5" open={tools.includes(view)||undefined}><summary title="Mở rộng · beta, một phần giả lập, ngoài phạm vi Đề A">{collapsed?<MoreHorizontal className="h-4 w-4"/>:'Mở rộng · beta (một phần giả lập)'}</summary><div className="mt-2 space-y-1">{tools.map(link)}</div></details>
-        <div className="mt-auto space-y-1 pt-6">{link('policy')}<Link href="/verify" onClick={event=>{if(dirty&&!window.confirm('Bản nháp tiếp nhận chưa lưu. Rời workspace?'))event.preventDefault();}} className="workspace-nav-link"><span className="nav-icon"><ClipboardCheck/></span><span className={collapsed?'md:sr-only':''}>Verify</span></Link></div>
+        <div className="mt-auto space-y-1 pt-6">{link('policy')}<Link href="/verify" onClick={event=>{if(dirty&&!window.confirm('Bản nháp tiếp nhận chưa lưu. Rời workspace?'))event.preventDefault();}} className="workspace-nav-link"><span className="nav-icon"><ClipboardCheck/></span><span className={collapsed?'md:sr-only':''}>Verify</span></Link><Link href="/trust" onClick={event=>{if(dirty&&!window.confirm('Bản nháp tiếp nhận chưa lưu. Rời workspace?'))event.preventDefault();}} className="workspace-nav-link"><span className="nav-icon"><ShieldCheck/></span><span className={collapsed?'md:sr-only':''}>Bảo mật</span></Link></div>
       </nav>
       <div className="flex items-center gap-2 border-t px-3 py-3"><span className={`min-w-0 flex-1 truncate text-xs text-muted-foreground ${collapsed?'md:hidden':''}`}>{roleNames[user.role]}</span><Button size="icon" variant="ghost" aria-label={collapsed?'Mở rộng thanh bên':'Thu gọn thanh bên'} className="hidden md:inline-flex" onClick={()=>setCollapsed(v=>!v)}>{collapsed?<PanelLeftOpen className="h-4 w-4"/>:<PanelLeftClose className="h-4 w-4"/>}</Button></div>
 </>;

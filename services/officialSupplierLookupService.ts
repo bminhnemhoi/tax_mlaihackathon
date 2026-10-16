@@ -161,6 +161,10 @@ function unavailable(message = 'Không thể truy cập dịch vụ tra cứu ch
  * Search output is treated as untrusted until its cited text supports both
  * the legal name and tax code.
  */
+/** Ngân sách tra cứu có grounding: tối đa 2 lần gọi (lần 2 là truy vấn sắc hơn) trong 18 giây; kết quả chỉ nhận nguồn chính thống. */
+export const GROUNDING_BUDGET_MS = 18_000;
+export const GROUNDING_MAX_CALLS = 2;
+
 export async function searchOfficialSupplierIdentity(input: {
   supplierName?: string;
   supplierTaxCode?: string;
@@ -192,7 +196,7 @@ First state the official source title, legal company name and tax code with an a
       finishReason?: string;
     } | undefined;
     let lastError: 'network' | 'http' | null = null;
-    const searchDeadline = Date.now() + 18000;
+    const searchDeadline = Date.now() + GROUNDING_BUDGET_MS;
     // ShopAIKey may return a text answer without structured grounding metadata
     // on the first attempt. Retry once with a sharper search request; never
     // accept the answer unless the returned grounding citation validates.

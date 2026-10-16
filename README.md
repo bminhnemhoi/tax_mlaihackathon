@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/khanhle1406/Tax-Referee/actions/workflows/ci.yml/badge.svg)](https://github.com/khanhle1406/Tax-Referee/actions/workflows/ci.yml)
 
+> **Đội / người deploy (Demo Day 17/10):** đọc [docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md](docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md) trước — việc phải làm, biến môi trường, kiểm tra sau deploy, chuẩn bị thuyết trình.
+
 **Tự xử lý hóa đơn đầu vào thường quy. Dừng đúng lúc, hỏi đúng người, bằng một câu hỏi trả lời được ngay.**
 
 Tax Referee đọc hóa đơn điện tử Việt Nam (XML chuẩn TT78/NĐ123, PDF, ảnh), chạy **quy tắc tất định trước** rồi mới dùng AI,
@@ -26,6 +28,7 @@ Mọi quyết định có nhật ký kiểm toán, dừng và hoàn tác đượ
 4. **Một câu hỏi, đúng người:** ý đánh số, có số tiền và thuế chờ quyết định; trả lời "1A, 2A" ngay trên hồ sơ.
 5. **Con người nắm quyền kiểm soát:** chặn tự duyệt, công tắc dừng, hoàn tác, nhật ký chỉ ghi thêm và nối chuỗi chống sửa.
 6. **AI đọc, quy tắc quyết định:** XML hóa đơn điện tử (Viettel, MISA, VNPT, FPT, TCT), PDF, ảnh.
+7. **Bảo mật hệ có agent AI, chứng minh trực tiếp:** trang [`/trust`](https://limegreen-salamander-517622.hostingersite.com/trust) chạy 12 phép thử tấn công trên mã đang deploy theo 4 trụ — định danh, đặc quyền tối thiểu, ranh giới thực thi, cách ly; ma trận quyền được test kiểm bằng hàm thật. Phân tích: [docs/security/threat-model.md](docs/security/threat-model.md) · kiến trúc và lộ trình production: [docs/architecture/demo-to-production.md](docs/architecture/demo-to-production.md).
 
 Chi tiết, cách tự thử và bằng chứng: [docs/submission/tinh-nang-noi-bat.md](docs/submission/tinh-nang-noi-bat.md).
 
@@ -86,7 +89,7 @@ Con người: trả lời / xác nhận từng dữ kiện / duyệt / từ ch�
 SQLite (WAL, bền qua khởi động lại) · audit nối chuỗi SHA-256 (ai, khi nào, inputHash, policy, contract, commit, lý do)
 ```
 
-- **Không có vòng lặp agent:** mỗi lượt đánh giá chạy một lần qua quy tắc; AI chỉ đọc ảnh (timeout 35s) và, nếu bật `QGEN_AI=1`, diễn đạt lại câu hỏi (timeout 3,5s, bị guard chặn nếu thêm số liệu hoặc đổi người nhận/phương án). Lượt đánh giá có hạn 60–300s; quá hạn → `ON_HOLD`, kết quả trễ bị loại.
+- **Không có vòng lặp agent:** mỗi lượt đánh giá chạy một lần qua quy tắc — đường quyết định **0 lần gọi LLM**. AI chỉ ở khâu nạp chứng từ: đọc ảnh/PDF scan (tối đa 1 lần, timeout 35s, chỉ nhận 14 trường nhìn thấy) và tra cứu danh tính bên bán có grounding (tối đa 2 lần trong 18s), cả hai có ngân sách theo phiên; nếu bật `QGEN_AI=1` thì diễn đạt lại câu hỏi (timeout 3,5s, bị guard chặn nếu thêm số liệu hoặc đổi người nhận/phương án). Lượt đánh giá có hạn 60–300s; quá hạn → `ON_HOLD`, kết quả trễ bị loại.
 - **Persistence:** SQLite WAL trên volume; mỗi phiên demo một file riêng; kiểm thử khởi động lại (`npm run test:recovery`).
 
 ### Thật / giả lập
@@ -128,7 +131,7 @@ CI (GitHub Actions, Ubuntu + Windows): typecheck, lint, test, build khi đẩy m
 - **Người dùng thực tế:** đang thử nghiệm với 3 người dùng do BTC điều phối (bộ câu hỏi: [docs/submission/proposal-user-questions.md](docs/submission/proposal-user-questions.md)). Chưa có kết quả tại thời điểm khóa repo; kết quả và cải tiến từ phản hồi sẽ được ghi ở `docs/evidence/` kèm commit riêng.
 - **Độ chính xác:** các bộ Verify và 60 ca phát triển là dữ liệu tổng hợp đội tự gán nhãn; 72 ca red team do agent AI viết từ SOP (không đọc `services/policyEngine.ts`, có đọc SOP và module ngưỡng `lib/refereeRequirements.ts`; nhãn do AI gán, chưa được người nghiệp vụ duyệt) (`data/verification/redteam/cases.json`, 72/72). Tất cả **chưa phải đánh giá độc lập**. Công cụ khóa nhãn và chấm độc lập đã có (`npm run labels:lock`, `npm run evaluate:independent`).
 - **Pháp lý:** quy tắc mô tả SOP nội bộ; điều khoản luật được dẫn nguồn nhưng diễn giải cần kế toán xác nhận.
-- **Đã biết:** "ngoài phạm vi" được nhận diện bằng danh sách từ khóa, nên chi cá nhân ghi tên khác vẫn có thể tự duyệt (VD "tiệc cưới người thân giám đốc" — giữ nguyên làm ca bẫy U2 cho buổi thử 16/10 đã công bố trong Proposal); tách nhỏ hóa đơn mới cộng dồn trong cùng ngày, cùng nhà cung cấp (chưa có cửa sổ nhiều ngày); chưa xác thực chữ ký số XML; ngày lập tương lai gần chưa bị chặn (chỉ chặn khi quá 6 tháng); dữ liệu ảnh gửi qua dịch vụ AI bên thứ ba; SQLite một instance; đăng nhập nội bộ là MVP.
+- **Đã biết:** "ngoài phạm vi" được nhận diện bằng danh sách từ khóa, nên chi cá nhân ghi tên khác vẫn có thể tự duyệt (ca bẫy U2 "tiệc cưới người thân giám đốc" của buổi thử 16/10 đã được đóng sau buổi thử; đảo sang danh sách trắng hạng mục là việc tiếp theo); định danh trong demo là vai trò mô phỏng (một người đổi được 3 vai trong phiên demo); tiến trình đọc PDF chưa cô lập bằng container/UID riêng; tách nhỏ hóa đơn mới cộng dồn trong cùng ngày, cùng nhà cung cấp (chưa có cửa sổ nhiều ngày); chưa xác thực chữ ký số XML; ngày lập tương lai gần chưa bị chặn (chỉ chặn khi quá 6 tháng); dữ liệu ảnh gửi qua dịch vụ AI bên thứ ba; SQLite một instance; đăng nhập nội bộ là MVP.
 
 Các thư mục `brainstorming/` là ghi chú nháp do AI hỗ trợ soạn, **không phải bằng chứng** (xem [brainstorming/README.md](brainstorming/README.md)).
 Lịch sử commit trước 14/10 có bản nháp AI chứa 3 persona giả định kèm trích dẫn **không có thật** và một bảng số liệu "tập độc lập 42 ca" không có lần chạy tương ứng; đội đã gỡ/đính chính công khai ở commit `3ace396` và trong `brainstorming/opus-evaluation.md` (§6, §7). Không viết lại lịch sử git để giữ minh bạch.

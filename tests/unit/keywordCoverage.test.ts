@@ -76,11 +76,19 @@ test('không chặn nhầm hàng thông thường', async () => {
   }
 });
 
-test('ca bẫy U2 của buổi thử người dùng 16/10 giữ nguyên thiết kế (hệ thống tự duyệt sai có chủ đích)', async () => {
+test('sau buổi thử 16/10: ca bẫy U2 (tiệc cưới người thân giám đốc) đã đóng — chuyển người, ngoài phạm vi SOP', async () => {
   const u2 = userStudyCases.find(c => c.id === 'U2')!;
-  assert.equal(u2.designedAs.trap, true);
+  assert.equal(u2.designedAs.trap, true, 'thiết kế buổi thử giữ nguyên làm hồ sơ lịch sử');
   const d = await runIsolated(async () => (await evaluateWorkflow({ id: 'U2', ...u2.invoice }, accountant, { forceLocalOnly: true })).decision as RefereeDecision);
-  assert.equal(d.status, 'ROUTINE');
+  assert.equal(d.status, 'ESCALATED');
+  assert.equal(d.status === 'ESCALATED' && d.riskGroup, 'OUT_OF_POLICY');
+});
+
+test('không báo nhầm 8%: thuê xe ô tô, điện thoại 5G, quảng cáo trên Internet được 8%; xe ô tô con và cước 4G vẫn bị chặn', async () => {
+  for (const item of ['Thuê xe ô tô 7 chỗ đi công tác', 'Điện thoại Samsung 5G cho nhân viên', 'Quảng cáo trên Internet tháng 9', 'Bảo dưỡng xe ô tô công ty'])
+    assert.equal((await judge(item, at8)).status, 'ROUTINE', item);
+  for (const item of ['Xe ô tô con Toyota Vios', 'Gói cước 4G tháng 9'])
+    assert.equal((await judge(item, at8)).status, 'ESCALATED', item);
 });
 
 test('ngày lập muộn hơn hôm nay quá 6 tháng (nhập sai năm) không được tự duyệt; câu hỏi hợp lệ', async () => {

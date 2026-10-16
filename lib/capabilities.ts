@@ -1,0 +1,45 @@
+/**
+ * Bảng định danh và quyền (capability) của Tax Referee — dùng chung cho trang /trust và cho test.
+ * Mỗi dòng ghi rõ ai được làm, với điều kiện gì, và HÀM NÀO thực thi. tests/unit/authzMatrix.test.ts gọi chính các hàm đó
+ * với từng vai trò để chứng minh bảng khớp với hành vi thật (bảng lệch mã thì CI đỏ). File này không import mã server.
+ */
+export type Principal = 'ACCOUNTANT' | 'CHIEF_ACCOUNTANT' | 'CFO' | 'SYSTEM_REFEREE' | 'AI_VISION' | 'AI_SUPPLIER_SEARCH' | 'AI_QGEN' | 'LEGAL_WEBHOOK';
+export const HUMAN_ROLES = ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'] as const;
+
+export interface PrincipalInfo { id: Principal; kind: 'Người' | 'Hệ thống' | 'Agent AI' | 'Bên ngoài'; label: string; identity: string; mayDo: string; mayNot: string }
+export const PRINCIPALS: PrincipalInfo[] = [
+  { id: 'ACCOUNTANT', kind: 'Người', label: 'Kế toán viên', identity: 'Phiên đăng nhập (cookie HttpOnly); mỗi phiên demo một DB riêng', mayDo: 'Nhập/sửa hồ sơ, tải chứng từ', mayNot: 'Duyệt, xác minh dữ liệu, thao tác workflow, đổi policy' },
+  { id: 'CHIEF_ACCOUNTANT', kind: 'Người', label: 'Kế toán trưởng', identity: 'Như trên', mayDo: 'Duyệt trong hạn mức, trả lời câu hỏi, giữ/dừng, hậu kiểm, soạn policy', mayNot: 'Duyệt ca cần CFO, tự duyệt/tự xác minh hồ sơ mình nhập, công bố policy nới lỏng' },
+  { id: 'CFO', kind: 'Người', label: 'Giám đốc tài chính', identity: 'Như trên', mayDo: 'Duyệt ca vượt hạn mức, công bố policy nới lỏng (khác người soạn), tạo tiền lệ', mayNot: 'Tự duyệt hồ sơ mình nhập, tự công bố bản nháp nới lỏng do mình soạn' },
+  { id: 'SYSTEM_REFEREE', kind: 'Hệ thống', label: 'Trọng tài tất định', identity: 'actorRole SYSTEM_REFEREE trong nhật ký, kèm policyHash, inputHash, commit', mayDo: 'Tự duyệt ca thường quy theo quy tắc', mayNot: 'Duyệt ca có nghi vấn, ca từng cần CFO, hay khi tự động hóa đang dừng' },
+  { id: 'AI_VISION', kind: 'Agent AI', label: 'Agent đọc ảnh (Gemini Vision)', identity: 'agent:vision@<model>#<hash prompt>, lưu cùng hồ sơ', mayDo: 'Đề xuất 14 trường nhìn thấy trên chứng từ', mayNot: 'Gọi công cụ, ghi DB, khai sự kiện không nhìn thấy (UNC, trạng thái MST…), quyết định' },
+  { id: 'AI_SUPPLIER_SEARCH', kind: 'Agent AI', label: 'Agent tra cứu MST (grounding)', identity: 'lookupMethod SEARCH_GROUNDING kèm nguồn trích dẫn', mayDo: 'Tìm nguồn chính thống cho tên/MST bên bán', mayNot: 'Vượt ngân sách lượt gọi, dùng nguồn không chính thống làm bằng chứng' },
+  { id: 'AI_QGEN', kind: 'Agent AI', label: 'Agent diễn đạt câu hỏi', identity: 'questionSource AI_GROUNDED', mayDo: 'Diễn đạt lại câu hỏi (tắt mặc định)', mayNot: 'Đổi người nhận, số liệu, phương án' },
+  { id: 'LEGAL_WEBHOOK', kind: 'Bên ngoài', label: 'Nguồn cập nhật pháp lý', identity: 'Secret ≥ 24 ký tự, so sánh thời gian hằng', mayDo: 'Tạo ứng viên văn bản mới', mayNot: 'Đổi quy tắc hay policy (chỉ NEEDS_REVIEW, cần người duyệt)' },
+];
+
+export interface Capability { action: string; label: string; allowed: Principal[]; conditions: string[]; enforcedBy: string }
+export const CAPABILITIES: Capability[] = [
+  { action: 'invoice.submit', label: 'Nhập / sửa hồ sơ', allowed: ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Sửa sau khi đã chuyển tiếp: trường đã đổi phải được người có thẩm quyền xác nhận', 'Ca từng cần CFO: người khác CFO sửa không làm hạ thẩm quyền'], enforcedBy: 'evaluateWorkflow · services/workflowService.ts' },
+  { action: 'invoice.confirmFields', label: 'Xác minh dữ liệu chưa chắc (kể cả AI đọc)', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Không phải người nhập hồ sơ'], enforcedBy: 'evaluateWorkflow · services/workflowService.ts' },
+  { action: 'handoff.answer', label: 'Trả lời câu hỏi chuyển tiếp ("1A, 2B")', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Ca cần CFO: chỉ CFO', 'Không phải người nhập hồ sơ'], enforcedBy: 'answerHandoff · services/workflowService.ts' },
+  { action: 'invoice.approve.ktt', label: 'Duyệt ca trong hạn mức KTT', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Hồ sơ đang chờ quyết định của lượt đánh giá hiện hành', 'Không phải người nhập', 'Mọi phát hiện còn mở được xác nhận từng cái'], enforcedBy: 'applyWorkflowAction + approvalBlock · services/workflowService.ts' },
+  { action: 'invoice.approve.cfo', label: 'Duyệt ca vượt hạn mức / ca chờ CFO', allowed: ['CFO'], conditions: ['Như trên'], enforcedBy: 'applyWorkflowAction + approvalBlock · services/workflowService.ts' },
+  { action: 'workflow.hold', label: 'Dừng hồ sơ / giữ thuế', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Ghi lý do ≥ 8 ký tự'], enforcedBy: 'applyWorkflowAction · services/workflowService.ts' },
+  { action: 'workflow.releaseCfoHold', label: 'Gỡ lệnh giữ thuế do CFO đặt', allowed: ['CFO'], conditions: ['Sau khi gỡ phải đánh giá lại trước khi duyệt'], enforcedBy: 'applyWorkflowAction (RELEASE_TAX_HOLD) · services/workflowService.ts' },
+  { action: 'workflow.undo', label: 'Hoàn tác thao tác gần nhất', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Không nới lỏng kiểm soát do người khác đặt', 'Không gỡ lệnh giữ theo luật hay kết quả hậu kiểm'], enforcedBy: 'undoCandidate · services/workflowService.ts' },
+  { action: 'postAudit.review', label: 'Hậu kiểm ca máy tự duyệt', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Không phải người nhập', '"Không đồng ý" thì giữ thuế ngay'], enforcedBy: 'reviewPostAudit · services/workflowService.ts' },
+  { action: 'automation.toggle', label: 'Dừng / bật lại tự động hóa toàn hệ thống', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Ghi lý do; mỗi lần đổi là một sự kiện nhật ký'], enforcedBy: 'setAutomationPaused · services/automationControl.ts' },
+  { action: 'policy.draft', label: 'Soạn bản nháp policy', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Bản nháp phải qua kiểm thử an toàn và chạy thử trên hồ sơ gần nhất'], enforcedBy: 'POST /api/policy · app/api/policy/route.ts' },
+  { action: 'policy.publishLoosening', label: 'Công bố policy làm lỏng kiểm soát', allowed: ['CFO'], conditions: ['Khác người soạn bản nháp (bốn mắt)'], enforcedBy: 'publishPolicy + policyLoosening · services/policyService.ts' },
+  { action: 'policy.rollbackLoosening', label: 'Quay về policy lỏng hơn bản đang hiệu lực', allowed: ['CFO'], conditions: ['Chỉ quay về bản đã từng công bố'], enforcedBy: 'rollbackPolicy · services/policyService.ts' },
+  { action: 'precedent.manage', label: 'Tạo / thu hồi tiền lệ', allowed: ['CFO'], conditions: ['Chỉ cho phát hiện kiểm soát nội bộ, không cho quy tắc luật'], enforcedBy: 'POST/DELETE /api/precedents · app/api/precedents/route.ts' },
+  { action: 'supplier.update', label: 'Sửa danh bạ nhà cung cấp', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Nguồn ghi nhận luôn MANUAL; có sự kiện nhật ký'], enforcedBy: 'POST /api/suppliers · app/api/suppliers/route.ts' },
+  { action: 'invoice.autoApprove', label: 'Tự duyệt ca thường quy', allowed: ['SYSTEM_REFEREE'], conditions: ['Mọi quy tắc đạt, mọi dữ kiện cần thiết đã xác minh', 'Tự động hóa không dừng', 'Không có mức sàn CFO', 'Một phần được hậu kiểm ngẫu nhiên'], enforcedBy: 'evaluateWorkflow · services/workflowService.ts' },
+  { action: 'extract.fields', label: 'Đọc chứng từ ảnh / PDF scan', allowed: ['AI_VISION'], conditions: ['Chỉ 14 trường nhìn thấy (VISION_ALLOWED_KEYS)', 'Không có công cụ, không ghi DB', 'Kết quả là dữ kiện chưa xác minh', 'Ngân sách lượt gọi theo người dùng'], enforcedBy: 'filterVisionInvoice · services/geminiService.ts' },
+  { action: 'supplier.search', label: 'Tra cứu danh tính bên bán', allowed: ['AI_SUPPLIER_SEARCH'], conditions: ['Tối đa 2 lần gọi trong 18 giây', 'Chỉ nhận nguồn chính thống', 'Ngân sách lượt gọi theo phiên, fail-closed'], enforcedBy: 'resolveSupplierIdentity · services/supplierIdentityResolver.ts' },
+  { action: 'question.phrase', label: 'Diễn đạt câu hỏi chuyển tiếp', allowed: ['AI_QGEN'], conditions: ['Tắt mặc định (QGEN_AI)', 'Quyết định đã khóa: không đổi người nhận, số liệu, phương án'], enforcedBy: 'queryJevReferee · services/jevService.ts' },
+  { action: 'legal.candidate', label: 'Đề xuất văn bản pháp lý mới', allowed: ['LEGAL_WEBHOOK'], conditions: ['Chỉ tạo ứng viên NEEDS_REVIEW, người duyệt mới áp dụng'], enforcedBy: 'POST /api/webhooks/legal-update · services/legal/legalUpdateService.ts' },
+];
+
+export const can = (principal: Principal, action: string): boolean => Boolean(CAPABILITIES.find(c => c.action === action)?.allowed.includes(principal));

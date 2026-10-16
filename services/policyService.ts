@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { InvoiceInputSchema, PolicyBundle, PolicyBundleSchema, RefereeDecisionSchema, SystemPolicyConfig, SystemPolicyConfigSchema } from '@/lib/schemas';
 import { getActivePolicy, getDatabase, jsonNow } from '@/lib/server/db';
 import { appendAuditEvent } from '@/lib/server/audit';
-import { evaluateInvoiceLocally } from './policyEngine';
+import { evaluateInvoiceLocally, SCOPE_NOT_COVERED_DEFAULT } from './policyEngine';
 import { executablePolicySummary, implementedPolicyRules,POLICY_CONTRACT_VERSION } from '@/data/policyContract';
 import { validatePolicySafety } from './policySafety';
 
@@ -72,10 +72,11 @@ export function policyLoosening(baseline: SystemPolicyConfig, candidate: SystemP
   const dropped = (a?: string[], b?: string[]) => (a || []).filter(x => !(b || []).includes(x));
   const vat8 = dropped(baseline.excludedVat8Categories, candidate.excludedVat8Categories);
   if (vat8.length) out.push(`Bỏ nhóm loại trừ VAT 8%: ${vat8.join(', ')}`);
-  if (baseline.scopeNotCoveredCategories && candidate.scopeNotCoveredCategories) {
-    const scope = dropped(baseline.scopeNotCoveredCategories, candidate.scopeNotCoveredCategories);
-    if (scope.length) out.push(`Bỏ nhóm ngoài phạm vi: ${scope.join(', ')}`);
-  }
+  // So trên danh mục CÓ HIỆU LỰC: chưa cấu hình nghĩa là đang dùng danh mục mặc định, nên đặt [] là tắt hẳn quy tắc "ngoài phạm vi SOP".
+  const scope = dropped(baseline.scopeNotCoveredCategories ?? SCOPE_NOT_COVERED_DEFAULT, candidate.scopeNotCoveredCategories ?? SCOPE_NOT_COVERED_DEFAULT);
+  if (scope.length) out.push(`Bỏ nhóm ngoài phạm vi SOP: ${scope.length > 6 ? `${scope.slice(0, 6).join(', ')}… (${scope.length} nhóm)` : scope.join(', ')}`);
+  // MST doanh nghiệp là căn cứ của kiểm tra "hóa đơn đúng người mua" (không chấp nhận được dù có người duyệt): xóa/đổi phải có người thứ hai.
+  if (baseline.companyTaxCode && candidate.companyTaxCode !== baseline.companyTaxCode) out.push(candidate.companyTaxCode ? `Đổi MST doanh nghiệp ${baseline.companyTaxCode} → ${candidate.companyTaxCode}` : 'Xóa MST doanh nghiệp (tắt kiểm tra MST người mua)');
   const rank: Record<string, number> = { SYSTEM: 0, CHIEF_ACCOUNTANT: 1, CFO: 2 };
   const toRoutine = changes.filter(c => c.before.startsWith('ESCALATED') && c.after.startsWith('ROUTINE')).length;
   const downgraded = changes.filter(c => (rank[c.afterRole] ?? 0) < (rank[c.beforeRole] ?? 0) && !(c.before.startsWith('ESCALATED') && c.after.startsWith('ROUTINE'))).length;
@@ -150,7 +151,7 @@ export function validatePolicyBundle(bundle: PolicyBundle):PolicyValidationResul
     contractVersion:POLICY_CONTRACT_VERSION,legacyNotes:bundle.contractVersion!==POLICY_CONTRACT_VERSION };
 }
 
-export function rollbackPolicy(version: string, actorId?: string, reason = 'Rollback theo yêu cầu vận hành'): PolicyBundle {
+export function rollbackPolicy(version: string, actorId?: string, reason = 'Rollback theo yêu cầu vận hành', actorRole?: string): PolicyBundle {
   const db = getDatabase();
   const row = db.prepare('SELECT payload_json, status FROM policy_versions WHERE version = ?').get(version) as { payload_json?: string; status?: string } | undefined;
   if (!row?.payload_json) throw new Error('Không tìm thấy policy để rollback');
@@ -159,6 +160,9 @@ export function rollbackPolicy(version: string, actorId?: string, reason = 'Roll
   const bundle = PolicyBundleSchema.parse({ ...JSON.parse(row.payload_json), status: 'PUBLISHED' });
   const validation=validatePolicyBundle(bundle);
   if(!validation.valid)throw new Error(`Policy rollback không đạt kiểm thử: ${validation.errors.join('; ')}`);
+  // Quay về bản cũ cũng là một thay đổi policy: nếu làm lỏng kiểm soát so với bản đang hiệu lực thì phải do CFO thực hiện.
+  const loosening = policyLoosening(getActivePolicy().config, bundle.config, validation.changes);
+  if (loosening.length && actorRole !== 'CFO') throw new PolicyApprovalError(`Quay về ${version} làm lỏng kiểm soát (${loosening.join('; ')}); cần CFO thực hiện.`);
   const timestamp = jsonNow();
   const tx = db.transaction(() => {
     db.prepare("UPDATE policy_versions SET status = 'ROLLED_BACK' WHERE status = 'PUBLISHED'").run();
