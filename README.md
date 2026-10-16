@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/khanhle1406/Tax-Referee/actions/workflows/ci.yml/badge.svg)](https://github.com/khanhle1406/Tax-Referee/actions/workflows/ci.yml)
 
+> **Đội / người deploy (Demo Day 17/10):** đọc [docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md](docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md) trước — việc phải làm, biến môi trường, kiểm tra sau deploy, chuẩn bị thuyết trình.
+
 **Tự xử lý hóa đơn đầu vào thường quy. Dừng đúng lúc, hỏi đúng người, bằng một câu hỏi trả lời được ngay.**
 
 Tax Referee đọc hóa đơn điện tử Việt Nam (XML chuẩn TT78/NĐ123, PDF, ảnh), chạy **quy tắc tất định trước** rồi mới dùng AI,
