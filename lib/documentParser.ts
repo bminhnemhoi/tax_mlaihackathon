@@ -110,10 +110,30 @@ function structuredXmlFallback(xml: string): Record<string, unknown> {
   };
   return Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== undefined));
 }
+/**
+ * Đưa XML về dạng tương đương trước khi trích bằng regex: bỏ chú thích, thay mỗi đoạn CDATA bằng chính văn bản của nó
+ * (đã escape). Nhờ vậy giá trị app đọc trùng với bộ đọc XML chuẩn của phần mềm kế toán và cơ quan thuế — không thể chèn
+ * CDATA, chú thích hay tham chiếu ký tự để app thấy 2.880.000₫ trong khi chứng từ pháp lý ghi 22.880.000₫ (parser differential).
+ */
+export function canonicalXmlForRegex(xml: string): string {
+  return xml.replace(/<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->/g, (_whole, cdata: string | undefined) =>
+    cdata === undefined ? '' : cdata.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+}
+
+const XML_NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+/** Giải mã tham chiếu thực thể và ký tự XML (`&amp;amp;`, `&#52;`, `&#x34;`) như bộ đọc XML chuẩn. */
+export function decodeXmlText(text: string): string {
+  return text.replace(/&(?:#x([0-9a-f]+)|#([0-9]+)|(amp|lt|gt|quot|apos));/gi, (whole, hex?: string, dec?: string, named?: string) => {
+    if (named) return XML_NAMED_ENTITIES[named.toLowerCase()];
+    const codePoint = hex ? parseInt(hex, 16) : parseInt(dec as string, 10);
+    return codePoint > 0 && codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : whole;
+  });
+}
+
 function tag(xml: string, name: string): string | undefined {
   const pattern = `<(?:[a-zA-Z0-9_]+:)?${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[a-zA-Z0-9_]+:)?${name}>`;
   const match = xml.match(new RegExp(pattern, 'i'));
-  return match?.[1]?.replace(/<[^>]+>/g, '').trim() || undefined;
+  return match ? decodeXmlText(match[1].replace(/<[^>]+>/g, '')).trim() || undefined : undefined;
 }
 
 export function assertValidXml(xml: string) {
@@ -121,9 +141,11 @@ export function assertValidXml(xml: string) {
     throw new Error('Tệp XML rỗng hoặc sai cấu trúc.');
 }
 
-export function parseXml(xml: string) {
-  assertValidXml(xml);
-  const structured = structuredXmlFallback(xml);
+export function parseXml(rawXml: string) {
+  assertValidXml(rawXml);
+  const structured = structuredXmlFallback(rawXml);
+  // Mọi trích xuất bằng regex bên dưới chạy trên bản đã chuẩn hóa (không CDATA, không chú thích).
+  const xml = canonicalXmlForRegex(rawXml);
   // 1. Trích xuất khối Người bán <NBan> hoặc <SellerInfo> hoặc <Seller>
   const nbanMatch =
     xml.match(/<NBan[\s\S]*?<\/NBan>/i)?.[0] ||
