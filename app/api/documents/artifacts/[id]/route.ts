@@ -6,6 +6,11 @@ import { getDatabase } from '@/lib/server/db';
 
 export const dynamic = 'force-dynamic';
 
+/** Tên file chỉ gồm ASCII in được (bỏ dấu tiếng Việt), không có ký tự làm vỡ header. */
+function asciiFileName(name: string): string {
+  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/[^\x20-\x7e]|["\\]/g, '_');
+}
+
 async function handleGET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     requireRequestUser(request);
@@ -30,7 +35,8 @@ async function handleGET(request: NextRequest, context: { params: Promise<{ id: 
         'X-Content-Type-Options': 'nosniff',
         ...(artifact.mime_type === 'application/pdf' ? {} : { 'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox" }),
         'Content-Length': String(body.byteLength),
-        'Content-Disposition': `inline; filename="${artifact.original_file_name.replace(/["\\\r\n]/g, '_')}"`,
+        // Tên file tiếng Việt vượt Latin-1 làm header lỗi (500): filename ASCII dự phòng + filename* UTF-8 (RFC 6266/5987).
+        'Content-Disposition': `inline; filename="${asciiFileName(artifact.original_file_name)}"; filename*=UTF-8''${encodeURIComponent(artifact.original_file_name)}`,
         'X-Content-SHA256': artifact.content_hash,
         'Cache-Control': 'private, no-store'
       }

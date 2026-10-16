@@ -23,7 +23,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Stored in the current request database: never reuse another session's artifact/review.
-const extractionVersion = `shopaikey-gemini-vision-identity-resolver-v4:${SHOPAIKEY_GEMINI_API_CONFIG.MODEL}:${process.env.DOCUMENT_IMAGE_MAX_DIM || '1000'}-q${process.env.DOCUMENT_IMAGE_JPEG_QUALITY || '80'}`;
+const extractionVersion = `shopaikey-gemini-vision-identity-resolver-v5:${SHOPAIKEY_GEMINI_API_CONFIG.MODEL}:${process.env.DOCUMENT_IMAGE_MAX_DIM || '1000'}-q${process.env.DOCUMENT_IMAGE_JPEG_QUALITY || '80'}`;
 function getCachedDocumentResult(hash: string) {
   const row = getDatabase().prepare(`SELECT r.payload_json FROM document_artifacts a
     JOIN extraction_reviews r ON r.artifact_id=a.id WHERE a.content_hash=?`).get(hash) as {payload_json:string}|undefined;
@@ -285,6 +285,8 @@ async function handlePOST(req: NextRequest) {
     let sourceReadFields: string[] | undefined;
     let documentType: 'INVOICE' | 'NOT_INVOICE' | 'UNCERTAIN' | undefined;
     let usedVision = false;
+    // Danh tính và ranh giới của agent đọc ảnh: ghi lại agent nào, prompt nào, và các key bị loại khỏi đầu ra.
+    let visionMeta: { droppedKeys: string[]; provenance: unknown } | null = null;
 
     if (sourceType === 'XML') {
       const parsed = parseXml(buffer.toString('utf8'));
@@ -303,7 +305,9 @@ async function handlePOST(req: NextRequest) {
           parsedPdf.extractedFields.includes('invoiceNumber')
         ) {
           rawData = parsedPdf.invoice as Record<string, unknown>;
-          sourceReadFields = parsedPdf.extractedFields;
+          // Lớp chữ PDF không phải bằng chứng thanh toán/bảng kê: không cho văn bản trong PDF tự khai các sự kiện này.
+          delete rawData.hasBankSlip; delete rawData.hasItemManifest;
+          sourceReadFields = parsedPdf.extractedFields.filter(field => field !== 'hasBankSlip' && field !== 'hasItemManifest');
           initialWarnings.push(
             `Đã đọc lớp chữ trực tiếp từ PDF (${parsedPdf.extractedFields.length} trường).`
           );
@@ -318,6 +322,7 @@ async function handlePOST(req: NextRequest) {
           documentType = vision.documentType;
           sourceReadFields = Object.keys(rawData);
           usedVision = true;
+          visionMeta = { droppedKeys: vision.droppedKeys, provenance: vision.provenance };
           initialWarnings.push('Dữ liệu được trích xuất trực tiếp từ PDF bằng Gemini Vision qua ShopAIKey; kế toán vui lòng kiểm tra trước khi thẩm định.');
         } catch (aiError: any) {
           console.error('[Document Parse] Lỗi bóc tách PDF scan qua ShopAIKey Gemini Vision:', aiError);
@@ -345,6 +350,7 @@ async function handlePOST(req: NextRequest) {
         documentType = vision.documentType;
         sourceReadFields = Object.keys(rawData);
         usedVision = true;
+        visionMeta = { droppedKeys: vision.droppedKeys, provenance: vision.provenance };
       } catch (aiError: any) {
         console.error('[Document Parse] Lỗi bóc tách ảnh hóa đơn qua ShopAIKey Gemini Vision:', aiError);
         return NextResponse.json({
@@ -485,7 +491,7 @@ async function handlePOST(req: NextRequest) {
       ocrHighlights
     });
 
-    getDatabase().prepare('INSERT OR REPLACE INTO extraction_reviews (artifact_id,payload_json) VALUES (?,?)').run(artifactId,JSON.stringify({...result, invoice:rawData, inferredFields, extractionVersion, cachedResult:result}));
+    getDatabase().prepare('INSERT OR REPLACE INTO extraction_reviews (artifact_id,payload_json) VALUES (?,?)').run(artifactId,JSON.stringify({...result, invoice:rawData, inferredFields, extractionVersion, llmProvenance:visionMeta?.provenance ?? null, droppedKeys:visionMeta?.droppedKeys ?? [], cachedResult:result}));
     return extractionResponse(result,started);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể đọc chứng từ' }, { status: error instanceof Error && error.message === 'AUTH_REQUIRED' ? 401 : error instanceof ArtifactQuotaError ? 413 : 400 });
