@@ -1,6 +1,6 @@
 {
   "name": "tax-referee",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Trọng tài thuế GTGT đầu vào cho hóa đơn điện tử Việt Nam: quy tắc tất định quyết định, AI chỉ đọc chứng từ, chuyển người đúng lúc bằng một câu hỏi.",
   "license": "MIT",
