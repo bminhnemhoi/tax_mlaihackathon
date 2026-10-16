@@ -231,21 +231,28 @@ console.log('\n--- 6. Chuẩn hóa Căn cứ Pháp lý (LegalCitation Registry) 
 const citations = listLegalCitations();
 assert(citations.length >= 8, `Danh mục trích dẫn pháp lý chuẩn mực đủ ${citations.length} căn cứ`);
 
-// Kiểm tra trích dẫn Luật 48/2024 Khoản 2 Điều 14
+// Kiểm tra trích dẫn Luật 48/2024 điểm b khoản 2 Điều 14 (luật chỉ nêu nguyên tắc; ngưỡng 5 triệu ở Điều 26 NĐ 181/2025)
 const citLaw48 = getLegalCitation('LUAT-48-2024-D14-K2');
 assert(
   citLaw48 !== undefined &&
-  citLaw48.officialSourceUrl.startsWith('https://vanban.chinhphu.vn') &&
-  citLaw48.exactQuote.includes('05 triệu đồng'),
-  'Trích dẫn Luật 48/2024/QH15 Điều 14 Khoản 2 có URL CSDL Quốc gia và nguyên văn chuẩn'
+  citLaw48.officialSourceUrl.endsWith('docid=212476') &&
+  citLaw48.exactQuote.includes('chứng từ thanh toán không dùng tiền mặt') &&
+  !citLaw48.exactQuote.includes('05 triệu'),
+  'Trích dẫn Luật 48/2024/QH15 điểm b khoản 2 Điều 14 đúng văn bản (docid 212476) và đúng nguyên văn'
+);
+const citNd181 = getLegalCitation('ND-181-2025-D26-K3');
+assert(
+  citNd181 !== undefined && citNd181.officialSourceUrl.endsWith('docid=214336') && citNd181.exactQuote.includes('dưới 05 triệu đồng'),
+  'Trích dẫn khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP (mua nhiều lần trong ngày) đúng văn bản và nguyên văn'
 );
 
-// Kiểm tra trích dẫn Nghị định 123/2020 Điều 14 (MCCQT)
-const citNd123 = getLegalCitation('ND-123-2020-D14');
+// Kiểm tra trích dẫn Nghị định 123/2020 điểm a khoản 2 Điều 3 (hóa đơn có mã của cơ quan thuế; Điều 14 là dịch vụ hóa đơn)
+const citNd123 = getLegalCitation('ND-123-2020-D3-K2');
 assert(
   citNd123 !== undefined &&
+  citNd123.officialSourceUrl.endsWith('docid=201365') &&
   citNd123.exactQuote.includes('Hóa đơn điện tử có mã của cơ quan thuế'),
-  'Trích dẫn Nghị định 123/2020/NĐ-CP Điều 14 về MCCQT có đầy đủ căn cứ'
+  'Trích dẫn Nghị định 123/2020/NĐ-CP điểm a khoản 2 Điều 3 về mã của cơ quan thuế đúng văn bản'
 );
 
 // Kiểm tra trích dẫn Thông tư 78/2021 Điều 4 (Ký hiệu HĐ)
