@@ -11,7 +11,7 @@ import {buildHandoff,describeRuleEvidence} from './handoffService';
 import {concreteIssue} from './questionBuilder';
 import {groupOf,orderFindings,riskGroupsOf} from '@/lib/riskTaxonomy';
 import {fieldLabels} from '@/lib/workflowPresentation';
-import {buyerTaxCodeBasis,cashPaymentBasis,closedSellerBasis,invoiceFrameworkAt,sameDayCashBasis,seriesYearBasis,taxAuthorityCodeBasis,vat8Basis,vat8ExcludedPhrases,vatReductionAt} from '@/lib/legalBasis';
+import {buyerTaxCodeBasis,cashPaymentBasis,closedSellerBasis,inSentence,invoiceFrameworkAt,sameDayCashBasis,seriesYearBasis,taxAuthorityCodeBasis,vat8Basis,vat8ExcludedPhrases,vatReductionAt} from '@/lib/legalBasis';
 
 /** Cụm từ chứa từ khóa loại trừ nhưng là hàng hóa thông thường (VD "mũ bảo hiểm" không phải dịch vụ bảo hiểm). */
 const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HIỂM','GĂNG TAY BẢO HIỂM',
@@ -408,7 +408,7 @@ function evaluateInvoiceLocallyInternal(
         severity: 'CRITICAL',
         riskGroup: 'OUT_OF_POLICY',
         flaggedReason: `Mã số thuế người mua trên hóa đơn (${inv.buyerTaxCode}) không trùng khớp với MST doanh nghiệp (${config.companyTaxCode})`,
-        plainExplanation: `Hóa đơn không ghi nhận MST của doanh nghiệp mình (nghi vấn lấy nhầm hóa đơn công ty khác hoặc hóa đơn cá nhân người lao động). Theo ${buyerTaxCodeBasis(inv.invoiceDate)}, hóa đơn phải ghi đúng tên, mã số thuế người mua; hóa đơn ghi MST của đơn vị khác không đủ điều kiện để doanh nghiệp khấu trừ thuế GTGT đầu vào.`,
+        plainExplanation: `Hóa đơn không ghi nhận MST của doanh nghiệp mình (nghi vấn lấy nhầm hóa đơn công ty khác hoặc hóa đơn cá nhân người lao động). Theo ${inSentence(buyerTaxCodeBasis(inv.invoiceDate))}, hóa đơn phải ghi đúng tên, mã số thuế người mua; hóa đơn ghi MST của đơn vị khác không đủ điều kiện để doanh nghiệp khấu trừ thuế GTGT đầu vào.`,
         legalBasis: buyerTaxCodeBasis(inv.invoiceDate),
         sopClause: buyerTaxCodeBasis(inv.invoiceDate),
         actionableQuestion: `Hóa đơn ${inv.invoiceNumber} từ ${inv.supplierName} ghi sai MST người mua (${inv.buyerTaxCode} thay vì ${config.companyTaxCode}). KTT xử lý thế nào?`,
@@ -443,7 +443,7 @@ function evaluateInvoiceLocallyInternal(
           severity: 'HIGH',
           riskGroup: 'UNCERTAIN_INFO',
           flaggedReason: `Ký hiệu hóa đơn '${inv.invoiceSeries}' là loại có mã của Cơ quan thuế (ký tự thứ 2 là 'C') nhưng thiếu hoặc sai định dạng chuỗi MCCQT 34 ký tự (hiện có: ${mccqt ? mccqt.length + ' ký tự' : 'Trống'}).`,
-          plainExplanation: `Theo ${taxAuthorityCodeBasis(inv.invoiceDate)}, hóa đơn điện tử có mã của cơ quan thuế phải được cơ quan thuế cấp mã trước khi gửi cho người mua, và mã này là nội dung của hóa đơn (theo đặc tả kỹ thuật của cơ quan thuế là chuỗi 34 ký tự). Chưa có mã hợp lệ thì cần tra cứu lại trước khi kê khai.`,
+          plainExplanation: `Theo ${inSentence(taxAuthorityCodeBasis(inv.invoiceDate))}, hóa đơn điện tử có mã của cơ quan thuế phải được cơ quan thuế cấp mã trước khi gửi cho người mua, và mã này là nội dung của hóa đơn (theo đặc tả kỹ thuật của cơ quan thuế là chuỗi 34 ký tự). Chưa có mã hợp lệ thì cần tra cứu lại trước khi kê khai.`,
           legalBasis: taxAuthorityCodeBasis(inv.invoiceDate),
           sopClause: taxAuthorityCodeBasis(inv.invoiceDate),
           actionableQuestion: `Hóa đơn ${inv.invoiceNumber} thuộc nhóm có mã CQT nhưng chưa có mã MCCQT 34 ký tự hợp lệ. KTT xử lý thế nào?`,
@@ -478,7 +478,7 @@ function evaluateInvoiceLocallyInternal(
           severity: 'HIGH',
           riskGroup: 'UNCERTAIN_INFO',
           flaggedReason: `Ký hiệu hóa đơn '${inv.invoiceSeries}' (dải năm ${seriesYear}) không khớp với năm lập hóa đơn (${inv.invoiceDate}, năm ${invYear}).`,
-          plainExplanation: `Theo ${seriesYearBasis(inv.invoiceDate)}, hai chữ số năm trong ký hiệu hóa đơn thể hiện năm lập hóa đơn điện tử. Lệch năm cần được người bán giải trình hoặc điều chỉnh trước khi kê khai.`,
+          plainExplanation: `Theo ${inSentence(seriesYearBasis(inv.invoiceDate))}, hai chữ số năm trong ký hiệu hóa đơn thể hiện năm lập hóa đơn điện tử. Lệch năm cần được người bán giải trình hoặc điều chỉnh trước khi kê khai.`,
           legalBasis: seriesYearBasis(inv.invoiceDate),
           sopClause: seriesYearBasis(inv.invoiceDate),
           actionableQuestion: `Hóa đơn ${inv.invoiceNumber} có ký hiệu dải năm '${seriesYear}' khác năm lập thực tế '${invYear}'. KTT xử lý thế nào?`,
@@ -590,7 +590,7 @@ function evaluateInvoiceLocallyInternal(
         severity: 'CRITICAL',
         riskGroup: 'OUT_OF_POLICY',
         flaggedReason: 'Hóa đơn từ ' + (nonCashThreshold / 1_000_000) + ' triệu đồng thanh toán TIỀN MẶT' + (isExceedKtt ? ' (vượt hạn mức KTT)' : '') + ' cần đối chiếu điều kiện thanh toán theo SOP',
-        plainExplanation: 'Theo ' + cashPaymentBasis(inv.invoiceDate) + ', hàng hóa, dịch vụ mua vào từ ' + (nonCashThreshold / 1_000_000) + ' triệu đồng trở lên (đã gồm thuế GTGT) phải có chứng từ thanh toán không dùng tiền mặt (ví dụ ủy nhiệm chi ngân hàng) để được khấu trừ. Không áp dụng tiền lệ tự duyệt cho điều kiện luật định.',
+        plainExplanation: 'Theo ' + inSentence(cashPaymentBasis(inv.invoiceDate)) + ', hàng hóa, dịch vụ mua vào từ ' + (nonCashThreshold / 1_000_000) + ' triệu đồng trở lên (đã gồm thuế GTGT) phải có chứng từ thanh toán không dùng tiền mặt (ví dụ ủy nhiệm chi ngân hàng) để được khấu trừ. Không áp dụng tiền lệ tự duyệt cho điều kiện luật định.',
         legalBasis: cashPaymentBasis(inv.invoiceDate) + ' & Điều 1.2 Tax-SOP-2026',
         sopClause: cashPaymentBasis(inv.invoiceDate) + ' & Điều 1.2 Tax-SOP-2026',
         actionableQuestion: 'Hóa đơn ' + inv.invoiceNumber + ' trị giá ' + inv.totalAmount.toLocaleString('vi-VN') + '₫ thanh toán Tiền mặt' + (isExceedKtt ? ' (vượt thẩm quyền KTT)' : '') + '. ' + (isExceedKtt ? 'CFO' : 'KTT') + ' xử lý thế nào?',
@@ -645,7 +645,7 @@ function evaluateInvoiceLocallyInternal(
           severity: 'CRITICAL',
           riskGroup: 'OUT_OF_POLICY',
           flaggedReason: `Cụm ${sameDayCheck.invoiceCount} hóa đơn cùng ngày (${inv.invoiceDate}) từ NCC [${inv.supplierName}] có tổng giá trị ${sameDayCheck.dailyTotal.toLocaleString('vi-VN')}₫ (≥ ${nonCashThreshold / 1_000_000} triệu đồng) thanh toán TIỀN MẶT`,
-          plainExplanation: `Theo ${sameDayCashBasis(inv.invoiceDate)}, mua hàng hóa, dịch vụ của cùng một người bán có giá trị dưới ${nonCashThreshold / 1_000_000} triệu đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ ${nonCashThreshold / 1_000_000} triệu đồng trở lên thì chỉ được khấu trừ thuế khi có chứng từ thanh toán không dùng tiền mặt.`,
+          plainExplanation: `Theo ${inSentence(sameDayCashBasis(inv.invoiceDate))}, mua hàng hóa, dịch vụ của cùng một người bán có giá trị dưới ${nonCashThreshold / 1_000_000} triệu đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ ${nonCashThreshold / 1_000_000} triệu đồng trở lên thì chỉ được khấu trừ thuế khi có chứng từ thanh toán không dùng tiền mặt.`,
           legalBasis: sameDayCashBasis(inv.invoiceDate),
           sopClause: sameDayCashBasis(inv.invoiceDate),
           actionableQuestion: `Phát hiện cụm hóa đơn cùng ngày từ ${inv.supplierName} đạt ${sameDayCheck.dailyTotal.toLocaleString('vi-VN')}₫ thanh toán tiền mặt. KTT xử lý thế nào?`,
@@ -959,7 +959,7 @@ function evaluateInvoiceLocallyInternal(
       severity: 'MEDIUM',
       riskGroup: 'UNCERTAIN_INFO',
       flaggedReason: 'Hóa đơn điều chỉnh nhưng không tìm thấy số hóa đơn gốc trong CSDL nội bộ',
-      plainExplanation: 'Hóa đơn ghi là điều chỉnh giảm tiền nhưng hệ thống không tìm thấy hóa đơn gốc tương ứng theo quy định tại Nghị định 254/2026/NĐ-CP.',
+      plainExplanation: 'Hóa đơn ghi là điều chỉnh giảm tiền nhưng hệ thống không tìm thấy hóa đơn gốc tương ứng theo ${invoiceFrameworkAt(inv.invoiceDate).decree}.',
       legalBasis: `Điều 1.4 Quy chế Tax-SOP-2026 & ${invoiceFrameworkAt(inv.invoiceDate).decree}`,
       sopClause: `Điều 1.4 Quy chế Tax-SOP-2026 & ${invoiceFrameworkAt(inv.invoiceDate).decree}`,
       actionableQuestion: 'Hóa đơn điều chỉnh ' + inv.invoiceNumber + ' không tìm thấy số hóa đơn gốc. KTT xử lý thế nào?',

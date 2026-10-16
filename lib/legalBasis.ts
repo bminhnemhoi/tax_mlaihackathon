@@ -57,14 +57,14 @@ export function vat8Basis(invoiceDate: string): string {
 
 /** Hóa đơn ghi MST người mua khác doanh nghiệp: điều kiện hóa đơn để khấu trừ và nội dung bắt buộc trên hóa đơn. */
 export function buyerTaxCodeBasis(invoiceDate: string): string {
-  if (invoiceDate >= '2026-07-01') return 'Điểm a khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Nghị định 254/2026/NĐ-CP (nội dung hóa đơn)';
-  if (invoiceDate >= '2025-07-01') return 'Điểm a khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & khoản 5 Điều 10 Nghị định 123/2020/NĐ-CP';
-  return 'Điều 15 Thông tư 219/2013/TT-BTC & khoản 5 Điều 10 Nghị định 123/2020/NĐ-CP';
+  if (invoiceDate >= '2026-07-01') return 'Điểm a khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Nghị định 254/2026/NĐ-CP, nội dung hóa đơn';
+  if (invoiceDate >= '2025-07-01') return 'Điểm a khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & khoản 5 Điều 10 Nghị định 123/2020/NĐ-CP, sửa đổi bởi Nghị định 70/2025/NĐ-CP';
+  return 'Khoản 1 Điều 15 và khoản 15 Điều 14 Thông tư 219/2013/TT-BTC & khoản 5 Điều 10 Nghị định 123/2020/NĐ-CP';
 }
 
 /** Hóa đơn có mã của cơ quan thuế: định nghĩa mã (điểm a khoản 2 Điều 3) và mã là nội dung của hóa đơn (khoản 10 Điều 10). */
 export function taxAuthorityCodeBasis(invoiceDate: string): string {
-  if (invoiceDate >= '2026-07-01') return 'Nghị định 254/2026/NĐ-CP & Thông tư 91/2026/TT-BTC (hóa đơn có mã của cơ quan thuế)';
+  if (invoiceDate >= '2026-07-01') return 'Nghị định 254/2026/NĐ-CP & Thông tư 91/2026/TT-BTC, hóa đơn có mã của cơ quan thuế';
   return 'Điểm a khoản 2 Điều 3 và khoản 10 Điều 10 Nghị định 123/2020/NĐ-CP';
 }
 
@@ -90,8 +90,13 @@ export function sameDayCashBasis(invoiceDate: string): string {
 /** Bên bán đã chấm dứt hiệu lực MST: ngừng sử dụng hóa đơn điện tử. */
 export function closedSellerBasis(invoiceDate: string): string {
   if (invoiceDate >= '2026-07-01') return 'Nghị định 254/2026/NĐ-CP & Thông tư 91/2026/TT-BTC';
-  if (invoiceDate >= '2025-06-01') return 'Điều 16 Nghị định 123/2020/NĐ-CP (sửa đổi bởi Nghị định 70/2025/NĐ-CP)';
+  if (invoiceDate >= '2025-06-01') return 'Điều 16 Nghị định 123/2020/NĐ-CP, sửa đổi bởi Nghị định 70/2025/NĐ-CP';
   return 'Điều 16 Nghị định 123/2020/NĐ-CP';
+}
+
+/** Viết thường chữ đầu để ghép căn cứ vào giữa câu ("Theo khoản 5 Điều 15…"). */
+export function inSentence(basis: string): string {
+  return basis.charAt(0).toLowerCase() + basis.slice(1);
 }
 
 /** Văn bản về hóa đơn điện tử có hiệu lực tại ngày lập (không ghi số điều cho văn bản mới khi chưa đối chiếu nguyên văn). */
