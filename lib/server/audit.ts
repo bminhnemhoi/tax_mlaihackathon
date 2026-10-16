@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
-import { getDatabase, jsonNow } from './db';
+import fs from 'node:fs';
+import path from 'node:path';
+import { getDatabase, jsonNow, persistentDataDirectory } from './db';
 import { eventLabels, fieldLabels, roleLabels, workflowStatusLabels } from '@/lib/workflowPresentation';
 
 export function presentAuditEvent(event: Record<string, unknown>) {
@@ -36,9 +38,37 @@ export type AuditEventInput = {
 };
 
 /** Khóa HMAC cho chuỗi audit (≥ 32 ký tự, đặt ngoài database). Không có khóa thì chỉ còn chuỗi hash. */
-function auditKey(): string | null {
+let fileKeyCache: { path: string; key: string | null } | null = null;
+/**
+ * Khóa HMAC tự sinh cho production khi người vận hành chưa đặt TAX_REFEREE_AUDIT_KEY: tạo 32 byte ngẫu nhiên một lần,
+ * lưu file quyền 600 cạnh database (thư mục bền, không theo release). Không cần ai vào hPanel mà nhật ký vẫn có HMAC.
+ * Cùng mức tin cậy với biến môi trường (cùng host); sao lưu file này ra ngoài để kiểm chữ ký sau sự cố.
+ */
+function fileAuditKey(): string | null {
+  if (process.env.NODE_ENV !== 'production' || process.env.TAX_REFEREE_AUDIT_KEY_FILE === 'off') return null;
+  const file = process.env.TAX_REFEREE_AUDIT_KEY_FILE || path.join(persistentDataDirectory(), '.audit-key');
+  if (fileKeyCache?.path === file) return fileKeyCache.key;
+  const read = () => { const value = fs.readFileSync(file, 'utf8').trim(); return value.length >= 32 ? value : null; };
+  let key: string | null = null;
+  try { key = read(); } catch {
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, crypto.randomBytes(32).toString('hex'), { flag: 'wx', mode: 0o600 });
+      key = read();
+    } catch (error) {
+      try { key = read(); } catch { console.warn('[audit] Không tạo được file khóa audit:', error instanceof Error ? error.message : error); }
+    }
+  }
+  fileKeyCache = { path: file, key };
+  return key;
+}
+export function auditKeySource(): 'env' | 'file' | null {
+  if ((process.env.TAX_REFEREE_AUDIT_KEY || '').length >= 32) return 'env';
+  return fileAuditKey() ? 'file' : null;
+}
+export function auditKey(): string | null {
   const key = process.env.TAX_REFEREE_AUDIT_KEY || '';
-  return key.length >= 32 ? key : null;
+  return key.length >= 32 ? key : fileAuditKey();
 }
 /** HMAC nối chuỗi: ký cả chữ ký trước đó, nên xóa/chèn/bỏ chữ ký giữa chuỗi đều bị phát hiện. */
 const macOf = (key: string, previousMac: string, eventHash: string) => crypto.createHmac('sha256', key).update(`${previousMac}|${eventHash}`).digest('hex');

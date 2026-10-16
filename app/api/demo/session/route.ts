@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const previous = req.cookies.get('tax_referee_demo')?.value;
     const reuse = Boolean(previous && demoExists(previous));
     // Mỗi phiên demo mới là một tệp SQLite trên đĩa: giới hạn theo IP để không bị tạo vô hạn.
-    if (!reuse && process.env.NODE_ENV !== 'test' && !allowRate(`demo:${clientIp(req.headers)}`, Number(process.env.TAX_REFEREE_DEMO_PER_HOUR || 30), 60 * 60 * 1000))
+    if (!reuse && process.env.NODE_ENV !== 'test' && !allowRate(`demo:${clientIp(req.headers)}`, Number(process.env.TAX_REFEREE_DEMO_PER_HOUR || 200), 60 * 60 * 1000))
       return NextResponse.json({ error: 'Đã tạo quá nhiều phiên demo từ địa chỉ này. Hãy dùng lại phiên hiện có hoặc thử lại sau.' }, { status: 429 });
     if (!reuse && demoCount() >= Number(process.env.TAX_REFEREE_DEMO_MAX || 2000))
       return NextResponse.json({ error: 'Máy chủ demo đã đủ số phiên. Hãy thử lại sau.' }, { status: 503 });

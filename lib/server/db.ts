@@ -9,6 +9,8 @@ import { MacroState, MacroStateSchema, PolicyBundle, PolicyBundleSchema, SystemP
 
 const dataDirectory = process.env.TAX_REFEREE_DATA_DIR || path.join(process.cwd(), 'data', 'runtime');
 const databasePath = process.env.TAX_REFEREE_DB_PATH || path.join(dataDirectory, 'tax-referee.sqlite');
+/** Thư mục bền chứa database nội bộ (không nằm trong thư mục release) — nơi đặt file khóa audit tự sinh. */
+export function persistentDataDirectory(): string { return databasePath === ':memory:' ? dataDirectory : path.dirname(path.resolve(databasePath)); }
 
 let database: Database.Database | null = null;
 
