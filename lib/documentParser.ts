@@ -120,11 +120,15 @@ function structuredXmlFallback(xml: string): Record<string, unknown> {
  * Giới hạn còn lại: trích bằng tên thẻ lấy phần tử trùng tên đầu tiên, chưa theo đường dẫn schema.
  */
 export function canonicalXmlForRegex(xml: string): string {
-  return xml
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>/g, (_whole, cdata: string | undefined) =>
-      cdata === undefined ? '' : cdata.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
-    // Thuộc tính không dùng để trích; giá trị thuộc tính hợp lệ có thể chứa '>' làm regex cắt thẻ sai chỗ.
-    .replace(/<([A-Za-z_][\w:.-]*)(?:\s(?:[^>"'/]|"[^"]*"|'[^']*')*)?(\/?)>/g, '<$1$2>');
+  // Lặp tới điểm dừng: bỏ một token có thể ghép phần còn lại thành token mới (ví dụ `<!-<!-- x -->-`).
+  let text = xml;
+  for (let previous = ''; previous !== text;) {
+    previous = text;
+    text = text.replace(/<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>/g, (_whole, cdata: string | undefined) =>
+      cdata === undefined ? '' : cdata.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+  }
+  // Thuộc tính không dùng để trích; giá trị thuộc tính hợp lệ có thể chứa '>' làm regex cắt thẻ sai chỗ.
+  return text.replace(/<([A-Za-z_][\w:.-]*)(?:\s(?:[^>"'/]|"[^"]*"|'[^']*')*)?(\/?)>/g, '<$1$2>');
 }
 
 const XML_NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
@@ -143,7 +147,14 @@ export function decodeXmlText(text: string): string {
 function tag(xml: string, name: string): string | undefined {
   const pattern = `<(?:[a-zA-Z0-9_]+:)?${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[a-zA-Z0-9_]+:)?${name}>`;
   const match = xml.match(new RegExp(pattern, 'i'));
-  return match ? decodeXmlText(match[1].replace(/<[^>]+>/g, '')).trim() || undefined : undefined;
+  if (!match) return undefined;
+  // Bỏ thẻ con, lặp tới điểm dừng để phần còn lại không ghép thành thẻ mới.
+  let text = match[1];
+  for (let previous = ''; previous !== text;) {
+    previous = text;
+    text = text.replace(/<[^>]+>/g, '');
+  }
+  return decodeXmlText(text).trim() || undefined;
 }
 
 /** Trường phần đầu hóa đơn chỉ được có một giá trị; trùng tên thì regex lấy phần tử đầu tiên, khác với bộ đọc theo schema. */
