@@ -1,6 +1,6 @@
 ---
 name: sprint-4h
-description: Quy trình vòng cải tiến 4 giờ của hackathon. Dùng khi người dùng gửi yêu cầu của Ban tổ chức trong vòng thi: hỏi rõ, chia lát nhỏ, làm, phản biện đối kháng, kiểm chứng, ship lên live, kiểm live, chuẩn bị bằng chứng và lời trình bày. Playbook đầy đủ ở docs/handoff/SPRINT-4H-PLAYBOOK.md.
+description: Quy trình vòng cải tiến 4 giờ của hackathon. Dùng khi người dùng gửi yêu cầu của Ban tổ chức trong vòng thi: hỏi rõ, chia lát nhỏ, làm, phản biện đối kháng, kiểm chứng, ship lên live, kiểm live, chuẩn bị bằng chứng và lời trình bày. Playbook đầy đủ ở docs/handoff/SPRINT-4H-PLAYBOOK.md; công thức sửa mã theo tên hàm ở docs/handoff/SPRINT-4H-COOKBOOK.md.
 ---
 
 # sprint-4h — vòng cải tiến 4 giờ
