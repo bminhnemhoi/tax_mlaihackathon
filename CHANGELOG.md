@@ -1,6 +1,6 @@
 # Lịch sử thay đổi
 
-Định dạng phỏng theo [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dự án chưa gắn tag phiên bản; mỗi mốc ứng với các Pull Request đã merge vào `main` (merge vào `main` = deploy production). Lịch sử git không bị squash hay viết lại — chi tiết từng thay đổi xem `git log`.
+Định dạng phỏng theo [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), phiên bản theo [SemVer](https://semver.org/). **v1.0.0** là commit `e496ab4` — bản đang chạy trên live, đã kiểm sau deploy ngày 16/10/2026. Các mốc trước đó ứng với Pull Request đã merge vào `main` của [repo gốc của đội](https://github.com/khanhle1406/Tax-Referee) (merge ở đó = deploy production). Lịch sử git không bị squash hay viết lại — chi tiết từng thay đổi xem `git log`.
 
 ## [Chưa phát hành]
 
@@ -8,8 +8,15 @@
 - README viết lại: mục lục, kiến trúc (Mermaid), bảng bảo mật 4 trụ, cấu hình, API, giới hạn.
 - Thêm `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, `THIRD_PARTY_NOTICES.md`, mẫu issue/PR, mục lục tài liệu [`docs/README.md`](docs/README.md).
 - `.env.example` bổ sung các biến mới (ngân sách AI, chống hạ cấp chữ ký, khóa audit tự sinh); `package.json` có metadata giấy phép và repository.
+- Ảnh giao diện thật chụp từ bản live (`docs/screenshots/`), mục thuật ngữ, `CITATION.cff`; đồng bộ các tài liệu còn ghi số liệu cũ (buổi thử người dùng, số quy tắc, trạng thái PR, yêu cầu Node).
+- Bằng chứng live sau deploy PR #8: [`docs/evidence/live-2026-10-16-post-deploy.json`](docs/evidence/live-2026-10-16-post-deploy.json).
 
-## 2026-10-16 — Bảo mật hệ có agent AI cho Demo Day (PR #6, #7, #8)
+### Hạ tầng repo
+- CI: quyền token tối thiểu (`contents: read`), action ghim theo SHA, `concurrency`, `timeout-minutes`, thêm Node 24 trên Ubuntu.
+- CodeQL quét JavaScript/TypeScript, Python và workflow; Dependabot cập nhật hằng tuần (bỏ qua `better-sqlite3` đang ghim cho Hostinger).
+- `CODEOWNERS`, `.gitattributes` (LF), `.nvmrc` (Node 22); `.gitignore` chặn gói nộp bài `.zip` và bộ cài Python cục bộ.
+
+## [1.0.0] — 2026-10-16 — Bảo mật hệ có agent AI cho Demo Day (PR [#6](https://github.com/khanhle1406/Tax-Referee/pull/6), [#7](https://github.com/khanhle1406/Tax-Referee/pull/7), [#8](https://github.com/khanhle1406/Tax-Referee/pull/8))
 
 ### Bảo mật
 - **Ranh giới đầu ra Vision:** chỉ nhận 14 trường nhìn thấy trên chứng từ (`VISION_ALLOWED_KEYS`); trường lạ bị loại và ghi lại; bỏ tên file khỏi prompt; dấu vết `agent:vision@model#hash-prompt`.
@@ -31,7 +38,7 @@
 - Đóng ca bẫy U2 ("tiệc cưới người thân giám đốc") sau buổi thử 16/10.
 - Giới hạn tạo phiên demo mặc định 200/giờ/IP.
 
-## 2026-10-15 — Cải tiến từ nghiên cứu (PR #5)
+## 2026-10-15 — Cải tiến từ nghiên cứu (PR [#5](https://github.com/khanhle1406/Tax-Referee/pull/5))
 
 ### Thêm
 - **Hậu kiểm ngẫu nhiên** ca máy tự duyệt: 10%, gấp 3 ở vùng sát ngưỡng, chọn mẫu bằng HMAC; tỉ lệ đồng thuận người–máy kèm khoảng Wilson 95%.
@@ -43,7 +50,7 @@
 - Trùng hóa đơn khác cách ghi số ("123" = "0000123"); **kiểm thử thuộc tính** bằng fast-check.
 - Tổng hợp 63 nguồn nghiên cứu: [docs/research/nghien-cuu-lien-quan.md](docs/research/nghien-cuu-lien-quan.md).
 
-## 2026-10-15 — Track A hardening và hồ sơ nộp bài (PR #1 → #4)
+## 2026-10-15 — Track A hardening và hồ sơ nộp bài (PR [#1](https://github.com/khanhle1406/Tax-Referee/pull/1) → [#4](https://github.com/khanhle1406/Tax-Referee/pull/4))
 
 ### Thêm
 - Ba kiểu dừng nhất quán (chưa rõ thông tin / ngoài quy định / vượt thẩm quyền) từ một bảng phân loại duy nhất.
@@ -66,3 +73,6 @@
 - Đọc ảnh/PDF scan bằng Gemini Vision; gỡ các engine AI cũ.
 - Siết khâu đọc chứng từ (chặn `DOCTYPE`/`ENTITY` — XXE) và quy trình thẩm định; workspace cho kế toán.
 - Verify chạy tất định, không gọi AI (13/10).
+
+[Chưa phát hành]: https://github.com/bminhnemhoi/tax_mlaihackathon/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/bminhnemhoi/tax_mlaihackathon/releases/tag/v1.0.0

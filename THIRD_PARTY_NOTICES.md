@@ -16,6 +16,15 @@ Các file được tải từ kho công khai để thử parser và luồng đ�
 - Chỉ dùng cho nghiên cứu, thử nghiệm và trình diễn. Không dùng để công bố độ chính xác: theo `licensePolicy` của manifest, chỉ mẫu `REDISTRIBUTABLE` mới được dùng cho tuyên bố công khai về độ chính xác. Hiện không mẫu nào có trạng thái này.
 - Nếu bạn là chủ sở hữu và muốn gỡ một file, hãy mở issue hoặc liên hệ maintainer (xem [SECURITY.md](SECURITY.md)); đội sẽ gỡ khỏi bản mới.
 
+## Tài liệu của Ban tổ chức và doanh nghiệp đồng hành
+
+| Tài liệu | Chủ sở hữu | Ghi chú |
+|---|---|---|
+| Đề bài gốc `Challenge_Brief_OrganizationAI_VN.docx` | Ban tổ chức MLAI Hackathon 2026 | Đã gỡ khỏi bản hiện tại của repo này; vẫn còn trong lịch sử git do lịch sử không được viết lại |
+| [`docs/assessment/*.md`](docs/assessment) | Ban giám khảo và doanh nghiệp đồng hành Sprint 1 | Nhận xét gốc, giữ để minh bạch việc xử lý phản hồi |
+
+Giấy phép MIT không áp dụng cho các tài liệu này. Chủ sở hữu muốn gỡ, xin liên hệ maintainer (xem [SECURITY.md](SECURITY.md)).
+
 ## Font
 
 | Tài nguyên | Giấy phép |
