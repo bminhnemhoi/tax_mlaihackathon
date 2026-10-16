@@ -140,7 +140,7 @@ Các chuyển dịch phụ:
 
 - **CSRF:** `middleware.ts` kiểm tra `Sec-Fetch-Site` (dự phòng: so Origin với Host) cho mọi POST/PUT/PATCH/DELETE vào `/api`, trừ webhook.
 - **XXE:** từ chối `DOCTYPE`/`ENTITY` trước khi parse (`lib/documentParser.ts`).
-- **Giới hạn tần suất:** tạo phiên demo tối đa 30 lần/giờ mỗi IP; tra cứu MST tối đa 60 lần/giờ mỗi người dùng; toàn hệ thống tối đa 2.000 phiên demo (`lib/server/rateLimit.ts`, `app/api/demo/session/route.ts`).
+- **Giới hạn tần suất và ngân sách AI (OWASP LLM10):** tạo phiên demo mặc định 30 lần/giờ mỗi IP (`TAX_REFEREE_DEMO_PER_HOUR`); đọc ảnh bằng Vision 60 lần/giờ mỗi người dùng và 600 lần/giờ toàn tiến trình; tra cứu có grounding 60 lần/giờ mỗi phiên và 300 lần/giờ toàn tiến trình, vượt thì fail-closed; tra cứu MST qua API 60 lần/giờ mỗi người dùng; phép thử bảo mật 10 lần/10 phút; toàn hệ thống tối đa 2.000 phiên demo (`lib/server/aiBudget.ts`, `lib/server/rateLimit.ts`, `app/api/demo/session/route.ts`).
 - **Hiển thị chứng từ:** `nosniff`, CSP có `default-src 'none'` và `sandbox` cho mọi loại trừ PDF; header toàn cục `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: same-origin` (`next.config.ts`).
 - **Quota lưu trữ:** mỗi phiên demo 100 file/100MB; database nội bộ 10.000 file/1GB (`lib/server/artifactQuota.ts`).
 - **Webhook pháp lý:** secret từ 24 ký tự, so bằng `timingSafeEqual`.
@@ -148,7 +148,7 @@ Các chuyển dịch phụ:
 
 ## 9. Kiểm thử và CI
 
-- **`npm test`:** 16 bộ gồm 68 unit test (16 file trong `tests/unit/`, có kiểm thử thuộc tính bằng fast-check trên ~1.500 hóa đơn sinh ngẫu nhiên với seed cố định) và 15 bộ hồi quy, trong đó có 72 ca red team. Mỗi bộ chạy trong tiến trình riêng với thư mục dữ liệu tạm; các bộ có đường gọi AI dùng khóa giả, và CI không có khóa AI thật. Bộ nào in ít dòng PASS hơn ngưỡng `minChecks` bị tính là FAIL.
+- **`npm test`:** 16 bộ gồm 100 kiểm tra unit (20 file trong `tests/unit/`: kiểm thử thuộc tính bằng fast-check trên ~1.500 hóa đơn sinh ngẫu nhiên với seed cố định; ma trận quyền gọi hàm thật với từng vai trò; 12 phép thử tấn công của trang /trust; ranh giới thực thi) và 15 bộ hồi quy, trong đó có 72 ca red team. Mỗi bộ chạy trong tiến trình riêng với thư mục dữ liệu tạm; các bộ có đường gọi AI dùng khóa giả, và CI không có khóa AI thật. Bộ nào in ít dòng PASS hơn ngưỡng `minChecks` bị tính là FAIL.
 - **CI** (`.github/workflows/ci.yml`): ma trận ubuntu-latest và windows-latest chạy typecheck, typecheck:referee, lint, test; job build chạy sau khi test đạt.
 - **Smoke HTTP** (`scripts/qa/test-api-smoke.ts`, `TEST_BASE_URL`): cô lập giữa hai phiên demo, lỗi 409 khi gửi revision cũ, hoàn tác, đọc chứng từ.
 - **Phục hồi:** `npm run test:recovery` kiểm tra dữ liệu còn nguyên sau khởi động lại.
@@ -238,3 +238,16 @@ Cải tiến đã làm từ nghiên cứu (nhánh `feat/finals-improvements`, m�
 | Căn cứ pháp lý và danh mục loại trừ 8% theo ngày lập | NQ 204/2025; NĐ 174/2025; TT 32/2025; NĐ 254/2026; TT 91/2026 | `lib/legalBasis.ts` |
 | Phát hiện trùng sau chuẩn hóa số hóa đơn | Coupa; AppZen | `services/duplicateDetector.ts` |
 | Kiểm thử thuộc tính (7 bất biến) | QuickCheck; kiểm thử biến hình | `tests/unit/engineProperties.test.ts` |
+
+## 16. Bảo mật hệ có agent AI (bổ sung 16/10)
+
+Trả lời câu hỏi của Track VNG về identity, least privilege, deterministic execution boundaries, sandbox isolation. Phân tích đầy đủ: [docs/security/threat-model.md](../security/threat-model.md); kiến trúc, đánh đổi và lộ trình production: [docs/architecture/demo-to-production.md](../architecture/demo-to-production.md).
+
+| Trụ | Cơ chế | Bằng chứng chạy được |
+|---|---|---|
+| Định danh | 8 principal (3 vai người, trọng tài tất định, 3 agent AI, webhook pháp lý) — `lib/capabilities.ts`; trọng tài ghi `SYSTEM_REFEREE` kèm policyHash/inputHash/commit; agent đọc ảnh ghi `agent:vision@model#hash-prompt`; người nhập không tự xác minh | /trust I1, I2; `/api/health` khối `ai` |
+| Đặc quyền tối thiểu | Ma trận 20 quyền; KTT không duyệt ca CFO; bánh cóc thẩm quyền (hạ số tiền không hạ thẩm quyền); bốn mắt cho policy nới lỏng | /trust L1–L3; `tests/unit/authzMatrix.test.ts` |
+| Ranh giới thực thi | Đầu ra Vision chỉ 14 trường (`VISION_ALLOWED_KEYS`); thao tác workflow theo danh sách cho phép; hoàn tác không nới lỏng kiểm soát; ngân sách gọi AI fail-closed; đường quyết định 0 lần gọi LLM | /trust D1–D4; `tests/unit/executionBoundaries.test.ts` |
+| Cách ly | Mỗi phiên demo một DB; phép thử chạy DB `:memory:`; XXE bị chặn; chứng từ phục vụ với CSP sandbox; nhật ký chỉ ghi thêm + HMAC + điểm neo + chống hạ cấp | /trust S1–S3; `tests/unit/auditIntegrity.test.ts` |
+
+Lỗi do audit nội bộ ngày 16/10 tìm ra và đã sửa (PR #6): AI đọc ảnh "khai" được sự kiện không nhìn thấy (UNC, trạng thái MST) rồi được tự duyệt; hoàn tác gỡ được lệnh giữ thuế theo luật; KTT hạ số tiền ca CFO để máy tự duyệt; người nhập tự xác minh; policy tắt được quy tắc ngoài phạm vi; không có ngân sách gọi AI; cấu hình production thiếu khóa audit mà không cảnh báo.

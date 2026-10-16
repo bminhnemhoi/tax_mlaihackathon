@@ -34,7 +34,7 @@ Người duyệt phải là tài khoản khác người nhập; ca từ 200 tri�
 *Bằng chứng:* `services/workflowService.ts`, `lib/server/audit.ts`, `lib/server/db.ts`, `services/automationControl.ts`, `tests/unit/auditIntegrity.test.ts`, `tests/unit/automationSwitch.test.ts`.
 
 ## 6. AI đọc, quy tắc quyết định
-Parser hóa đơn điện tử XML theo định dạng Viettel, MISA, VNPT, FPT và Tổng cục Thuế (chặn DOCTYPE/ENTITY để tránh XXE); ảnh và PDF scan đọc qua Gemini Vision, kết quả luôn gắn cờ cần người kiểm tra (đo 15/10 với key thật: ảnh ~14 giây, PDF ~26 giây). **Mọi quyết định thuế do quy tắc tất định** trong một lượt, không có vòng lặp agent; lượt đánh giá quá hạn chuyển "chờ bổ sung".
+Parser hóa đơn điện tử XML theo định dạng Viettel, MISA, VNPT, FPT và Tổng cục Thuế (chặn DOCTYPE/ENTITY để tránh XXE); ảnh và PDF scan đọc qua Gemini Vision (đo 15/10 với key thật: ảnh ~14 giây, PDF ~26 giây); từ 16/10 hệ thống chỉ nhận đúng 14 trường nhìn thấy trên chứng từ — các sự kiện không thể thấy trên ảnh (UNC, trạng thái MST, bảng kê…) AI có "khai" cũng bị loại, phải do người cung cấp và xác minh; trường đọc chưa chắc phải được KTT/CFO khác người nhập xác minh. **Mọi quyết định thuế do quy tắc tất định** trong một lượt, không có vòng lặp agent; lượt đánh giá quá hạn chuyển "chờ bổ sung".
 *Bằng chứng:* `lib/documentParser.ts`, `services/geminiService.ts`, `app/api/documents/parse/route.ts`, `input-sample/`.
 
 ## Giá trị cho doanh nghiệp
