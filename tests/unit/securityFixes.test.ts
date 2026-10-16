@@ -44,3 +44,9 @@ test('chống CSRF: POST từ trang khác bị chặn, cùng trang và gọi t�
   assert.notEqual(post({}).status, 403);
   assert.notEqual(post({ 'sec-fetch-site': 'cross-site' }, '/api/webhooks/legal-update').status, 403);
 });
+
+test('tiến trình Python đọc PDF không thừa hưởng biến bí mật (khóa API, khóa audit, mật khẩu)', async () => {
+  const { pdfChildEnv } = await import('../../lib/server/pdfToImage');
+  const env = pdfChildEnv({ PATH: '/usr/bin', PYTHONPATH: '/app/runtime/python', SHOPAIKEY_API_KEY: 'x', TAX_REFEREE_AUDIT_KEY: 'y', TAX_REFEREE_CFO_PASSWORD: 'z', NODE_ENV: 'production' } as NodeJS.ProcessEnv);
+  assert.deepEqual(Object.keys(env).sort(), ['PATH', 'PYTHONIOENCODING', 'PYTHONPATH']);
+});
