@@ -148,7 +148,7 @@ Các chuyển dịch phụ:
 
 ## 9. Kiểm thử và CI
 
-- **`npm test`:** 16 bộ gồm 107 kiểm tra unit (ngưỡng `minChecks` trong `scripts/qa/run-all.ts`; 21 file trong `tests/unit/`: kiểm thử thuộc tính bằng fast-check trên ~1.500 hóa đơn sinh ngẫu nhiên với seed cố định; ma trận quyền gọi hàm thật với từng vai trò; 12 phép thử tấn công của trang /trust; ranh giới thực thi) và 15 bộ hồi quy, trong đó có 72 ca red team. Mỗi bộ chạy trong tiến trình riêng với thư mục dữ liệu tạm; các bộ có đường gọi AI dùng khóa giả, và CI không có khóa AI thật. Bộ nào in ít dòng PASS hơn ngưỡng `minChecks` bị tính là FAIL.
+- **`npm test`:** 16 bộ gồm 110 kiểm tra unit (ngưỡng `minChecks` trong `scripts/qa/run-all.ts`; 21 file trong `tests/unit/`: kiểm thử thuộc tính bằng fast-check trên ~1.500 hóa đơn sinh ngẫu nhiên với seed cố định; ma trận quyền gọi hàm thật với từng vai trò; 12 phép thử tấn công của trang /trust; ranh giới thực thi) và 15 bộ hồi quy, trong đó có 72 ca red team. Mỗi bộ chạy trong tiến trình riêng với thư mục dữ liệu tạm; các bộ có đường gọi AI dùng khóa giả, và CI không có khóa AI thật. Bộ nào in ít dòng PASS hơn ngưỡng `minChecks` bị tính là FAIL.
 - **CI** (`.github/workflows/ci.yml`): ma trận Ubuntu và Windows với Node 22, thêm Node 24 trên Ubuntu, chạy typecheck, typecheck:referee, lint, test; job build chạy sau khi test đạt.
 - **Smoke HTTP** (`scripts/qa/test-api-smoke.ts`, `TEST_BASE_URL`): cô lập giữa hai phiên demo, lỗi 409 khi gửi revision cũ, hoàn tác, đọc chứng từ.
 - **Phục hồi:** `npm run test:recovery` kiểm tra dữ liệu còn nguyên sau khởi động lại.
