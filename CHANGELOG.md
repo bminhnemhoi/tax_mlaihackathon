@@ -4,6 +4,12 @@
 
 ## [Chưa phát hành]
 
+### Bảo mật
+- **Đọc XML không còn lệch so với bộ đọc chuẩn:** chuẩn hóa CDATA, chú thích và tham chiếu ký tự trước khi trích. Trước đây hóa đơn chứa `2<![CDATA[2]]>880000` được đọc thành 2.880.000₫ trong khi phần mềm kế toán và cơ quan thuế đọc 22.880.000₫ — đủ để lọt ngưỡng tiền mặt và hạn mức Kế toán trưởng (`221c614`).
+- **XML sổ cái (beta):** escape mọi giá trị, chặn chèn phần tử giả qua số hóa đơn hay tên nhà cung cấp (`781aa0e`).
+- **File tạm PDF:** thư mục riêng quyền 700, file 600, luôn được dọn; xóa hàm PDF→PNG không còn dùng (`2c5cf09`).
+- Phát hiện nhờ CodeQL, mỗi cảnh báo được phân loại và phản biện độc lập; test hồi quy `tests/unit/xmlIntegrity.test.ts` (unit 103 → 107 kiểm tra).
+
 ### Tài liệu
 - README viết lại: mục lục, kiến trúc (Mermaid), bảng bảo mật 4 trụ, cấu hình, API, giới hạn.
 - Thêm `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, `THIRD_PARTY_NOTICES.md`, mẫu issue/PR, mục lục tài liệu [`docs/README.md`](docs/README.md).
