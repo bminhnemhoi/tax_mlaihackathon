@@ -1,5 +1,10 @@
 import { CanonicalLedgerVoucher } from '../types';
 
+/** Escape giá trị trước khi chèn vào XML: số hóa đơn hay tên NCC chứa `</InvoiceNo>` hoặc `]]>` không chèn được phần tử giả vào tệp nạp phần mềm kế toán. */
+export function xmlEscape(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c] as string);
+}
+
 /**
  * Kết xuất tệp XML theo cấu trúc Thông tư 99/2025/TT-BTC chuẩn nạp vào phần mềm kế toán
  */
@@ -16,24 +21,24 @@ export function generateUniversalXml(vouchers: CanonicalLedgerVoucher[]): string
   lines.push('  <Vouchers>');
 
   for (const v of vouchers) {
-    lines.push(`    <Voucher id="${v.id}">`);
-    lines.push(`      <VoucherNo>${v.voucherNumber}</VoucherNo>`);
-    lines.push(`      <VoucherDate>${v.voucherDate}</VoucherDate>`);
-    lines.push(`      <InvoiceNo>${v.invoiceRef}</InvoiceNo>`);
-    lines.push(`      <InvoiceDate>${v.invoiceDate}</InvoiceDate>`);
-    lines.push(`      <VendorTaxCode>${v.supplierTaxCode}</VendorTaxCode>`);
-    lines.push(`      <VendorName><![CDATA[${v.supplierName}]]></VendorName>`);
-    lines.push(`      <TotalAmount>${v.totalAmount}</TotalAmount>`);
-    lines.push(`      <ApprovedTaxAmount>${v.approvedTaxAmount}</ApprovedTaxAmount>`);
-    lines.push(`      <AuditHash>${v.auditHash}</AuditHash>`);
+    lines.push(`    <Voucher id="${xmlEscape(v.id)}">`);
+    lines.push(`      <VoucherNo>${xmlEscape(v.voucherNumber)}</VoucherNo>`);
+    lines.push(`      <VoucherDate>${xmlEscape(v.voucherDate)}</VoucherDate>`);
+    lines.push(`      <InvoiceNo>${xmlEscape(v.invoiceRef)}</InvoiceNo>`);
+    lines.push(`      <InvoiceDate>${xmlEscape(v.invoiceDate)}</InvoiceDate>`);
+    lines.push(`      <VendorTaxCode>${xmlEscape(v.supplierTaxCode)}</VendorTaxCode>`);
+    lines.push(`      <VendorName>${xmlEscape(v.supplierName)}</VendorName>`);
+    lines.push(`      <TotalAmount>${xmlEscape(v.totalAmount)}</TotalAmount>`);
+    lines.push(`      <ApprovedTaxAmount>${xmlEscape(v.approvedTaxAmount)}</ApprovedTaxAmount>`);
+    lines.push(`      <AuditHash>${xmlEscape(v.auditHash)}</AuditHash>`);
     lines.push(`      <Entries>`);
     for (const e of v.entries) {
       lines.push(`        <Entry>`);
-      lines.push(`          <AccountCode>${e.accountCode}</AccountCode>`);
-      lines.push(`          <AccountName><![CDATA[${e.accountName}]]></AccountName>`);
-      lines.push(`          <Debit>${e.debitAmount}</Debit>`);
-      lines.push(`          <Credit>${e.creditAmount}</Credit>`);
-      lines.push(`          <Memo><![CDATA[${e.memo}]]></Memo>`);
+      lines.push(`          <AccountCode>${xmlEscape(e.accountCode)}</AccountCode>`);
+      lines.push(`          <AccountName>${xmlEscape(e.accountName)}</AccountName>`);
+      lines.push(`          <Debit>${xmlEscape(e.debitAmount)}</Debit>`);
+      lines.push(`          <Credit>${xmlEscape(e.creditAmount)}</Credit>`);
+      lines.push(`          <Memo>${xmlEscape(e.memo)}</Memo>`);
       lines.push(`        </Entry>`);
     }
     lines.push(`      </Entries>`);
