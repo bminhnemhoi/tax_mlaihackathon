@@ -81,13 +81,25 @@ export function recoverExpiredEvaluations(now = jsonNow()): number {
   })();
 }
 
-function undoCandidate(row:WorkflowRecord) {
-  const events=getDatabase().prepare('SELECT id,event_type,payload_json FROM audit_events WHERE entity_id=? ORDER BY rowid DESC').all(row.id) as {id:string;event_type:string;payload_json:string}[];
+/**
+ * Thao tác có thể hoàn tác. Ranh giới: hoàn tác là một chuyển trạng thái NGƯỢC, nên không được nới lỏng kiểm soát mà người khác
+ * (hoặc luật) đã đặt — trả hồ sơ về "Đã duyệt", gỡ giữ thuế, tăng thuế duyệt chỉ được làm bởi chính người đã thao tác.
+ * Lệnh giữ theo luật (cụm tiền mặt) và giữ thuế do hậu kiểm "không đồng ý" không hoàn tác được.
+ */
+function undoCandidate(row:WorkflowRecord,user?:AppUser) {
+  const events=getDatabase().prepare('SELECT id,event_type,payload_json,actor_id FROM audit_events WHERE entity_id=? ORDER BY rowid DESC').all(row.id) as {id:string;event_type:string;payload_json:string;actor_id:string|null}[];
   const reversed=new Set(events.filter(e=>e.event_type==='INVOICE_ACTION_REVERTED').map(e=>JSON.parse(e.payload_json).reversesEventId));
-  const latest=events.find(e=>!reversed.has(e.id) && !['INVOICE_ACTION_REVERTED','EVALUATION_STARTED','EVALUATION_FAILED','EVALUATION_RECOVERED','INVOICE_EVALUATED','BANK_EVIDENCE_RECORDED','ROUTINE_HELD_AUTOMATION_PAUSED'].includes(e.event_type) && JSON.parse(e.payload_json).before);
+  const latest=events.find(e=>!reversed.has(e.id) && !['INVOICE_ACTION_REVERTED','EVALUATION_STARTED','EVALUATION_FAILED','EVALUATION_RECOVERED','INVOICE_EVALUATED','BANK_EVIDENCE_RECORDED','ROUTINE_HELD_AUTOMATION_PAUSED','LINKED_CASH_HOLD','ROUTINE_HELD_AUTHORITY_FLOOR'].includes(e.event_type) && JSON.parse(e.payload_json).before);
   if(!latest)return null;
   const payload=JSON.parse(latest.payload_json);
-  return payload.after.status===row.status && payload.revision===row.revision ? {id:latest.id,eventType:latest.event_type,payload} : null;
+  if(!(payload.after.status===row.status && payload.revision===row.revision)) return null;
+  const before=payload.before,after=payload.after;
+  const loosens=before.status==='APPROVED' || Number(before.taxHold)<Number(after.taxHold) || Number(before.approvedTax)>Number(after.approvedTax);
+  if(loosens){
+    if(latest.event_type==='TAX_HOLD' && postAuditStatus(row.id)?.result==='DISAGREE') return null;
+    if(!user || latest.actor_id!==user.id) return null;
+  }
+  return {id:latest.id,eventType:latest.event_type,payload};
 }
 export function approvalBlock(row: WorkflowRecord, user: AppUser): string | null {
   if (user.role === 'ACCOUNTANT') return 'Cần Kế toán trưởng hoặc CFO.';
@@ -95,7 +107,7 @@ export function approvalBlock(row: WorkflowRecord, user: AppUser): string | null
   if (row.status === 'PAUSED' || row.status === 'EVALUATING') return 'Hồ sơ đang dừng hoặc đang được đánh giá.';
   if (!row.decision_json) return 'Chưa có evaluation.';
   const d = RefereeDecisionSchema.parse(JSON.parse(row.decision_json));
-  if (d.status === 'ESCALATED' && (d.requiresCFO || row.status==='FORWARDED') && user.role !== 'CFO') return 'Hồ sơ cần CFO.';
+  if (((d.status === 'ESCALATED' && d.requiresCFO) || ['FORWARDED','WAITING_CFO'].includes(row.status)) && user.role !== 'CFO') return 'Hồ sơ cần CFO.';
   const review = JSON.parse(row.source_review_json || '{}');
   if (review.needsReevaluation) return 'Bằng chứng đã thay đổi; cần đánh giá lại hồ sơ.';
   if (review.unresolvedFields?.length) return `Cần xác minh: ${review.unresolvedFields.join(', ')}.`;
@@ -106,7 +118,7 @@ export function approvalBlock(row: WorkflowRecord, user: AppUser): string | null
 export function allowedActions(row: WorkflowRecord, user: AppUser) {
   const operator = user.role !== 'ACCOUNTANT';
   const blockedReason = approvalBlock(row, user);
-  const undo=undoCandidate(row);
+  const undo=undoCandidate(row,user);
   return { approve: !blockedReason && ['WAITING_CHIEF_ACCOUNTANT','WAITING_CFO','FORWARDED'].includes(row.status),
     pause: operator && row.status !== 'PAUSED', resume: operator && row.status === 'PAUSED',
     undo: operator && Boolean(undo), undoTarget:operator && undo ? {eventId:undo.id,eventType:undo.eventType,targetStatus:undo.payload.before.status==='EVALUATING'?'ON_HOLD':undo.payload.before.status} : null,
@@ -174,11 +186,19 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
   const sourceConflicts:string[]=sourceInvoice ? SOURCE_DIFF_FIELDS.filter(field=>differsFromSource(field,sourceInvoice[field],(invoice as unknown as Record<string,unknown>)[field])) : [];
   const previousReview=existing ? JSON.parse(existing.source_review_json || '{}') : {};
   const oldInvoice=existing ? JSON.parse(existing.payload_json) : {};
+  const prevDecision=existing?.decision_json ? JSON.parse(existing.decision_json) : null;
+  // Bánh cóc thẩm quyền: ca đã từng cần CFO thì người khác CFO sửa dữ liệu (VD hạ 330 triệu xuống 198 triệu) không làm hạ thẩm quyền.
+  // Mức sàn chỉ được gỡ khi chính CFO thao tác.
+  const cfoFloor=previousReview.authorityFloor==='CFO' || (prevDecision?.status==='ESCALATED' && prevDecision.requiresCFO===true) || ['WAITING_CFO','FORWARDED'].includes(existing?.status ?? '');
+  const floorHold=cfoFloor && user?.role!=='CFO';
   // Sửa dữ liệu sau khi hồ sơ đã bị chuyển tiếp: người nhập không được "rửa" ca (VD hạ số tiền để né CFO).
   // Trường đã có giá trị mà bị Kế toán viên đổi phải được KTT/CFO xác nhận như một mâu thuẫn với bản trước; bổ sung trường còn thiếu thì vẫn bình thường.
   const escalatedBefore=Boolean(existing?.decision_json) && JSON.parse(existing!.decision_json!).status==='ESCALATED';
-  const postEscalationEdits:string[]=escalatedBefore && (!user || user.role==='ACCOUNTANT')
-    ? SOURCE_DIFF_FIELDS.filter(field=>!(previousReview.unresolvedFields || []).includes(field) && oldInvoice[field]!=='UNKNOWN' && differsFromSource(field,oldInvoice[field],(invoice as unknown as Record<string,unknown>)[field]))
+  // Không chỉ số tiền: các dữ kiện kích hoạt phát hiện còn mở (trạng thái MST, bảng kê, hóa đơn điều chỉnh…) đã có giá trị mà bị đổi
+  // sau khi chuyển tiếp cũng phải được người có thẩm quyền xác nhận — không "rửa" được ca bằng cách lật một dữ kiện.
+  const guardedFields=[...new Set<string>([...SOURCE_DIFF_FIELDS,...((prevDecision?.findings || []) as Array<{ruleId:string;kind?:string}>).flatMap(f=>taxonomyOf(f.ruleId,f.kind as never).triggerFields).filter(field=>field in InvoiceInputSchema.shape && oldInvoice[field]!==undefined && oldInvoice[field]!==null)])];
+  const postEscalationEdits:string[]=escalatedBefore && (!user || user.role==='ACCOUNTANT' || floorHold)
+    ? guardedFields.filter(field=>!(previousReview.unresolvedFields || []).includes(field) && oldInvoice[field]!=='UNKNOWN' && differsFromSource(field,oldInvoice[field],(invoice as unknown as Record<string,unknown>)[field]))
     : [];
   const dailyTotal=sameDayPurchaseTotal(invoice);
   const requiredFields=requiredDecisionFields(invoice,policy.config,dailyTotal);
@@ -196,6 +216,8 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
   const legacyFields = z.array(z.string().refine(field => field in InvoiceInputSchema.shape, 'Trường xác minh không hợp lệ')).max(100).parse(options.confirmedFields || []);
   if (newConfirmations.length || legacyFields.length) {
     if (!user || user.role==='ACCOUNTANT') throw new WorkflowError('KTT/CFO cần xác minh dữ liệu.',403);
+    // Bất kiêm nhiệm: người nhập hồ sơ không tự xác minh dữ liệu (kể cả dữ liệu AI đọc) của chính mình.
+    if (!existing || existing.created_by_user_id===user.id) throw new WorkflowError('Người nhập hồ sơ không tự xác minh dữ liệu của mình: hãy để Kế toán viên nhập, rồi KTT/CFO khác xác minh (trong demo, đổi vai ở góc trên).',403);
     if (legacyFields.length && (!options.evidence || options.evidence.trim().length<8)) throw new WorkflowError('KTT/CFO cần ghi bằng chứng xác minh dữ liệu.',403);
     for (const confirmation of [...newConfirmations, ...legacyFields.map(field => ({field,evidence:options.evidence!}))]) {
       const value = (invoice as any)[confirmation.field];
@@ -222,7 +244,10 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
     && (recordedIdentity.supplierTaxCode !== invoice.supplierTaxCode || recordedIdentity.legalName !== invoice.supplierName)
     ? { ...recordedIdentity, status: 'CONFLICT', message: 'Thông tin nhà cung cấp đã thay đổi so với kết quả đối chiếu nguồn.' }
     : recordedIdentity;
-  const review={rawInput:raw,sourceValues:extracted.invoice || previousReview.sourceValues || null,sourceConflicts,postEscalationEdits,supplierIdentity,inferredFields,unresolvedFields:unresolved,nonBlockingFields:allWarnings.filter(field=>!requiredFields.has(field)),confirmedFields:[...new Set(confirmed)],confirmations,evidence:options.evidence || previousReview.evidence || null,confirmedBy:newConfirmations.length || legacyFields.length ? user?.id : previousReview.confirmedBy};
+  const review={rawInput:raw,sourceValues:extracted.invoice || previousReview.sourceValues || null,sourceConflicts,postEscalationEdits,supplierIdentity,inferredFields,unresolvedFields:unresolved,nonBlockingFields:allWarnings.filter(field=>!requiredFields.has(field)),confirmedFields:[...new Set(confirmed)],confirmations,evidence:options.evidence || previousReview.evidence || null,confirmedBy:newConfirmations.length || legacyFields.length ? user?.id : previousReview.confirmedBy,
+    authorityFloor:floorHold || (previousReview.authorityFloor==='CFO' && user?.role!=='CFO') ? 'CFO' : undefined,
+    // Danh tính agent AI đã đọc chứng từ (model, hash prompt, key bị loại) đi theo hồ sơ vào mọi sự kiện audit.
+    llmProvenance:extracted.llmProvenance ?? previousReview.llmProvenance ?? null,visionDroppedKeys:extracted.droppedKeys ?? previousReview.visionDroppedKeys ?? []};
   const hash=hashPayload({invoice,review});
   const heldRoutine=existing?.status==='WAITING_CHIEF_ACCOUNTANT' && Boolean(existing.decision_json) && JSON.parse(existing.decision_json!).status==='ROUTINE';
   if(existing?.content_hash===hash && existing.evaluation_id && !heldRoutine && ['APPROVED','REJECTED','WAITING_CFO','WAITING_CHIEF_ACCOUNTANT','FORWARDED'].includes(existing.status)) return {decision:JSON.parse(existing.decision_json!),workflow:{status:existing.status,revision:existing.revision,evaluationId:existing.evaluation_id,duplicate:true},policy};
@@ -281,6 +306,8 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
       decision={...decision,riskGroup:groupOf(primary.ruleId,primary.kind),riskGroups:riskGroupsOf(ordered,unresolved),flaggedReason:ordered.map(f=>f.flaggedReason).join(' '),actionableQuestion:primary.actionableQuestion || sourceFinding.flaggedReason,
         options:primaryOptions,plainExplanation:primary.plainExplanation,sopClause:primary.sopClause || decision.sopClause,findings:ordered};
     }
+    // Mức sàn thẩm quyền: câu hỏi chuyển tiếp gửi CFO (người nhận khớp checkHandoff).
+    if(floorHold && decision.status==='ESCALATED' && !decision.requiresCFO) decision={...decision,requiresCFO:true};
     if(decision.status==='ESCALATED'){
       const groundedQuestion=!unresolved.length && decision.handoff?.questionSource==='AI_GROUNDED'?decision.actionableQuestion:undefined;
       decision={...decision,findings:decision.findings?.map(f=>describeRuleEvidence(f,invoice.invoiceDate))};
@@ -299,12 +326,13 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
       if(current.tax_hold) throw new WorkflowError('Cần giải phóng giữ thuế trước khi ghi kết quả.');
       // Công tắc dừng toàn hệ thống: ca thường quy không được tự duyệt, chờ Kế toán trưởng duyệt tay.
       const held=decision.status==='ROUTINE' && isAutomationPaused();
-      const autoApprove=decision.status==='ROUTINE' && !held;
-      const status=autoApprove ? 'APPROVED' : decision.status==='ESCALATED' && decision.requiresCFO ? 'WAITING_CFO' : 'WAITING_CHIEF_ACCOUNTANT';
+      const floorHeld=decision.status==='ROUTINE' && floorHold && !held;
+      const autoApprove=decision.status==='ROUTINE' && !held && !floorHeld;
+      const status=autoApprove ? 'APPROVED' : (decision.status==='ESCALATED' && decision.requiresCFO) || floorHeld ? 'WAITING_CFO' : 'WAITING_CHIEF_ACCOUNTANT';
       db.prepare('INSERT INTO evaluations (id,invoice_id,decision_json,policy_version,legal_version,created_at) VALUES (?,?,?,?,?,?)').run(evaluationId,id,JSON.stringify(decision),policy.version,decision.applicableRegulations?.join(',') || null,jsonNow());
       db.prepare('UPDATE invoices SET status=?,approved_deductible_tax=?,updated_at=?,evaluation_deadline=NULL WHERE id=?').run(status,autoApprove && decision.status==='ROUTINE' ? decision.approvedTaxAmount : 0,jsonNow(),id);
       const row=readRecord(id);syncVoucher(row);recomputeMacro();
-      recordAction(row,null,autoApprove?'ROUTINE_AUTO_APPROVED':held?'ROUTINE_HELD_AUTOMATION_PAUSED':'INVOICE_EVALUATED',held?`Tự động hóa đang dừng toàn hệ thống: ca thường quy chờ Kế toán trưởng duyệt tay. ${decision.plainExplanation}`:decision.plainExplanation,before);
+      recordAction(row,null,autoApprove?'ROUTINE_AUTO_APPROVED':held?'ROUTINE_HELD_AUTOMATION_PAUSED':floorHeld?'ROUTINE_HELD_AUTHORITY_FLOOR':'INVOICE_EVALUATED',held?`Tự động hóa đang dừng toàn hệ thống: ca thường quy chờ Kế toán trưởng duyệt tay. ${decision.plainExplanation}`:floorHeld?`Hồ sơ từng cần CFO duyệt; dữ liệu được sửa bởi ${user?.role==='CHIEF_ACCOUNTANT'?'Kế toán trưởng':user?'Kế toán viên':'hệ thống'} nên thẩm quyền không hạ theo số tiền mới — chờ CFO duyệt. ${decision.plainExplanation}`:decision.plainExplanation,before,floorHeld?{triggeredBy:user?.id ?? null,triggeredByRole:user?.role ?? null,authorityFloor:'CFO'}:{});
       // Hậu kiểm ngẫu nhiên: một tỉ lệ ca tự duyệt được đưa vào danh sách để Kế toán trưởng xem lại (không làm chậm luồng duyệt).
       if(autoApprove){const strat=stratifiedRate(policy.config.postAuditRate ?? DEFAULT_POST_AUDIT_RATE,invoice.totalAmount,[paymentThreshold(invoice,policy.config),policy.config.sellerStatusMaterialityVnd ?? 20_000_000,policy.config.kttApprovalLimit]);samplePostAudit({id,content_hash:row.content_hash,evaluation_id:evaluationId},strat.rate,false,strat.nearThreshold);}
       // Cụm tiền mặt cùng ngày vượt ngưỡng: hóa đơn tiền mặt cùng bên bán đã tự duyệt trước đó cũng mất điều kiện khấu trừ → giữ thuế cả cụm.
@@ -458,9 +486,11 @@ export function applyWorkflowAction(id: string, user: AppUser, input: {action:st
     } else if(input.action==='TAX_HOLD') {
       db.prepare("UPDATE invoices SET tax_hold=1,status='ON_HOLD',approved_deductible_tax=0 WHERE id=?").run(id);
     } else if(input.action==='RELEASE_TAX_HOLD') {
+      const lastHold=db.prepare("SELECT payload_json FROM audit_events WHERE entity_id=? AND event_type='TAX_HOLD' ORDER BY rowid DESC LIMIT 1").get(id) as {payload_json:string}|undefined;
+      if(lastHold && JSON.parse(lastHold.payload_json).actorRole==='CFO' && user.role!=='CFO') throw new WorkflowError('Lệnh giữ thuế do CFO đặt; chỉ CFO được gỡ.',403);
       db.prepare("UPDATE invoices SET tax_hold=0,status='ON_HOLD',approved_deductible_tax=0 WHERE id=?").run(id);
     } else if(input.action==='UNDO') {
-      const latest=undoCandidate(row);
+      const latest=undoCandidate(row,user);
       if(!latest) throw new WorkflowError('Không có thao tác an toàn để hoàn tác.');
       const payload=latest.payload;
       const saved=payload.before;
@@ -486,8 +516,10 @@ export function applyWorkflowAction(id: string, user: AppUser, input: {action:st
       // Ca cần CFO: Kế toán trưởng chỉ được giữ hồ sơ/chuyển CFO, không được tự duyệt hay từ chối thay CFO.
       if(input.action==='OVERRIDE' && ['APPROVED','REJECTED'].includes(target) && user.role!=='CFO' && row.decision_json){
         const d=JSON.parse(row.decision_json);
-        if(d.status==='ESCALATED' && (d.requiresCFO || row.status==='FORWARDED')) throw new WorkflowError('Hồ sơ cần CFO quyết định.',403);
+        if((d.status==='ESCALATED' && d.requiresCFO) || ['FORWARDED','WAITING_CFO'].includes(row.status)) throw new WorkflowError('Hồ sơ cần CFO quyết định.',403);
       }
+      // Chỉ duyệt khi hồ sơ đang chờ quyết định của lượt đánh giá hiện hành: không duyệt một revision chưa từng được engine đánh giá.
+      if(target==='APPROVED' && !['WAITING_CHIEF_ACCOUNTANT','WAITING_CFO','FORWARDED'].includes(row.status)) throw new WorkflowError('Chỉ duyệt hồ sơ đang chờ quyết định của lượt đánh giá hiện hành; hãy đánh giá lại hồ sơ.',409);
       if(target==='APPROVED') {const block=approvalBlock(row,user);if(block) throw new WorkflowError(block,403);const d=JSON.parse(row.decision_json!);if(d.status==='ESCALATED' && d.findings?.some((f:{ruleId:string})=>!input.resolvedFindingIds?.includes(f.ruleId)))throw new WorkflowError('Cần xác nhận giải quyết từng phát hiện còn mở trước khi duyệt.',400);}
       const invoice=JSON.parse(row.payload_json);
       db.prepare('UPDATE invoices SET status=?,approved_deductible_tax=? WHERE id=?').run(target,target==='APPROVED'?invoice.taxAmount:0,id);

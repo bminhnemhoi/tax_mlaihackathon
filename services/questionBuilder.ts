@@ -26,10 +26,12 @@ type Option = ActionOption;
 const option = (id: 'A' | 'B', label: string, actionDescription: string, resultingAction: Option['resultingAction']): Option => ({ id, label, actionDescription, resultingAction });
 
 export interface ConcreteIssue { reason: string; ask: string; options?: [Option, Option] }
+/** Cắt chuỗi do người dùng/AI nhập (tên hàng, tên NCC) để câu hỏi luôn ≤ 700 ký tự — tên rất dài không làm vỡ chuyển tiếp (lỗi 500). */
+const clip = (value: unknown, max = 120): string => { const text = String(value ?? ''); return text.length > max ? `${text.slice(0, max - 1)}…` : text; };
 export interface QuestionContext { config?: Partial<SystemPolicyConfig>; nonCashThreshold: number; dailyTotal?: number; splitTotal?: number; kttLimit: number; duplicateOf?: { id: string; invoiceNumber: string } }
 
 export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReason'>, inv: InvoiceInput, ctx: QuestionContext): ConcreteIssue | null {
-  const tax = vnd(inv.taxAmount), total = vnd(inv.totalAmount), item = `“${inv.itemName}”`;
+  const tax = vnd(inv.taxAmount), total = vnd(inv.totalAmount), item = `“${clip(inv.itemName)}”`;
   const standardRate = ctx.config?.vatStandardRate ?? 10;
   switch (finding.ruleId) {
     case 'RULE_DATA_QUALITY': {
@@ -69,7 +71,7 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
       };
     case 'STATUTORY_SAME_DAY_CASH_5M':
       return {
-        reason: `Các hóa đơn cùng ngày ${viDate(inv.invoiceDate)} từ ${inv.supplierName} cộng lại ${vnd(ctx.dailyTotal || inv.totalAmount)} (≥ ${vnd(ctx.nonCashThreshold)}) và đang trả tiền mặt.`,
+        reason: `Các hóa đơn cùng ngày ${viDate(inv.invoiceDate)} từ ${clip(inv.supplierName)} cộng lại ${vnd(ctx.dailyTotal || inv.totalAmount)} (≥ ${vnd(ctx.nonCashThreshold)}) và đang trả tiền mặt.`,
         ask: 'Cụm hóa đơn này được thanh toán thế nào?',
         options: [option('A', 'Đã chuyển khoản — bổ sung UNC cho cả cụm', 'Tạm giữ cụm hóa đơn, bổ sung ủy nhiệm chi rồi đánh giá lại.', 'REQUEST_INFORMATION'),
           option('B', `Trả tiền mặt thật — loại ${tax} VAT của hóa đơn này`, 'Không ghi nhận thuế được khấu trừ; lưu lý do.', 'REJECT_TAX_DEDUCTION')]
@@ -104,7 +106,7 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
       };
     case 'RULE_HIGH_RISK_SUPPLIER':
       return {
-        reason: `Nhà cung cấp ${inv.supplierName} (MST ${inv.supplierTaxCode}) nằm trong danh bạ cảnh báo rủi ro hóa đơn (CV 2392/TCT-QLRR).`,
+        reason: `Nhà cung cấp ${clip(inv.supplierName)} (MST ${inv.supplierTaxCode}) nằm trong danh bạ cảnh báo rủi ro hóa đơn (CV 2392/TCT-QLRR).`,
         ask: 'CFO đã thẩm tra hàng hóa/hợp đồng thực tế chưa?',
         options: [option('A', `Đã thẩm tra, giao dịch có thật — CFO duyệt kèm hồ sơ phòng vệ, khấu trừ ${tax}`, 'CFO chấp nhận khi đã có hợp đồng, phiếu nhập kho, chứng từ thanh toán chứng minh giao dịch có thật.', 'ACCEPT_WITH_DEFENSE_DOSSIER'),
           option('B', `Chưa chứng minh được — loại toàn bộ ${tax} VAT`, 'Không kê khai khấu trừ để tránh rủi ro khi thanh tra.', 'REJECT_TAX_DEDUCTION')]
@@ -127,13 +129,13 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
       if (inv.isAdjustment) return null;
       return {
         reason: `Tổng thanh toán ${total} ≥ hạn mức tự duyệt của Kế toán trưởng ${vnd(ctx.kttLimit)} (SOP Điều 3.3).`,
-        ask: `CFO có phê duyệt khoản chi ${item} của ${inv.supplierName} không?`,
+        ask: `CFO có phê duyệt khoản chi ${item} của ${clip(inv.supplierName)} không?`,
         options: [option('A', `CFO phê duyệt chi ${total} — khấu trừ ${tax}`, 'Phê duyệt trong thẩm quyền CFO; chỉ hoàn tất khi mọi phát hiện khác đã được giải quyết.', 'ACCEPT_WITH_DOCS'),
           option('B', 'Tạm dừng để thẩm tra hợp đồng', 'Giữ hồ sơ, chưa duyệt thuế cho đến khi thẩm tra xong điều khoản hợp đồng.', 'REQUEST_INFORMATION')]
       };
     case 'AUTHORITY_SPLIT_PURCHASE':
       return {
-        reason: `Hóa đơn ${total} từ ${inv.supplierName}; cộng các hóa đơn cùng bên bán ngày ${viDate(inv.invoiceDate)} (mỗi tờ dưới hạn mức) là ${vnd(ctx.splitTotal || inv.totalAmount)} ≥ hạn mức Kế toán trưởng ${vnd(ctx.kttLimit)} — có thể là một giao dịch bị tách nhỏ (SOP Điều 3.3).`,
+        reason: `Hóa đơn ${total} từ ${clip(inv.supplierName)}; cộng các hóa đơn cùng bên bán ngày ${viDate(inv.invoiceDate)} (mỗi tờ dưới hạn mức) là ${vnd(ctx.splitTotal || inv.totalAmount)} ≥ hạn mức Kế toán trưởng ${vnd(ctx.kttLimit)} — có thể là một giao dịch bị tách nhỏ (SOP Điều 3.3).`,
         ask: 'CFO xác nhận đây là các giao dịch độc lập?',
         options: [option('A', `Giao dịch độc lập, có hợp đồng/đơn hàng riêng — CFO duyệt, khấu trừ ${tax}`, 'CFO phê duyệt trong thẩm quyền; lưu hợp đồng/đơn hàng làm bằng chứng.', 'ACCEPT_WITH_DOCS'),
           option('B', 'Cùng một giao dịch bị tách — giữ hồ sơ, gộp phê duyệt', 'Giữ hồ sơ, chưa ghi nhận thuế; gộp phê duyệt theo hạn mức CFO.', 'REQUEST_INFORMATION')]
@@ -179,13 +181,13 @@ export function fieldAsk(field: string, inv: InvoiceInput, ctx: FieldAskContext)
   const known = (f: string) => !ctx.missingFields?.has(f) && !isAbsent((inv as unknown as Record<string, unknown>)[f]);
   const total = vnd(inv.totalAmount), tax = vnd(inv.taxAmount);
   const totalText = known('totalAmount') ? total : 'này';
-  const supplier = known('supplierName') ? inv.supplierName : 'bên bán';
+  const supplier = known('supplierName') ? clip(inv.supplierName) : 'bên bán';
   const computedTotal = inv.preTaxAmount + inv.taxAmount;
   const expectedTax = Math.round(inv.preTaxAmount * inv.taxRate / 100);
   const label = FIELD_LABELS[field] || field;
   const raw = (inv as unknown as Record<string, unknown>)[field];
   const absent = ctx.missing || isAbsent(raw);
-  const show = (v: unknown) => typeof v === 'number' ? (field === 'taxRate' ? `${v}%` : vnd(v)) : typeof v === 'boolean' ? (v ? 'Có' : 'Không') : Array.isArray(v) ? `${v.length} dòng` : String(v);
+  const show = (v: unknown) => typeof v === 'number' ? (field === 'taxRate' ? `${v}%` : vnd(v)) : typeof v === 'boolean' ? (v ? 'Có' : 'Không') : Array.isArray(v) ? `${v.length} dòng` : clip(v);
   if (ctx.sourceValue !== undefined && !isAbsent(ctx.sourceValue)) {
     return { field, ask: `${label} trên chứng từ gốc là ${show(ctx.sourceValue)}, nhưng hồ sơ gửi lên ghi ${absent ? 'trống' : show(raw)}. Giá trị đúng là?`,
       answers: [`${show(ctx.sourceValue)} theo chứng từ gốc`, absent ? 'Chứng từ gốc sai — nhập giá trị đúng kèm bằng chứng' : `${show(raw)} (đã sửa, kèm bằng chứng)`],
@@ -206,7 +208,7 @@ export function fieldAsk(field: string, inv: InvoiceInput, ctx: FieldAskContext)
       return { field, ask: `Đã có ủy nhiệm chi/chứng từ chuyển khoản cho khoản ${totalText} chưa?`, answers: ['Có UNC — đính kèm', `Chưa có → tạm chưa khấu trừ ${tax}`],
         effects: [set({ hasBankSlip: true }), set({ hasBankSlip: false })] };
     case 'hasItemManifest':
-      return { field, ask: `“${inv.itemName}” là hóa đơn tổng hợp — đã có bảng kê chi tiết chưa?`, answers: ['Có bảng kê — đính kèm', 'Chưa có → tạm treo hồ sơ'],
+      return { field, ask: `“${clip(inv.itemName)}” là hóa đơn tổng hợp — đã có bảng kê chi tiết chưa?`, answers: ['Có bảng kê — đính kèm', 'Chưa có → tạm treo hồ sơ'],
         effects: [set({ hasItemManifest: true }), set({ hasItemManifest: false })] };
     case 'taxRate':
       if (ctx.rawTaxRate !== undefined) return { field, ask: `Thuế suất ghi trên hóa đơn là ${String(ctx.rawTaxRate)}% — không thuộc các mức 0/5/8/10% của Luật Thuế GTGT. Thuế suất đúng là?`,
@@ -248,7 +250,7 @@ export interface QuestionItem { n: number; ruleIds: string[]; riskGroup: RiskGro
 export function composeQuestion(inv: InvoiceInput, role: 'CFO' | 'Kế toán trưởng', items: Array<Omit<QuestionItem, 'n'>>, taxAtStake: number, missing: ReadonlySet<string> = new Set()): { question: string; items: QuestionItem[]; invoiceRef: string } {
   const numbered = items.map((item, index) => ({ ...item, n: index + 1 }));
   const invoiceRef = missing.has('invoiceNumber') ? 'Hóa đơn (chưa có số)' : `Hóa đơn ${inv.invoiceNumber}`;
-  const supplier = missing.has('supplierName') ? 'bên bán chưa rõ' : inv.supplierName;
+  const supplier = missing.has('supplierName') ? 'bên bán chưa rõ' : clip(inv.supplierName);
   const amount = missing.has('totalAmount') ? 'chưa có tổng tiền' : vnd(inv.totalAmount);
   const stake = taxAtStake > 0 && !missing.has('taxAmount') ? ` (VAT chờ quyết định ${vnd(taxAtStake)})` : '';
   const header = `${invoiceRef} · ${supplier} · ${amount}${stake}. ${role} trả lời`;
