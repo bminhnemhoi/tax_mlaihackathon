@@ -106,7 +106,7 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
       };
     case 'RULE_HIGH_RISK_SUPPLIER':
       return {
-        reason: `Nhà cung cấp ${clip(inv.supplierName)} (MST ${inv.supplierTaxCode}) nằm trong danh bạ cảnh báo rủi ro hóa đơn (CV 2392/TCT-QLRR).`,
+        reason: `Nhà cung cấp ${clip(inv.supplierName)} (MST ${inv.supplierTaxCode}) nằm trong danh bạ cảnh báo rủi ro hóa đơn của doanh nghiệp.`,
         ask: 'CFO đã thẩm tra hàng hóa/hợp đồng thực tế chưa?',
         options: [option('A', `Đã thẩm tra, giao dịch có thật — CFO duyệt kèm hồ sơ phòng vệ, khấu trừ ${tax}`, 'CFO chấp nhận khi đã có hợp đồng, phiếu nhập kho, chứng từ thanh toán chứng minh giao dịch có thật.', 'ACCEPT_WITH_DEFENSE_DOSSIER'),
           option('B', `Chưa chứng minh được — loại toàn bộ ${tax} VAT`, 'Không kê khai khấu trừ để tránh rủi ro khi thanh tra.', 'REJECT_TAX_DEDUCTION')]

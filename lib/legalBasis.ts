@@ -48,6 +48,52 @@ export function vat8Basis(invoiceDate: string): string {
   return vatReductionAt(invoiceDate)?.basis ?? 'Nghị quyết giảm thuế GTGT của kỳ lập hóa đơn';
 }
 
+/*
+ * Căn cứ cấp điều/khoản theo ngày lập. Chỉ ghi số điều, khoản đã đối chiếu nguyên văn bản gốc trên vanban.chinhphu.vn
+ * ngày 17/10/2026: Luật 48/2024 Điều 14; NĐ 181/2025 Điều 26; TT 219/2013 Điều 15 (VBHN 01/VBHN-BTC); NĐ 123/2020 Điều 3,
+ * Điều 10, Điều 16; TT 78/2021 Điều 4; TT 32/2025 Điều 5; TT 91/2026 Điều 4 và Phụ lục I. Văn bản chưa đối chiếu điều khoản
+ * (NĐ 254/2026 ở nhiều nội dung) chỉ ghi số hiệu.
+ */
+
+/** Hóa đơn ghi MST người mua khác doanh nghiệp: điều kiện hóa đơn để khấu trừ và nội dung bắt buộc trên hóa đơn. */
+export function buyerTaxCodeBasis(invoiceDate: string): string {
+  if (invoiceDate >= '2026-07-01') return 'Điểm a khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Nghị định 254/2026/NĐ-CP (nội dung hóa đơn)';
+  if (invoiceDate >= '2025-07-01') return 'Điểm a khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & khoản 5 Điều 10 Nghị định 123/2020/NĐ-CP';
+  return 'Điều 15 Thông tư 219/2013/TT-BTC & khoản 5 Điều 10 Nghị định 123/2020/NĐ-CP';
+}
+
+/** Hóa đơn có mã của cơ quan thuế: định nghĩa mã (điểm a khoản 2 Điều 3) và mã là nội dung của hóa đơn (khoản 10 Điều 10). */
+export function taxAuthorityCodeBasis(invoiceDate: string): string {
+  if (invoiceDate >= '2026-07-01') return 'Nghị định 254/2026/NĐ-CP & Thông tư 91/2026/TT-BTC (hóa đơn có mã của cơ quan thuế)';
+  return 'Điểm a khoản 2 Điều 3 và khoản 10 Điều 10 Nghị định 123/2020/NĐ-CP';
+}
+
+/** Hai chữ số năm trong ký hiệu hóa đơn (điểm b — điểm a chỉ quy định ký hiệu mẫu số). */
+export function seriesYearBasis(invoiceDate: string): string {
+  if (invoiceDate >= '2026-07-01') return 'Điều 4 và Phụ lục I Thông tư 91/2026/TT-BTC';
+  if (invoiceDate >= '2025-06-01') return 'Điểm b khoản 1 Điều 5 Thông tư 32/2025/TT-BTC';
+  return 'Điểm b khoản 1 Điều 4 Thông tư 78/2021/TT-BTC';
+}
+
+/** Hàng hóa, dịch vụ mua vào từ ngưỡng trở lên phải có chứng từ thanh toán không dùng tiền mặt. Luật 48 chỉ nêu nguyên tắc; ngưỡng 5 triệu ở Điều 26 NĐ 181. */
+export function cashPaymentBasis(invoiceDate: string): string {
+  return invoiceDate < '2025-07-01'
+    ? 'Khoản 2 Điều 15 Thông tư 219/2013/TT-BTC'
+    : 'Điểm b khoản 2 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 26 Nghị định 181/2025/NĐ-CP';
+}
+
+/** Mua của cùng một người bán nhiều lần trong ngày, mỗi lần dưới ngưỡng nhưng tổng từ ngưỡng trở lên. */
+export function sameDayCashBasis(invoiceDate: string): string {
+  return invoiceDate < '2025-07-01' ? 'Khoản 5 Điều 15 Thông tư 219/2013/TT-BTC' : 'Khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP';
+}
+
+/** Bên bán đã chấm dứt hiệu lực MST: ngừng sử dụng hóa đơn điện tử. */
+export function closedSellerBasis(invoiceDate: string): string {
+  if (invoiceDate >= '2026-07-01') return 'Nghị định 254/2026/NĐ-CP & Thông tư 91/2026/TT-BTC';
+  if (invoiceDate >= '2025-06-01') return 'Điều 16 Nghị định 123/2020/NĐ-CP (sửa đổi bởi Nghị định 70/2025/NĐ-CP)';
+  return 'Điều 16 Nghị định 123/2020/NĐ-CP';
+}
+
 /** Văn bản về hóa đơn điện tử có hiệu lực tại ngày lập (không ghi số điều cho văn bản mới khi chưa đối chiếu nguyên văn). */
 export function invoiceFrameworkAt(invoiceDate: string): { decree: string; circular: string; legacy: boolean } {
   if (invoiceDate >= '2026-07-01') return { decree: 'Nghị định 254/2026/NĐ-CP', circular: 'Thông tư 91/2026/TT-BTC', legacy: false };
