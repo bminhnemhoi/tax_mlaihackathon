@@ -1,13 +1,17 @@
 <div align="center">
 
+<img src="public/brand/tax-referee-logo.png" alt="Logo Tax Referee" width="96" height="96">
+
 # Tax Referee
 
-**Trọng tài thuế GTGT đầu vào cho hóa đơn điện tử Việt Nam**
+**Trọng tài thuế GTGT đầu vào cho hóa đơn điện tử Việt Nam**<br>
 Tự xử lý hóa đơn thường quy · dừng đúng lúc · hỏi đúng người bằng một câu hỏi trả lời được ngay
 
-[![CI](https://github.com/khanhle1406/Tax-Referee/actions/workflows/ci.yml/badge.svg)](https://github.com/khanhle1406/Tax-Referee/actions/workflows/ci.yml)
+[![CI](https://github.com/bminhnemhoi/tax_mlaihackathon/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bminhnemhoi/tax_mlaihackathon/actions/workflows/ci.yml?query=branch%3Amain)
+[![CodeQL](https://github.com/bminhnemhoi/tax_mlaihackathon/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/bminhnemhoi/tax_mlaihackathon/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/bminhnemhoi/tax_mlaihackathon?label=release&color=blue)](https://github.com/bminhnemhoi/tax_mlaihackathon/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A520.19-339933?logo=node.js&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22%20%7C%2024-339933?logo=node.js&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
@@ -22,7 +26,10 @@ MLAI Hackathon 2026 · Track VNG · Đề A — *The Escalation Referee* · Đ�
 
 </div>
 
-> **Đội / người deploy (Demo Day 17/10):** đọc [docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md](docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md) trước — việc phải làm, kiểm tra sau deploy, chuẩn bị thuyết trình.
+> [!NOTE]
+> **Về repo này:** bản phát triển của Minh ([@bminhnemhoi](https://github.com/bminhnemhoi)), thành viên đội Fprinciples, giữ nguyên toàn bộ lịch sử commit của đội (cùng mã hash, không squash, không viết lại). Repo chính thức của đội — nơi review Pull Request, nộp bài và là nguồn deploy production — là [khanhle1406/Tax-Referee](https://github.com/khanhle1406/Tax-Referee). Các số PR `#1`–`#10` trong lịch sử commit thuộc repo gốc đó.
+
+<p align="center"><img src="docs/screenshots/inbox.png" alt="Hộp thẩm định: 4 hóa đơn mẫu — 1 đã tự xử lý, 2 chờ Kế toán trưởng, 1 chờ CFO" width="880"></p>
 
 *English summary — Tax Referee is an input-VAT "escalation referee" for Vietnamese e-invoices. A deterministic rule engine (25 published SOP rules, zero LLM calls on the decision path) auto-approves routine invoices and escalates only three kinds of cases — unclear data, out of policy, or beyond the approver's authority — each with a single, answerable question routed to the right person. AI is confined to reading documents through an output allowlist; every action is written to a tamper-evident, HMAC-chained audit log. Security claims are provable live on `/trust` (12 attack probes run against the deployed code).*
 
@@ -32,6 +39,7 @@ MLAI Hackathon 2026 · Track VNG · Đề A — *The Escalation Referee* · Đ�
 
 - [Vấn đề và giải pháp](#vấn-đề-và-giải-pháp)
 - [Dùng thử trong 90 giây](#dùng-thử-trong-90-giây)
+- [Giao diện](#giao-diện)
 - [Tính năng chính](#tính-năng-chính)
 - [Kiến trúc](#kiến-trúc)
 - [Bảo mật hệ có agent AI](#bảo-mật-hệ-có-agent-ai)
@@ -42,6 +50,7 @@ MLAI Hackathon 2026 · Track VNG · Đề A — *The Escalation Referee* · Đ�
 - [API chính](#api-chính)
 - [Cấu trúc thư mục](#cấu-trúc-thư-mục)
 - [Bằng chứng và giới hạn](#bằng-chứng-và-giới-hạn)
+- [Thuật ngữ](#thuật-ngữ)
 - [Đóng góp, bảo mật, giấy phép](#đóng-góp-bảo-mật-giấy-phép)
 - [Đội ngũ](#đội-ngũ)
 
@@ -82,6 +91,16 @@ Không cần tài khoản — mỗi phiên demo có database riêng.
 
 Dữ liệu: [`data/verification/challengeCases.ts`](data/verification/challengeCases.ts). Chạy: `/verify` hoặc `npm test`.
 </details>
+
+## Giao diện
+
+Ảnh chụp từ bản live ngày 17/10/2026 (commit `e496ab4`, dữ liệu mẫu tổng hợp của phiên demo).
+
+| Verify một nút: 9/9 ca đúng kỳ vọng, có run ID và commit | Câu hỏi chuyển tiếp "1A, 2A" gửi CFO |
+|---|---|
+| [![Trang Verify: PASS 9/9](docs/screenshots/verify.png)](docs/screenshots/verify.png) | [![Hồ sơ 330 triệu chờ CFO với câu hỏi hai ý](docs/screenshots/handoff.png)](docs/screenshots/handoff.png) |
+| **Trung tâm tin cậy: 12/12 phép thử tấn công trên mã đang deploy** | **Trang chủ cho giám khảo: không cần tài khoản** |
+| [![Trang /trust: 12/12 phép thử đạt](docs/screenshots/trust.png)](docs/screenshots/trust.png) | [![Trang chủ Tax Referee](docs/screenshots/home.png)](docs/screenshots/home.png) |
 
 ## Tính năng chính
 
@@ -147,11 +166,11 @@ Phân tích đầy đủ (mô hình mối đe dọa, STRIDE, lỗi tự phát hi
 
 ## Bắt đầu nhanh
 
-**Yêu cầu:** Node.js ≥ 20.19 (khuyến nghị 22, giống CI) kèm npm. Python 3 với PyMuPDF là tùy chọn (đọc lớp chữ PDF).
+**Yêu cầu:** Node.js 22 (giống CI và production) hoặc 24, kèm npm. Python 3 với PyMuPDF là tùy chọn (đọc lớp chữ PDF).
 
 ```bash
-git clone https://github.com/khanhle1406/Tax-Referee.git
-cd Tax-Referee
+git clone https://github.com/bminhnemhoi/tax_mlaihackathon.git
+cd tax_mlaihackathon
 npm ci
 cp .env.example .env.local    # khóa AI chỉ cần cho đọc ảnh; Verify và test không cần
 npm run dev                   # http://localhost:3000
@@ -188,13 +207,15 @@ Sao chép [`.env.example`](.env.example) thành `.env.local`. Không commit file
 - **`npm test`**: 16 bộ — 103 kiểm tra unit (20 file trong [`tests/unit/`](tests/unit)) và 15 bộ hồi quy, gồm 72 ca red team. Bộ nào in ít kiểm tra hơn ngưỡng `minChecks` bị tính là FAIL.
 - **Kiểm thử thuộc tính** (fast-check, ~1.500 hóa đơn sinh ngẫu nhiên, seed cố định) cho các bất biến của engine.
 - **Ma trận quyền** gọi hàm thực thi với từng vai trò; **12 phép thử bảo mật** của `/trust` chạy cả trong CI.
-- **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): Ubuntu và Windows — typecheck, lint, test; build sau khi test đạt.
+- **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): Ubuntu (Node 22 và 24) và Windows (Node 22) — typecheck, lint, test; build sau khi test đạt. Action ghim theo SHA, token chỉ quyền đọc.
+- **Bảo mật chuỗi cung ứng:** CodeQL ([`.github/workflows/codeql.yml`](.github/workflows/codeql.yml)) quét JavaScript/TypeScript, Python và workflow mỗi lần push và hằng tuần; Dependabot ([`.github/dependabot.yml`](.github/dependabot.yml)) đề xuất cập nhật phụ thuộc hằng tuần.
 - **Verify** tất định, không gọi AI: 9/9 trên live, có run ID và commit.
 
 ## Triển khai
 
-- **Production:** Hostinger, ứng dụng Node.js quản lý qua hPanel. hPanel **tự deploy khi `main` thay đổi** (khoảng 1,5 phút sau merge; chờ 2–5 phút rồi kiểm). Commit được ghi lúc build; khóa audit tự sinh nếu chưa cấu hình.
-- **Quy trình:** nhánh riêng → Pull Request → CI xanh → *Create a merge commit* → kiểm `/api/health`, `/verify`, `/trust`.
+- **Production:** Hostinger, ứng dụng Node.js quản lý qua hPanel, deploy từ nhánh `main` của [repo gốc của đội](https://github.com/khanhle1406/Tax-Referee): hPanel tự deploy khi `main` ở đó thay đổi (khoảng 1,5 phút sau merge; chờ 2–5 phút rồi kiểm). Repo này **không** deploy. Commit được ghi lúc build; khóa audit tự sinh nếu chưa cấu hình.
+- **Phiên bản:** [`v1.0.0`](https://github.com/bminhnemhoi/tax_mlaihackathon/releases/tag/v1.0.0) là commit `e496ab4` — bản đang chạy trên live và đã kiểm sau deploy ngày 16/10/2026 ([bằng chứng](docs/evidence/live-2026-10-16-post-deploy.json)).
+- **Quy trình:** nhánh riêng → Pull Request → CI xanh → *Create a merge commit* (không squash, không force-push) → ở repo gốc, kiểm `/api/health`, `/verify`, `/trust` sau deploy.
 - **Tài liệu:** [RUNBOOK.md](RUNBOOK.md) · [deployment/HOSTINGER.md](deployment/HOSTINGER.md) · [docs/handoff/huong-dan-ban-giao.md](docs/handoff/huong-dan-ban-giao.md). Có sẵn [`Dockerfile`](Dockerfile) và [`compose.yaml`](compose.yaml) cho môi trường container.
 
 ## API chính
@@ -225,13 +246,17 @@ data/           Hợp đồng quy tắc/SOP, sổ văn bản pháp luật, fixtu
 tests/unit/     Unit test (node:test)
 scripts/qa/     Bộ hồi quy và runner đa nền tảng; scripts/ops/ vận hành
 deployment/     Hostinger, Docker, sao lưu
-docs/           Tài liệu nộp thi, kiến trúc, bảo mật, nghiên cứu, bằng chứng, bàn giao
+docs/           Tài liệu nộp thi, kiến trúc, bảo mật, nghiên cứu, bằng chứng, bàn giao, ảnh giao diện
 input-sample/   Chứng từ mẫu (XML, PDF, ảnh)
+public/         Logo, favicon, font Inter
+brainstorming/  Ghi chú nháp do AI hỗ trợ soạn — không phải bằng chứng
+.github/        CI, CodeQL, Dependabot, mẫu issue/PR
+.claude/        Harness cho trợ lý AI: agent chuyên gia, hook chặn đọc bí mật
 ```
 
 ## Bằng chứng và giới hạn
 
-**Bằng chứng chạy được:** Verify 9/9 và 12/12 phép thử bảo mật trên live (lưu tại [`docs/evidence/`](docs/evidence)); CI xanh trên mỗi PR.
+**Bằng chứng chạy được:** Verify 9/9 và 12/12 phép thử bảo mật trên live sau deploy, kèm commit và trạng thái HMAC ([`docs/evidence/live-2026-10-16-post-deploy.json`](docs/evidence/live-2026-10-16-post-deploy.json)); CI xanh trên mỗi PR của repo gốc.
 
 **Giới hạn — nói thẳng:**
 - **Độ chính xác:** Verify và 60 ca phát triển là dữ liệu tổng hợp đội tự gán nhãn; 72 ca red team do agent AI viết từ SOP (không đọc `services/policyEngine.ts`; nhãn do AI gán, chưa được người nghiệp vụ duyệt — [`data/verification/redteam/cases.json`](data/verification/redteam/cases.json)). Tất cả **chưa phải đánh giá độc lập**. Công cụ khóa nhãn và chấm độc lập có sẵn (`npm run labels:lock`, `npm run evaluate:independent`).
@@ -259,9 +284,23 @@ input-sample/   Chứng từ mẫu (XML, PDF, ảnh)
 Toàn bộ thay đổi theo mốc: [CHANGELOG.md](CHANGELOG.md).
 </details>
 
+## Thuật ngữ
+
+| Viết tắt | Nghĩa |
+|---|---|
+| GTGT / VAT | Thuế giá trị gia tăng; "VAT đầu vào" là thuế trên hóa đơn mua vào, được khấu trừ nếu đủ điều kiện |
+| MST | Mã số thuế (bên bán, bên mua) |
+| KTT | Kế toán trưởng — duyệt ca dưới hạn mức 200 triệu |
+| CFO | Giám đốc tài chính — duyệt ca từ hạn mức KTT trở lên hoặc vượt thẩm quyền |
+| SOP | Quy chế nội bộ về khấu trừ; 25 quy tắc công khai tại [`/sop`](https://limegreen-salamander-517622.hostingersite.com/sop) |
+| UNC | Ủy nhiệm chi — chứng từ chuyển khoản qua ngân hàng |
+| MCCQT | Mã của cơ quan thuế trên hóa đơn điện tử có mã |
+| Hệ số K | Doanh số / (tồn đầu + mua đã duyệt + mua mới); ngưỡng nội bộ cảnh báo lô hàng lớn |
+| HMAC | Chữ ký khóa bí mật nối vào chuỗi hash của nhật ký, phát hiện sửa đổi |
+
 ## Đóng góp, bảo mật, giấy phép
 
-- **Đóng góp:** [CONTRIBUTING.md](CONTRIBUTING.md) · [Quy tắc ứng xử](CODE_OF_CONDUCT.md) · [Lịch sử thay đổi](CHANGELOG.md)
+- **Đóng góp:** [CONTRIBUTING.md](CONTRIBUTING.md) · [Quy tắc ứng xử](CODE_OF_CONDUCT.md) · [Lịch sử thay đổi](CHANGELOG.md) · [Trích dẫn](CITATION.cff)
 - **Báo lỗ hổng bảo mật:** [SECURITY.md](SECURITY.md) (không mở issue công khai)
 - **Trợ lý AI làm việc trên repo:** [AGENTS.md](AGENTS.md) · [CLAUDE.md](CLAUDE.md)
 - **Giấy phép:** mã nguồn theo [MIT License](LICENSE). Dữ liệu và tài nguyên bên thứ ba (ảnh mẫu MC-OCR chỉ dùng cho nghiên cứu, XML mẫu công khai…) theo giấy phép riêng — xem [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
