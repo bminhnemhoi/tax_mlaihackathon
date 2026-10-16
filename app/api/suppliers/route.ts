@@ -1,6 +1,7 @@
 import { requireRequestUser } from '@/lib/server/auth';
 import { RequestError, requestErrorResponse } from '@/lib/server/http';
 import { isSandbox, withRequestDatabase } from '@/lib/server/db';
+import { appendAuditEvent } from '@/lib/server/audit';
 import { NextRequest, NextResponse } from 'next/server';
 import { listSuppliers, getSupplier, upsertSupplier, recordVerificationEvidence, seedDefaultSuppliers } from '@/services/supplierService';
 import { SupplierMasterSchema } from '@/lib/schemas';
@@ -63,11 +64,15 @@ async function handlePOST(req: NextRequest) {
     const user = requireRequestUser(req);
     if (user.role === 'ACCOUNTANT') throw new RequestError('Cần Kế toán trưởng hoặc CFO để cập nhật nhà cung cấp.', 403);
     const body = await req.json();
-    const parsed = UpsertSupplierBodySchema.parse(body);
+    const declared = UpsertSupplierBodySchema.parse(body);
+    // Nguồn "đã xác minh chính thống" (TCT/ĐKKD/API thuế) chỉ do bộ tra cứu của hệ thống ghi; người dùng nhập tay luôn là MANUAL.
+    const parsed = { ...declared, verificationSource: 'MANUAL' as const };
+    appendAuditEvent({ eventType: 'SUPPLIER_MASTER_UPDATED', entityId: parsed.taxCode, actorId: user.id,
+      payload: { actorRole: user.role, actorName: user.displayName, status: parsed.status, riskLevel: parsed.riskLevel, declaredSource: declared.verificationSource ?? declared.evidence?.source ?? null, recordedSource: 'MANUAL', reason: 'Cập nhật danh bạ nhà cung cấp bằng tay (nguồn ghi nhận: MANUAL).' } });
 
     if (parsed.evidence) {
       const res = recordVerificationEvidence(parsed.taxCode, {
-        source: parsed.evidence.source,
+        source: 'MANUAL',
         rawPayload: parsed.evidence.rawPayload,
         notes: parsed.evidence.notes,
         newStatus: parsed.status,

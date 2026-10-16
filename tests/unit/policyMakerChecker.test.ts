@@ -45,7 +45,20 @@ test('bản nháp chặt hơn: người soạn tự công bố được; không 
     assert.equal(getActivePolicy().version, 'MC-STRICTER');
     const looser = createPolicyDraft({ config: { ...base.config, postAuditRate: 0 }, version: 'MC-BYPASS' }, ktt.id);
     assert.throws(() => rollbackPolicy(looser.version, ktt.id, 'lách'), /đã từng công bố/);
-    rollbackPolicy(base.version, ktt.id, 'Quay lại bản chuẩn');
+    // Quay về bản chuẩn làm giảm tỉ lệ hậu kiểm (25% → 10%) = nới lỏng: KTT không tự làm được, CFO thì được.
+    assert.throws(() => rollbackPolicy(base.version, ktt.id, 'Quay lại bản chuẩn', ktt.role), /cần CFO/);
+    const cfo = switchRole('CFO')!.user;
+    rollbackPolicy(base.version, cfo.id, 'CFO quay lại bản chuẩn', cfo.role);
     assert.equal(getActivePolicy().version, base.version);
+  });
+});
+
+test('bộ dò nới lỏng so trên danh mục có hiệu lực: đặt danh mục ngoài phạm vi rỗng hoặc xóa MST doanh nghiệp đều là nới lỏng', async () => {
+  await runIsolated(async () => {
+    const base = { ...getActivePolicy().config, companyTaxCode: '0102030405' };
+    delete (base as { scopeNotCoveredCategories?: string[] }).scopeNotCoveredCategories;
+    assert.ok(policyLoosening(base, { ...base, scopeNotCoveredCategories: [] }).some(x => x.startsWith('Bỏ nhóm ngoài phạm vi SOP')));
+    assert.deepEqual(policyLoosening(base, { ...base, companyTaxCode: undefined }), ['Xóa MST doanh nghiệp (tắt kiểm tra MST người mua)']);
+    assert.deepEqual(policyLoosening(base, { ...base }), []);
   });
 });

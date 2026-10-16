@@ -28,7 +28,7 @@ async function handlePOST(req: NextRequest) {
       return NextResponse.json(validatePolicyBundle(draft));
     }
     if (body.action === 'publish') return NextResponse.json({ policy: publishPolicy(body.version, actorId, body.reason, user.role) });
-    if (body.action === 'rollback') return NextResponse.json({ policy: rollbackPolicy(body.version, actorId, body.reason) });
+    if (body.action === 'rollback') return NextResponse.json({ policy: rollbackPolicy(body.version, actorId, body.reason, user.role) });
     return NextResponse.json({ policy: createPolicyDraft(body, actorId) }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Không thể cập nhật policy', ...(error instanceof PolicyApprovalError ? { needsSecondApprover: true } : {}) }, { status: error instanceof PolicyApprovalError ? 403 : 400 });
