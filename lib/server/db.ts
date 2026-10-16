@@ -738,6 +738,8 @@ export function jsonNow(): string {
 const databaseContext = new AsyncLocalStorage<{ db: Database.Database; sandbox: boolean; id: string }>();
 const demoDatabases = new Map<string, { db: Database.Database; touched: number; inflight: number }>();
 export function isSandbox(): boolean { return databaseContext.getStore()?.sandbox === true; }
+/** Dấu vân tay ngắn của DB đang dùng (phiên demo / DB thử cô lập / nội bộ) — chứng minh cách ly mà không lộ id hay đường dẫn. */
+export function databaseFingerprint(): string { return crypto.createHash('sha256').update(databaseContext.getStore()?.id || 'internal').digest('hex').slice(0, 10); }
 export function artifactRoot(): string { return path.join(dataDirectory, 'artifacts', databaseContext.getStore()?.id || 'internal'); }
 export function withIsolatedDatabase<T>(fn: () => T): T {
   const db = new Database(':memory:');
