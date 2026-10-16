@@ -8,10 +8,10 @@
   "homepage": "https://limegreen-salamander-517622.hostingersite.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/khanhle1406/Tax-Referee.git"
+    "url": "git+https://github.com/bminhnemhoi/tax_mlaihackathon.git"
   },
   "bugs": {
-    "url": "https://github.com/khanhle1406/Tax-Referee/issues"
+    "url": "https://github.com/bminhnemhoi/tax_mlaihackathon/issues"
   },
   "keywords": [
     "vat",
@@ -23,7 +23,7 @@
     "nextjs"
   ],
   "engines": {
-    "node": ">=20.19"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "next dev --turbo",
