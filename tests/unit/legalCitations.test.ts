@@ -7,12 +7,14 @@ import { test } from 'node:test';
 import { GOVERNMENT_REGULATORY_REGISTRY, listLegalCitations } from '../../data/regulatoryRegistry';
 import { buyerTaxCodeBasis, cashPaymentBasis, closedSellerBasis, sameDayCashBasis, seriesYearBasis, taxAuthorityCodeBasis } from '../../lib/legalBasis';
 import { getActivePolicy, runIsolated } from '../../lib/server/db';
+import { describeRuleEvidence } from '../../services/handoffService';
 import { evaluateInvoiceLocally } from '../../services/policyEngine';
 import type { InvoiceInput } from '../../lib/schemas';
 
 const VERIFIED_DOCID: Record<string, string> = {
   '48/2024/QH15': '212476', '181/2025/NĐ-CP': '214336', '204/2025/QH15': '214209', '123/2020/NĐ-CP': '201365',
   '78/2021/TT-BTC': '204200', '32/2025/TT-BTC': '213855', '254/2026/NĐ-CP': '218689', '219/2013/TT-BTC': '209521',
+  '70/2025/NĐ-CP': '213179', '174/2025/NĐ-CP': '214310', '144/2026/NĐ-CP': '218020', '91/2026/TT-BTC': '219006',
 };
 const docidOf = (url?: string) => url?.match(/[?&]docid=(\d+)/)?.[1];
 
@@ -56,6 +58,29 @@ test('căn cứ cấp điều/khoản đổi đúng tại các mốc ngày lập
   assert.match(closedSellerBasis('2025-05-31'), /^Điều 16 Nghị định 123\/2020\/NĐ-CP$/);
   assert.match(closedSellerBasis('2025-06-01'), /Nghị định 70\/2025/);
   assert.match(closedSellerBasis('2026-07-01'), /Nghị định 254\/2026/);
+  // Ngày cuối của khung cũ vẫn dùng văn bản cũ (so sánh >= tại mốc hiệu lực, không lệch một ngày).
+  assert.match(seriesYearBasis('2026-06-30'), /Thông tư 32\/2025/);
+  assert.match(closedSellerBasis('2026-06-30'), /Nghị định 70\/2025/);
+  assert.match(buyerTaxCodeBasis('2026-06-30'), /khoản 5 Điều 10 Nghị định 123\/2020/);
+  assert.match(buyerTaxCodeBasis('2026-07-01'), /Nghị định 254\/2026/);
+});
+
+test('liên kết nguồn của phát hiện trỏ đúng văn bản được ghi trong căn cứ, ở mọi khung ngày lập', () => {
+  const rules = ['STATUTORY_LAW_48_CASH_PAYMENT', 'STATUTORY_SAME_DAY_CASH_5M', 'RULE_BUYER_TAX_CODE_MISMATCH', 'RULE_MCCQT_INVALID', 'RULE_SERIES_YEAR_MISMATCH', 'STATUTORY_DECREE_254_CLOSED_SELLER'];
+  for (const date of ['2025-05-31', '2025-06-01', '2025-06-30', '2025-07-01', '2026-06-30', '2026-07-01'])
+    for (const ruleId of rules) {
+      const f = describeRuleEvidence({ ruleId, kind: 'STATUTORY', severity: 'HIGH', riskGroup: 'OUT_OF_POLICY', flaggedReason: '-', plainExplanation: '-', legalBasis: '' }, date);
+      const code = Object.keys(VERIFIED_DOCID).find(k => VERIFIED_DOCID[k] === docidOf(f.sourceUrl));
+      assert.ok(code, `${ruleId} @ ${date}: nguồn ${f.sourceUrl} không thuộc bảng đã đối chiếu`);
+      assert.ok(f.legalBasis.includes(code.split('/').slice(0, 2).join('/')), `${ruleId} @ ${date}: nguồn ${code} không có trong căn cứ "${f.legalBasis}"`);
+    }
+});
+
+test('sổ văn bản ghi đúng tên chính thức của NĐ 181/2025 và có NĐ 144/2026 sửa đổi', () => {
+  const nd181 = GOVERNMENT_REGULATORY_REGISTRY.find(d => d.code === '181/2025/NĐ-CP')!;
+  assert.equal(nd181.title, 'Nghị định quy định chi tiết thi hành một số điều của Luật Thuế giá trị gia tăng');
+  const nd144 = GOVERNMENT_REGULATORY_REGISTRY.find(d => d.code === '144/2026/NĐ-CP');
+  assert.ok(nd144 && nd144.effectiveFrom === '2026-06-20', 'NĐ 144/2026 hiệu lực 20/6/2026');
 });
 
 test('phát hiện của engine hiển thị căn cứ theo ngày lập: cụm tiền mặt trước/sau 01/7/2025, MST người mua, mã cơ quan thuế', async () => {
@@ -71,5 +96,9 @@ test('phát hiện của engine hiển thị căn cứ theo ngày lập: cụm t
     assert.match(basisOf(old, [{ ...old, id: 'L2', invoiceNumber: '0000002' }], 'STATUTORY_SAME_DAY_CASH_5M'), /Khoản 5 Điều 15 Thông tư 219\/2013/);
     assert.match(basisOf({ ...base, paymentMethod: 'BANK_TRANSFER', buyerTaxCode: '0200200200' }, [], 'RULE_BUYER_TAX_CODE_MISMATCH'), /Điểm a khoản 2 Điều 14.*khoản 5 Điều 10/);
     assert.match(basisOf({ ...base, paymentMethod: 'BANK_TRANSFER', invoiceSeries: '1C25TAA', invoiceDate: '2025-08-01' }, [], 'RULE_MCCQT_INVALID'), /Điểm a khoản 2 Điều 3 và khoản 10 Điều 10/);
+    // Biên ngưỡng tiền mặt không đổi: dưới 5 triệu không phát quy tắc từng tờ, đúng 5 triệu thì phát và ghi căn cứ Điều 26 NĐ 181.
+    const cash = (total: number) => ({ ...base, id: `C${total}`, preTaxAmount: Math.round(total / 1.1), taxAmount: total - Math.round(total / 1.1), totalAmount: total });
+    assert.equal(basisOf(cash(4_999_999), [], 'STATUTORY_LAW_48_CASH_PAYMENT'), '');
+    assert.match(basisOf(cash(5_000_000), [], 'STATUTORY_LAW_48_CASH_PAYMENT'), /Điều 26 Nghị định 181\/2025/);
   });
 });
