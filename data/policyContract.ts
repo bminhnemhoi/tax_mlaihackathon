@@ -54,6 +54,9 @@ const officialSources={
   earlierInvoice:{code:'70/2025/NĐ-CP',url:'https://vanban.chinhphu.vn/?docid=213179&pageid=27160',effectiveFrom:'2025-06-01'},
   legacyInvoice:{code:'123/2020/NĐ-CP',url:'https://vanban.chinhphu.vn/?pageid=27160&docid=201365',effectiveFrom:'2022-07-01'},
   legacyPayment:{code:'219/2013/TT-BTC',url:'https://vanban.chinhphu.vn/?pageid=27160&docid=209521',effectiveFrom:'2014-01-01'},
+  seriesTt78:{code:'78/2021/TT-BTC',url:'https://vanban.chinhphu.vn/?pageid=27160&docid=204200',effectiveFrom:'2022-07-01'},
+  seriesTt32:{code:'32/2025/TT-BTC',url:'https://vanban.chinhphu.vn/?pageid=27160&docid=213855',effectiveFrom:'2025-06-01'},
+  seriesTt91:{code:'91/2026/TT-BTC',url:'https://vanban.chinhphu.vn/?pageid=27160&docid=219006',effectiveFrom:'2026-07-01'},
 };
 export function ruleContract(id:string,invoiceDate?:string):PolicyRuleContract {
   const check=checks.find(row=>row[0]===id);
@@ -61,7 +64,9 @@ export function ruleContract(id:string,invoiceDate?:string):PolicyRuleContract {
   const vatPeriod=invoiceDate?vatReductionAt(invoiceDate):null;
   const vatSource=!invoiceDate || vatPeriod?.nq204 || invoiceDate>'2026-12-31'?officialSources.vat:vatPeriod?{code:vatPeriod.decree,url:'',effectiveFrom:vatPeriod.from}:undefined;
   const source=id.includes('CASH')?(invoiceDate && invoiceDate<'2025-07-01'?officialSources.legacyPayment:officialSources.payment):id.includes('VAT_8')||id==='RULE_SCOPE_VAT8_PERIOD'?vatSource:
-    /CLOSED_SELLER|BUYER_TAX|ADJUSTMENT|MCCQT|SERIES|SIGNING/.test(id)?invoiceDate && invoiceDate<'2026-07-01'?(invoiceDate>='2025-06-01'?officialSources.earlierInvoice:officialSources.legacyInvoice):officialSources.invoice:undefined;
+    id==='RULE_SERIES_YEAR_MISMATCH'?invoiceDate && invoiceDate<'2026-07-01'?(invoiceDate>='2025-06-01'?officialSources.seriesTt32:officialSources.seriesTt78):officialSources.seriesTt91:
+    /BUYER_TAX|MCCQT|SIGNING/.test(id)?invoiceDate && invoiceDate<'2026-07-01'?officialSources.legacyInvoice:officialSources.invoice:
+    /CLOSED_SELLER|ADJUSTMENT/.test(id)?invoiceDate && invoiceDate<'2026-07-01'?(invoiceDate>='2025-06-01'?officialSources.earlierInvoice:officialSources.legacyInvoice):officialSources.invoice:undefined;
   // Nhóm lấy từ bảng phân loại duy nhất (lib/riskTaxonomy) — SOP, engine và workflow không thể lệch nhau.
   const group=groupOf(id);
   return {id,label:check?.[1]||id,clause:check?.[2]||'Dữ liệu đầu vào',condition:check?.[3]||'Xác minh dữ kiện trước khi tiếp tục.',requiredFields:fields[id]||[],

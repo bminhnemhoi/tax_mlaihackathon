@@ -3,7 +3,7 @@
  * Đồng bộ Khung Pháp lý Thuế Hiện hành (Niên độ 2025 - 2026)
  * Đảm bảo Context AI đối chiếu đúng Luật, Nghị định, Thông tư có hiệu lực tại thời điểm xuất hóa đơn.
  *
- * Đối chiếu ngày 17/10/2026: mọi officialUrl trên vanban.chinhphu.vn đã mở đúng văn bản; trích dẫn "nguyên văn" chỉ giữ
+ * Đối chiếu ngày 17/10/2026: mọi officialUrl có docid trên vanban.chinhphu.vn đã mở đúng văn bản; trích dẫn "nguyên văn" chỉ giữ
  * những câu đã đối chiếu với bản PDF chính thức (bản quét, đọc bằng OCR — có thể lệch vài ký tự). Văn bản hoặc nội dung chưa
  * đối chiếu được ghi rõ "chưa đối chiếu nguyên văn"; engine không dựa vào chúng để kết luận.
  */
@@ -44,7 +44,7 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
   {
     id: 'ND-181-2025',
     code: '181/2025/NĐ-CP',
-    title: 'Nghị định quy định chi tiết một số điều và biện pháp thi hành Luật Thuế giá trị gia tăng',
+    title: 'Nghị định quy định chi tiết thi hành một số điều của Luật Thuế giá trị gia tăng',
     issuer: 'CHÍNH PHỦ',
     effectiveFrom: '2025-07-01',
     status: 'ACTIVE',
@@ -55,7 +55,20 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
       'Khoản 1 Điều 26: không tính chứng từ bên mua nộp tiền mặt vào tài khoản của bên bán',
       'Điểm g khoản 2 Điều 26 (sửa đổi bởi Nghị định 144/2026/NĐ-CP, hiệu lực 20/6/2026): hàng mua trả chậm, trả góp từ 05 triệu đồng chưa có chứng từ thanh toán do chưa đến thời điểm thanh toán theo hợp đồng vẫn được khấu trừ'
     ],
-    summary: 'Ngưỡng 5 triệu đồng (đã gồm thuế GTGT) và quy tắc mua nhiều lần trong ngày cho điều kiện khấu trừ thuế GTGT đầu vào từ 01/7/2025.'
+    summary: 'Ngưỡng 5 triệu đồng (đã gồm thuế GTGT) và quy tắc mua nhiều lần trong ngày cho điều kiện khấu trừ thuế GTGT đầu vào từ 01/7/2025. Sửa đổi bởi Nghị định 359/2025/NĐ-CP và Nghị định 144/2026/NĐ-CP (không sửa đoạn mở đầu và khoản 3 Điều 26).'
+  },
+  {
+    id: 'ND-144-2026',
+    code: '144/2026/NĐ-CP',
+    title: 'Nghị định sửa đổi, bổ sung Nghị định 181/2025/NĐ-CP (điểm g khoản 2 Điều 26)',
+    issuer: 'CHÍNH PHỦ',
+    effectiveFrom: '2026-06-20',
+    status: 'ACTIVE',
+    officialUrl: 'https://vanban.chinhphu.vn/?docid=218020&pageid=27160',
+    keyRules: [
+      'Điều 4: sửa đổi, bổ sung điểm g khoản 2 Điều 26 Nghị định 181/2025/NĐ-CP — hàng mua trả chậm, trả góp từ 05 triệu đồng chưa có chứng từ thanh toán do chưa đến thời điểm thanh toán theo hợp đồng vẫn được khấu trừ'
+    ],
+    summary: 'Sửa đổi điều kiện chứng từ thanh toán đối với hàng mua trả chậm, trả góp; không sửa khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP.'
   },
   {
     id: 'NQ-204-2025',
@@ -69,7 +82,7 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
     keyRules: [
       'Tiếp tục giảm 2% thuế suất thuế GTGT (từ 10% xuống 8%) áp dụng đến hết ngày 31/12/2026',
       'DANH MỤC LOẠI TRỪ (giữ 10%), theo nguyên văn Điều 1 khoản 1: viễn thông, hoạt động tài chính, ngân hàng, chứng khoán, bảo hiểm, kinh doanh bất động sản, sản phẩm kim loại, sản phẩm khai khoáng (trừ than), sản phẩm hàng hóa và dịch vụ chịu thuế tiêu thụ đặc biệt (trừ xăng)',
-      'So với NQ 174/2024: than cốc, dầu mỏ tinh chế, sản phẩm hóa chất và hàng hóa/dịch vụ công nghệ thông tin KHÔNG còn bị loại trừ; xăng, nhiên liệu dầu, than ở mọi khâu được giảm 8% (Phụ lục NĐ 174/2025/NĐ-CP, docid 214310)'
+      'So với NQ 174/2024: than cốc, dầu mỏ tinh chế, sản phẩm hóa chất và hàng hóa/dịch vụ công nghệ thông tin KHÔNG còn bị loại trừ; xăng, nhiên liệu dầu, than ở mọi khâu được giảm 8% (Phụ lục Nghị định 174/2025/NĐ-CP)'
     ],
     summary: 'Chính sách giảm thuế GTGT 8% và danh mục ngành nghề loại trừ áp dụng từ 01/7/2025 đến 31/12/2026.'
   },
@@ -85,7 +98,7 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
     keyRules: [
       'Điểm a khoản 2 Điều 3: hóa đơn điện tử có mã của cơ quan thuế được cơ quan thuế cấp mã trước khi gửi cho người mua; mã gồm số giao dịch duy nhất và chuỗi ký tự do cơ quan thuế mã hóa (độ dài 34 ký tự theo đặc tả kỹ thuật của cơ quan thuế — nguồn thứ cấp)',
       'Điều 10: nội dung hóa đơn — khoản 5 tên, địa chỉ, mã số thuế người mua; khoản 10 mã của cơ quan thuế đối với hóa đơn có mã',
-      'Thời điểm ký số khác thời điểm lập hóa đơn thì thời điểm khai thuế là thời điểm lập hóa đơn (Điều 10)',
+      'Khoản 9 Điều 10 (đến 31/5/2025): thời điểm ký số khác thời điểm lập thì thời điểm khai thuế là thời điểm lập hóa đơn; từ 01/6/2025 (sửa đổi bởi Nghị định 70/2025/NĐ-CP): người bán khai theo thời điểm lập hóa đơn, người mua khai theo thời điểm nhận hóa đơn đúng, đủ về hình thức và nội dung',
       'Điều 16 (sửa đổi bởi NĐ 70/2025/NĐ-CP): ngừng sử dụng hóa đơn điện tử khi chấm dứt hiệu lực mã số thuế hoặc tạm ngừng kinh doanh'
     ],
     summary: 'Nghị định nền tảng về hóa đơn điện tử áp dụng cho hóa đơn lập trước 01/7/2026.'
@@ -123,13 +136,13 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
   {
     id: 'ND-254-2026',
     code: '254/2026/NĐ-CP',
-    title: 'Nghị định quy định về hóa đơn, chứng từ điện tử (thay NĐ 123/2020 và NĐ 70/2025; kèm TT 91/2026/TT-BTC, docid 219006)',
+    title: 'Nghị định quy định chi tiết một số điều và biện pháp để tổ chức, hướng dẫn thi hành Luật Quản lý thuế số 108/2025/QH15 về hóa đơn điện tử, chứng từ điện tử',
     issuer: 'CHÍNH PHỦ',
     effectiveFrom: '2026-07-01',
     status: 'ACTIVE',
     officialUrl: 'https://vanban.chinhphu.vn/?docid=218689&pageid=27160',
     keyRules: [
-      'Thay thế Nghị định 123/2020/NĐ-CP và Nghị định 70/2025/NĐ-CP về hóa đơn, chứng từ điện tử từ 01/7/2026',
+      'Khoản 2 Điều 43: Nghị định 123/2020/NĐ-CP và Nghị định 70/2025/NĐ-CP hết hiệu lực từ 01/7/2026',
       'Hướng dẫn chi tiết tại Thông tư 91/2026/TT-BTC; ký hiệu hóa đơn theo Điều 4 và Phụ lục I Thông tư 91/2026/TT-BTC',
       'Các nội dung cụ thể khác của Nghị định chưa đối chiếu nguyên văn trong bộ quy tắc này; engine chỉ viện dẫn số hiệu văn bản'
     ],
@@ -247,7 +260,7 @@ export const LEGAL_CITATIONS_REGISTRY: Record<string, LegalCitation> = {
   },
   'ND-181-2025-D26': {
     documentCode: '181/2025/NĐ-CP',
-    documentTitle: 'Nghị định quy định chi tiết một số điều và biện pháp thi hành Luật Thuế giá trị gia tăng',
+    documentTitle: 'Nghị định quy định chi tiết thi hành một số điều của Luật Thuế giá trị gia tăng',
     issuingAuthority: 'Chính phủ',
     article: 'Điều 26',
     effectiveFrom: '2025-07-01',
@@ -257,7 +270,7 @@ export const LEGAL_CITATIONS_REGISTRY: Record<string, LegalCitation> = {
   },
   'ND-181-2025-D26-K3': {
     documentCode: '181/2025/NĐ-CP',
-    documentTitle: 'Nghị định quy định chi tiết một số điều và biện pháp thi hành Luật Thuế giá trị gia tăng',
+    documentTitle: 'Nghị định quy định chi tiết thi hành một số điều của Luật Thuế giá trị gia tăng',
     issuingAuthority: 'Chính phủ',
     article: 'Điều 26',
     clause: 'Khoản 3',
@@ -296,9 +309,10 @@ export const LEGAL_CITATIONS_REGISTRY: Record<string, LegalCitation> = {
     article: 'Điều 10',
     clause: 'Khoản 9',
     effectiveFrom: '2022-07-01',
+    effectiveTo: '2025-05-31',
     officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=201365',
-    exactQuote: 'Thời điểm ký số trên hóa đơn điện tử là thời điểm người bán, người mua sử dụng chữ ký số để ký trên hóa đơn điện tử được hiển thị theo định dạng ngày, tháng, năm của năm dương lịch. Trường hợp thời điểm ký số khác thời điểm lập hóa đơn thì thời điểm khai thuế là thời điểm lập hóa đơn.',
-    summary: 'Quy định về thời điểm lập và thời điểm ký số trên hóa đơn điện tử.'
+    exactQuote: '… Trường hợp hóa đơn điện tử đã lập có thời điểm ký số trên hóa đơn khác thời điểm lập hóa đơn thì thời điểm khai thuế là thời điểm lập hóa đơn.',
+    summary: 'Thời điểm ký số khác thời điểm lập hóa đơn (bản gốc, áp dụng đến 31/5/2025; từ 01/6/2025 khoản 9 được thay bởi Nghị định 70/2025/NĐ-CP: người mua khai theo thời điểm nhận hóa đơn đúng, đủ hình thức và nội dung).'
   },
   'ND-123-2020-D3-K2': {
     documentCode: '123/2020/NĐ-CP',
@@ -322,18 +336,8 @@ export const LEGAL_CITATIONS_REGISTRY: Record<string, LegalCitation> = {
     effectiveFrom: '2022-07-01',
     effectiveTo: '2025-05-31',
     officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=204200',
-    exactQuote: 'Ký hiệu mẫu số hóa đơn điện tử là một ký tự có một chữ số tự nhiên là các số tự nhiên 1, 2, 3, 4, 5, 6 để phản ánh loại hóa đơn điện tử. Ký hiệu hóa đơn điện tử là nhóm gồm 6 ký tự gồm cả chữ viết và chữ số thể hiện các thông tin về loại hóa đơn có mã hay không có mã, năm lập hóa đơn, loại hóa đơn điện tử được sử dụng.',
+    exactQuote: 'Ký hiệu mẫu số hóa đơn điện tử là ký tự có một chữ số tự nhiên là các số tự nhiên 1, 2, 3, 4, 5, 6 để phản ánh loại hóa đơn điện tử … Ký hiệu hóa đơn điện tử là nhóm 6 ký tự gồm cả chữ viết và chữ số thể hiện ký hiệu hóa đơn điện tử để phản ánh các thông tin về loại hóa đơn điện tử có mã của cơ quan thuế hoặc hóa đơn điện tử không mã, năm lập hóa đơn, loại hóa đơn điện tử được sử dụng …',
     summary: 'Ký hiệu mẫu số (điểm a) và ký hiệu hóa đơn 6 ký tự, trong đó hai chữ số năm thể hiện năm lập hóa đơn (điểm b).'
-  },
-  'CV-2392-TCT-QLRR': {
-    documentCode: '2392/TCT-QLRR',
-    documentTitle: 'Công văn Tổng cục Thuế về quản trị rủi ro hóa đơn điện tử và Tham số nguồn hàng K',
-    issuingAuthority: 'Tổng cục Thuế',
-    article: 'Mục 2',
-    effectiveFrom: '2023-06-20',
-    officialSourceUrl: 'https://www.gdt.gov.vn',
-    exactQuote: '[Nguồn thứ cấp — chưa đối chiếu nguyên văn] Chỉ số K = Tổng doanh thu bán ra / (Tồn kho đầu kỳ + Tổng giá trị mua vào trong kỳ) dùng để nhận diện dấu hiệu rủi ro hóa đơn.',
-    summary: 'Tham khảo về hệ số K; ngưỡng vùng đỏ trong engine là ngưỡng nội bộ Điều 4.3 Tax-SOP-2026.'
   }
 };
 
@@ -386,7 +390,7 @@ export function getApplicableRegulations(invoiceDateStr: string): {
   // Trước 01/07/2025: 20 triệu (khoản 2 Điều 15 TT 219/2013); từ 01/07/2025: 5 triệu (Điều 26 NĐ 181/2025, hướng dẫn Luật 48/2024/QH15)
   const isLaw48Active = invDate >= new Date('2025-07-01');
   const nonCashThreshold = isLaw48Active ? 5_000_000 : 20_000_000;
-  const thresholdLawCode = isLaw48Active ? '181/2025/NĐ-CP (Điều 26)' : '219/2013/TT-BTC (khoản 2 Điều 15)';
+  const thresholdLawCode = isLaw48Active ? 'Điều 26 Nghị định 181/2025/NĐ-CP' : 'khoản 2 Điều 15 Thông tư 219/2013/TT-BTC';
 
   // Xác định chính sách giảm thuế 8% (NQ 204/2025 áp dụng đến 31/12/2026)
   const hasVatReduction = activeDocs.some((d) => d.id === 'NQ-204-2025');
