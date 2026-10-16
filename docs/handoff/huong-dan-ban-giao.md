@@ -104,8 +104,8 @@ Nhánh này đã merge `main` mới nhất; review như A1 (merge commit, không
 1. **Trước khi merge:** ghi lại `curl -s https://limegreen-salamander-517622.hostingersite.com/api/health` (số `audit.events`, ngày 16/10 là 42) để so sau deploy. Sau deploy số này phải **≥** số cũ; nếu về 0 thì DB đang nằm trong thư mục release, rollback ngay.
 2. Merge PR bằng **Create a merge commit** (không squash).
 3. **Biến môi trường** (hPanel → Environment, hoặc `hbuilds/config/.env`; chỉ kiểm tra tên biến, không in giá trị):
-   - `TAX_REFEREE_AUDIT_KEY` = kết quả `openssl rand -hex 32`. **Lưu một bản sao ngoài host** (mất khóa thì không kiểm được chữ ký cũ).
-   - `TAX_REFEREE_DEMO_PER_HOUR=300` (giám khảo dùng chung NAT hội trường).
+   - `TAX_REFEREE_AUDIT_KEY` (tùy chọn) = kết quả `openssl rand -hex 32`. Không đặt thì app tự sinh file `.audit-key` (quyền 600) cạnh database ở lần chạy đầu. **Lưu một bản sao khóa ngoài host** (mất khóa thì không kiểm được chữ ký cũ).
+   - `TAX_REFEREE_DEMO_PER_HOUR` (tùy chọn; mặc định trong mã nay là 200).
    - **Không** đặt `QGEN_AI` và `TAX_REFEREE_ALLOW_INTERNAL_ROLE_LOGIN`.
    - Commit: nếu hPanel deploy bằng git thì `/api/health` tự đọc commit từ `.git`; nếu vẫn `unknown` thì đặt `GIT_COMMIT_SHA` bằng `git rev-parse origin/main`, và nhớ cập nhật mỗi lần deploy.
    - Tùy chọn, làm sau cùng: sau khi khóa audit đã chạy và đã restart, đặt `TAX_REFEREE_AUDIT_SIGNED_SINCE` bằng thời điểm hiện tại (ISO, ví dụ `2026-10-16T17:30:00Z`) rồi restart lần nữa. Từ mốc này, sự kiện thiếu chữ ký bị coi là không hợp lệ (chống hạ cấp HMAC). **Không** đặt mốc sớm hơn lúc khóa có hiệu lực.

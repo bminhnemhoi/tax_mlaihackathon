@@ -10,14 +10,14 @@ Người viết: Minh (cùng trợ lý AI), tối 16/10/2026. Repo: https://gith
 ## 0. Ba cảnh báo quan trọng nhất
 
 1. **Merge vào `main` = deploy production.** hPanel tự deploy khi `main` đổi (live khởi động lại khoảng 97 giây sau khi PR #5 được merge). Chỉ merge khi CI xanh, và làm checklist mục 4 ngay sau đó.
-2. **Live đang thiếu cấu hình bảo mật** (16/10 22:27): `/api/health` báo `"commit":"unknown"` và `"audit":{"hmac":false}`. Phải đặt `TAX_REFEREE_AUDIT_KEY` tối nay (mục 3), nếu không chuỗi nhật ký không có chữ ký HMAC và mẫu hậu kiểm đoán trước được.
+2. **Live đang thiếu cấu hình bảo mật** (16/10 22:27): `/api/health` báo `"commit":"unknown"` và `"audit":{"hmac":false}`. Từ PR #6, app **tự xử lý cả hai** khi deploy: tự sinh khóa audit (file `.audit-key` quyền 600 cạnh database) nếu chưa đặt `TAX_REFEREE_AUDIT_KEY`, và tự đọc commit từ `.git`. Không cần vào hPanel; đặt biến môi trường chỉ là tùy chọn (mục 3).
 3. **Merge bằng "Create a merge commit"**, không "Squash and merge", không force-push: lịch sử commit nhỏ là bằng chứng chấm thi.
 
 ## 1. Việc phải làm tối nay (theo thứ tự)
 
 - [ ] **Bước 1 — Ghi số đo trước deploy:** mở `https://limegreen-salamander-517622.hostingersite.com/api/health`, ghi lại số `audit.events` (16/10 là 42). Dùng để chứng minh dữ liệu không mất sau restart.
 - [ ] **Bước 2 — Merge PR #6** `feat/demo-day-security` → `main` bằng **Create a merge commit**: https://github.com/khanhle1406/Tax-Referee/pull/6 (CI đã xanh: Ubuntu, Windows, build).
-- [ ] **Bước 3 — Đặt biến môi trường** (hPanel → Environment, hoặc `hbuilds/config/.env`) theo mục 3, rồi restart app.
+- [ ] **Bước 3 — (Tùy chọn) Biến môi trường** theo mục 3. Không bắt buộc: không đặt gì thì app tự sinh khóa audit và dùng giới hạn demo 200 phiên/giờ/IP.
 - [ ] **Bước 4 — Kiểm tra sau deploy** theo mục 4. Có mục đỏ thì làm mục 7 (rollback).
 - [ ] **Bước 5 — Merge PR #7** `docs/demo-day-q1-q2` → `main` (tài liệu Q1/Q2 + harness, không đổi hành vi app; vẫn kích hoạt deploy lại): https://github.com/khanhle1406/Tax-Referee/pull/7. Sau đó mở `/api/health` lần nữa: `audit.events` không giảm.
 - [ ] **Bước 6 — Lưu bằng chứng:** chép JSON của `/api/health` và kết quả `/trust` (ảnh chụp hoặc JSON) vào `docs/evidence/live-2026-10-17.json` (commit riêng, message tiếng Việt).
@@ -51,8 +51,8 @@ PR #7 chỉ thêm: `docs/security/threat-model.md` (Q1), `docs/architecture/demo
 
 | Biến | Giá trị | Lưu ý |
 |---|---|---|
-| `TAX_REFEREE_AUDIT_KEY` | Tạo bằng `openssl rand -hex 32` (64 ký tự hex) | **Bắt buộc tối nay.** Lưu một bản sao ngoài host (mất khóa thì không kiểm được chữ ký cũ). Không đổi khóa giữa chừng |
-| `TAX_REFEREE_DEMO_PER_HOUR` | `300` | Giám khảo dùng chung NAT hội trường; mặc định 30 phiên/giờ/IP là quá thấp |
+| `TAX_REFEREE_AUDIT_KEY` | Tùy chọn. Tạo bằng `openssl rand -hex 32` (64 ký tự hex) | **Không đặt thì app tự sinh** file `.audit-key` (quyền 600) cạnh database ở lần chạy đầu và dùng mãi (`/api/health` → `audit.keySource: "file"`). Nếu đặt thì biến được ưu tiên. Dù cách nào: sao lưu khóa ra ngoài host, không đổi giữa chừng |
+| `TAX_REFEREE_DEMO_PER_HOUR` | Tùy chọn (mặc định trong mã nay là 200) | Giám khảo dùng chung NAT hội trường |
 | `GIT_COMMIT_SHA` | Chỉ đặt nếu sau deploy `/api/health` vẫn `"commit":"unknown"` | App tự đọc commit từ `.git` khi hPanel deploy bằng git. Nếu phải đặt tay thì cập nhật mỗi lần deploy |
 | `TAX_REFEREE_AUDIT_SIGNED_SINCE` | Tùy chọn, làm **sau cùng**: thời điểm hiện tại dạng ISO, ví dụ `2026-10-16T17:30:00Z` | Chỉ đặt **sau khi** khóa audit đã chạy và đã restart; đặt sớm hơn sẽ làm nhật ký báo không hợp lệ |
 | `QGEN_AI`, `TAX_REFEREE_ALLOW_INTERNAL_ROLE_LOGIN` | **Không đặt** | Kiểm tra rằng chúng không có mặt |
@@ -61,7 +61,7 @@ PR #7 chỉ thêm: `docs/security/threat-model.md` (Q1), `docs/architecture/demo
 
 | Kiểm | Kỳ vọng |
 |---|---|
-| `GET /api/health` | `"status":"ok"`, `"audit":{"hmac":true,…}`, `"warnings":[]`, `"commit"` khác `unknown`, `"ai":{"decisionPathLlmCalls":0,…}`, `audit.events` **≥** số ghi ở bước 1 (nếu về 0 → DB nằm trong thư mục release → rollback ngay) |
+| `GET /api/health` | `"status":"ok"`, `"audit":{"hmac":true,"keySource":"file" hoặc "env",…}`, `"warnings":[]`, `"commit"` khác `unknown`, `"ai":{"decisionPathLlmCalls":0,…}`, `audit.events` **≥** số ghi ở bước 1 (nếu về 0 → DB nằm trong thư mục release → rollback ngay) |
 | Trang `/verify` | 9/9 PASS |
 | Trang `/trust` → bấm **"Chạy 12 phép thử tấn công"** | Dòng **"12/12 đạt"**; dòng D2 hiện "tin AI: ROUTINE → có ranh giới: ESCALATED" |
 | Nhập tay ca U2 (tên hàng "Chi phí tiệc cưới người thân giám đốc", 4.400.000₫, chuyển khoản) | **Chuyển người**, nhóm "Ngoài quy định" (không còn tự duyệt) |
@@ -87,6 +87,15 @@ PR #7 chỉ thêm: `docs/security/threat-model.md` (Q1), `docs/architecture/demo
 4. Câu mở Q1: *"Máy đọc có thể bị lừa, trọng tài thì không. Agent AI của chúng tôi không có quyền quyết định — rủi ro agentic chuyển sang dữ liệu, nên mỗi trường AI viết ra được kiểm soát như một quyền."* Rồi đi 4 trụ, mỗi trụ chỉ một phép thử trên `/trust`.
 5. Câu mở Q2: kiến trúc 7 lớp (nạp chứng từ → chuẩn hóa → quyết định tất định → workflow & thẩm quyền → người trong vòng lặp → nhật ký chống sửa → vận hành), 3 đánh đổi (SQLite mỗi phiên vs Postgres + RLS; gọi AI đồng bộ vs hàng đợi; danh sách đen từ khóa vs danh sách trắng), cái gì vỡ trước khi chạy nhiều instance, lộ trình 30/90 ngày.
 6. Bản nói đầy đủ (60 giây và 2 phút 30 giây) + 12 câu hỏi khó: `docs/handoff/the-nhac-thuyet-trinh-17-10.md`.
+
+## 6b. Tự cập nhật dự án không cần Khánh (Minh hoặc bất kỳ ai có quyền push)
+
+Tài khoản `bminhnemhoi` có quyền **push** lên repo và nhánh `main` **không bật bảo vệ**, nên tự merge PR được:
+1. Mở PR trên GitHub → kiểm tra CI xanh (tab Checks) → **Merge pull request** → chọn **Create a merge commit** (không squash). Hoặc dòng lệnh: `gh pr merge <số PR> --repo khanhle1406/Tax-Referee --merge`.
+2. Chờ 2–5 phút rồi mở `/api/health`: `startedAt` phải đổi sang thời điểm mới và `commit` trùng merge commit trên GitHub → hPanel đã tự deploy.
+3. Nếu sau khoảng 10 phút `startedAt` không đổi: hPanel **không** tự deploy theo `main` → cần người có tài khoản Hostinger bấm deploy, hoặc xin Khánh cấp quyền qua **hPanel → Access Manager** (thêm email của Minh) hoặc thêm SSH key của Minh — chỉ cần làm một lần, sau đó tự chủ hoàn toàn.
+4. Làm checklist mục 4. Có mục đỏ thì làm mục 7.
+Lưu ý phối hợp: nhắn nhóm trước khi merge vào `main` (đang là bản live giám khảo dùng).
 
 ## 7. Rollback nếu có mục đỏ
 
