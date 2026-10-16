@@ -22,4 +22,4 @@
 ## Lưu ý merge
 
 - Merge bằng **Create a merge commit** (không squash, không rebase).
-- Merge vào `main` = **deploy production**: chờ 2–5 phút rồi kiểm `/api/health` (commit), `/verify` (9/9), `/trust` (12/12).
+- Repo này không deploy. Thay đổi cần lên bản live phải được merge ở [repo gốc của đội](https://github.com/khanhle1406/Tax-Referee) — ở đó merge vào `main` = deploy production: chờ 2–5 phút rồi kiểm `/api/health` (commit), `/verify` (9/9), `/trust` (12/12).

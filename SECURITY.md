@@ -6,7 +6,8 @@ Tax Referee xử lý dữ liệu thuế và quyết định khấu trừ, nên l
 
 | Phiên bản | Hỗ trợ |
 |---|---|
-| Nhánh `main` (bản đang chạy trên live) | ✅ |
+| Nhánh `main` | ✅ |
+| [`v1.0.0`](https://github.com/bminhnemhoi/tax_mlaihackathon/releases/tag/v1.0.0) — commit `e496ab4`, bản đang chạy trên live | ✅ |
 | Nhánh tính năng, commit cũ | ❌ — hãy kiểm tra lại trên `main` |
 
 Commit đang chạy trên live xem tại [`/api/health`](https://limegreen-salamander-517622.hostingersite.com/api/health) (trường `commit`).
@@ -15,7 +16,7 @@ Commit đang chạy trên live xem tại [`/api/health`](https://limegreen-salam
 
 **Không mở issue công khai** cho lỗ hổng bảo mật.
 
-1. Liên hệ riêng với maintainer qua GitHub: [@khanhle1406](https://github.com/khanhle1406) (chủ repo) hoặc [@bminhnemhoi](https://github.com/bminhnemhoi). Khi repo bật *Private vulnerability reporting*, dùng tab **Security → Report a vulnerability**.
+1. Báo riêng qua tab **Security → [Report a vulnerability](https://github.com/bminhnemhoi/tax_mlaihackathon/security/advisories/new)** của repo này, hoặc liên hệ riêng chủ repo [@bminhnemhoi](https://github.com/bminhnemhoi). Lỗ hổng ảnh hưởng bản live xin báo thêm cho repo gốc của đội [khanhle1406/Tax-Referee](https://github.com/khanhle1406/Tax-Referee) ([@khanhle1406](https://github.com/khanhle1406)).
 2. Nội dung nên có:
    - mô tả lỗ hổng và tác động (ví dụ: hóa đơn được tự duyệt sai, vượt thẩm quyền, sửa được nhật ký);
    - các bước tái hiện tối thiểu, commit hoặc URL bị ảnh hưởng;
