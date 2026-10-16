@@ -4,6 +4,12 @@
 
 ## [Chưa phát hành]
 
+_Chưa có thay đổi._
+
+## [1.1.0] — 2026-10-17 — Sửa lỗi bảo mật đọc XML và nâng cấp repo
+
+> Chưa deploy lên live: bản live chạy `v1.0.0` (commit `e496ab4`) từ repo gốc của đội.
+
 ### Bảo mật
 - **Đọc XML không còn lệch do CDATA, chú thích, processing instruction, `>` trong thuộc tính hay tham chiếu ký tự:** chuẩn hóa trước mọi trích xuất. Trước đây hóa đơn chứa `2<![CDATA[2]]>880000` được đọc thành 2.880.000₫ trong khi phần mềm kế toán và cơ quan thuế đọc 22.880.000₫ — đủ để lọt ngưỡng tiền mặt và hạn mức Kế toán trưởng.
 - **XML mơ hồ bị từ chối (fail-closed):** phần tử tổng tiền/số hóa đơn trùng tên ở phần đầu, khối bên bán/bên mua trùng, dòng hàng lồng nhau; tham chiếu tới ký tự cấm, `&` lẻ. Trước đây regex lấy phần tử trùng tên đầu tiên, nên một khối mở rộng đặt trước phần tổng thật làm hóa đơn 220 triệu thành 2,2 triệu và được tự duyệt.
@@ -83,5 +89,6 @@
 - Siết khâu đọc chứng từ (chặn `DOCTYPE`/`ENTITY` — XXE) và quy trình thẩm định; workspace cho kế toán.
 - Verify chạy tất định, không gọi AI (13/10).
 
-[Chưa phát hành]: https://github.com/bminhnemhoi/tax_mlaihackathon/compare/v1.0.0...HEAD
+[Chưa phát hành]: https://github.com/bminhnemhoi/tax_mlaihackathon/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/bminhnemhoi/tax_mlaihackathon/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/bminhnemhoi/tax_mlaihackathon/releases/tag/v1.0.0

@@ -214,7 +214,7 @@ Sao chép [`.env.example`](.env.example) thành `.env.local`. Không commit file
 ## Triển khai
 
 - **Production:** Hostinger, ứng dụng Node.js quản lý qua hPanel, deploy từ nhánh `main` của [repo gốc của đội](https://github.com/khanhle1406/Tax-Referee): hPanel tự deploy khi `main` ở đó thay đổi (khoảng 1,5 phút sau merge; chờ 2–5 phút rồi kiểm). Repo này **không** deploy. Commit được ghi lúc build; khóa audit tự sinh nếu chưa cấu hình.
-- **Phiên bản:** [`v1.0.0`](https://github.com/bminhnemhoi/tax_mlaihackathon/releases/tag/v1.0.0) là commit `e496ab4` — bản đang chạy trên live và đã kiểm sau deploy ngày 16/10/2026 ([bằng chứng](docs/evidence/live-2026-10-16-post-deploy.json)).
+- **Phiên bản:** [`v1.0.0`](https://github.com/bminhnemhoi/tax_mlaihackathon/releases/tag/v1.0.0) là commit `e496ab4` — bản đang chạy trên live và đã kiểm sau deploy ngày 16/10/2026 ([bằng chứng](docs/evidence/live-2026-10-16-post-deploy.json)). [`v1.1.0`](https://github.com/bminhnemhoi/tax_mlaihackathon/releases/tag/v1.1.0) thêm bản sửa bảo mật đọc XML và hạ tầng repo — chưa deploy lên live.
 - **Quy trình:** nhánh riêng → Pull Request → CI xanh → *Create a merge commit* (không squash, không force-push) → ở repo gốc, kiểm `/api/health`, `/verify`, `/trust` sau deploy.
 - **Tài liệu:** [RUNBOOK.md](RUNBOOK.md) · [deployment/HOSTINGER.md](deployment/HOSTINGER.md) · [docs/handoff/huong-dan-ban-giao.md](docs/handoff/huong-dan-ban-giao.md). Có sẵn [`Dockerfile`](Dockerfile) và [`compose.yaml`](compose.yaml) cho môi trường container.
 

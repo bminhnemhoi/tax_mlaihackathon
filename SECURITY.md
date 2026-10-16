@@ -7,6 +7,7 @@ Tax Referee xử lý dữ liệu thuế và quyết định khấu trừ, nên l
 | Phiên bản | Hỗ trợ |
 |---|---|
 | Nhánh `main` | ✅ |
+| [`v1.1.0`](https://github.com/bminhnemhoi/tax_mlaihackathon/releases/tag/v1.1.0) — bản sửa bảo mật đọc XML (chưa deploy) | ✅ |
 | [`v1.0.0`](https://github.com/bminhnemhoi/tax_mlaihackathon/releases/tag/v1.0.0) — commit `e496ab4`, bản đang chạy trên live | ✅ |
 | Nhánh tính năng, commit cũ | ❌ — hãy kiểm tra lại trên `main` |
 
