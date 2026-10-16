@@ -1,0 +1,58 @@
+name: Báo lỗi
+description: Hệ thống quyết định sai, lỗi giao diện hoặc lỗi vận hành
+title: "[Lỗi] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Cảm ơn bạn đã báo lỗi. **Lỗ hổng bảo mật xin đừng báo ở đây** — xem [SECURITY.md](https://github.com/khanhle1406/Tax-Referee/blob/main/SECURITY.md).
+        Không dán dữ liệu thật của doanh nghiệp, khóa API hay mật khẩu.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Khu vực
+      options:
+        - Quyết định của engine (tự duyệt / chuyển tiếp sai)
+        - Câu hỏi chuyển tiếp
+        - Đọc chứng từ (XML / PDF / ảnh)
+        - Workflow, thẩm quyền, hoàn tác
+        - Nhật ký, policy, hậu kiểm
+        - Giao diện
+        - Triển khai, vận hành
+        - Khác
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Các bước tái hiện
+      description: Dữ liệu hóa đơn tối thiểu (JSON hoặc file mẫu trong input-sample/), vai trò đang dùng, thao tác.
+      placeholder: |
+        1. Mở /verify → Thử dữ liệu mới
+        2. Dán JSON ...
+        3. Bấm ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Kết quả mong đợi và kết quả thực tế
+      description: Với lỗi quyết định, nêu căn cứ (quy tắc SOP, văn bản pháp luật theo ngày lập hóa đơn).
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: Trường "commit" trong /api/health, hoặc kết quả git rev-parse HEAD khi chạy cục bộ.
+  - type: dropdown
+    id: env
+    attributes:
+      label: Môi trường
+      options:
+        - Live (hostingersite.com)
+        - Cục bộ (npm run dev)
+        - Cục bộ (bản build / Docker)
+    validations:
+      required: true

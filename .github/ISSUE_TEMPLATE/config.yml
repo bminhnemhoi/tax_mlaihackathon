@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Báo lỗ hổng bảo mật
+    url: https://github.com/khanhle1406/Tax-Referee/blob/main/SECURITY.md
+    about: Không mở issue công khai cho lỗ hổng — làm theo hướng dẫn trong SECURITY.md.
+  - name: Tài liệu dự án
+    url: https://github.com/khanhle1406/Tax-Referee/blob/main/docs/README.md
+    about: Kiến trúc, bảo mật, hồ sơ nộp thi, hướng dẫn vận hành.
