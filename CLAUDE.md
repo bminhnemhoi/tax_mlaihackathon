@@ -3,6 +3,8 @@
 Trọng tài thuế GTGT đầu vào cho hóa đơn điện tử Việt Nam (MLAI Hackathon 2026 · Track VNG · Đề A "The Escalation Referee").
 **Quy tắc tất định quyết định; AI chỉ đọc chứng từ.** Live: https://limegreen-salamander-517622.hostingersite.com · Repo: khanhle1406/Tax-Referee.
 
+> **Demo Day 17/10:** nếu người dùng là Khánh hoặc hỏi "cần làm gì", đọc và tóm tắt `docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md` trước tiên.
+
 ## Luật cứng (không ngoại lệ)
 - **Bí mật:** không đọc, in hay commit `env_*`, `.env*` (trừ `.env.example`); chỉ được nhắc TÊN biến. Hook `.claude/hooks/guard.mjs` chặn các lệnh vi phạm.
 - **Lịch sử git là bằng chứng chấm thi:** không squash, không force-push, không `--no-verify`; mỗi thay đổi một commit nhỏ, message tiếng Việt, kết thúc bằng trailer Co-Authored-By. Làm trên nhánh riêng → PR (reviewer `khanhle1406`) → Khánh merge bằng merge commit. **Merge vào `main` = deploy production** (hPanel tự deploy).
