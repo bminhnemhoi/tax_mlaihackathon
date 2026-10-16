@@ -7,7 +7,7 @@
 - Prompt ngắn, JSON dùng khóa gọn; ánh xạ về tên trường API hiện hành. Nêu rõ số 0 đầu MST, thuế suất dạng phần trăm, không tự điền dữ liệu thiếu.
 - Tắt reasoning cho Vision; cấu hình provider theo từng model và khả năng endpoint. Ling/Novita và Nex không gửi `response_format` không được endpoint hỗ trợ. Không tự chuyển sang provider khác có giá khác khi endpoint lỗi.
 - Dùng sharp trong bộ nhớ thay subprocess để tối ưu ảnh. Giữ nguyên ảnh nhỏ để bảo toàn chữ; ảnh lớn giới hạn cạnh 1800px, JPEG chất lượng 88.
-- Cache kết quả theo hash chứng từ, database phiên, phiên bản prompt/model/chuẩn hóa. Giữ cảnh báo và trạng thái cần xác minh. `forceRefresh=true` bỏ qua cache. Không có cache dùng chung giữa các phiên.
+- Cache kết quả theo hash chứng từ, database phiên, phiên bản prompt/model/chuẩn hóa. Giữ cảnh báo và trạng thái cần xác minh. Không có tham số bỏ qua cache (đã gỡ `forceRefresh` ngày 16/10 vì nó vượt cả cache lẫn ngân sách gọi AI). Không có cache dùng chung giữa các phiên.
 - API trả `performance.totalMs`, `performance.cacheHit`, Server-Timing và no-store. UI đo từ khi bắt đầu xử lý file đến khi form đã được vẽ, gồm upload, backend và hai animation frames; không gồm thời gian người dùng chọn file trong hộp thoại. Cache được ghi rõ trên UI.
 - Xóa số đo khi sang hóa đơn tiếp theo; loading không còn quảng cáo “siêu tốc” hoặc gọi tên Qwen khi server đang dùng model khác.
 - Phát hiện qua ảnh thật và sửa lỗi chuẩn hóa `HD198735` thành `198735`: chỉ bỏ nhãn đi kèm dấu hai chấm, giữ tiền tố mã và số 0. Cache được tăng phiên bản để không trả mã đã chuẩn hóa sai.

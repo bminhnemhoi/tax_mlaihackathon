@@ -1,5 +1,6 @@
 import { assertValidXml, parseXml, sanitizeInvoice } from '@/lib/documentParser';
 import { requireRequestUser } from '@/lib/server/auth';
+import { allowVisionCall } from '@/lib/server/aiBudget';
 import { artifactRoot } from '@/lib/server/db';
 import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
@@ -145,7 +146,10 @@ function persistTextExtraction(rawText:string, rawInvoice:Record<string,unknown>
 async function handlePOST(req: NextRequest) {
   const started = performance.now();
   try {
-    requireRequestUser(req);
+    const user = requireRequestUser(req);
+    // Từ chối sớm khi thân yêu cầu quá lớn (file tối đa 15MB + phần bao multipart), trước khi đọc vào bộ nhớ.
+    if (Number(req.headers.get('content-length') || 0) > 16 * 1024 * 1024) return NextResponse.json({ error: 'File vượt quá 15MB' }, { status: 413 });
+    const visionBudgetExceeded = () => NextResponse.json({ error: 'Đã vượt hạn mức đọc ảnh bằng AI trong giờ này (ngân sách chi phí AI). Hãy nhập tay hoặc tải XML hóa đơn điện tử.' }, { status: 429 });
     const contentType = req.headers.get('content-type') || '';
     let capturedFile: File | null = null;
     if (contentType.includes('application/json')) {
@@ -247,7 +251,7 @@ async function handlePOST(req: NextRequest) {
         error: imageScreeningMessage(screening), code: 'IMAGE_PREFLIGHT_REJECTED'
       }, { status: 422 });
     }
-    const cachedFile = form?.get('forceRefresh') === 'true' ? null : getCachedDocumentResult(sourceHash);
+    const cachedFile = getCachedDocumentResult(sourceHash);
     if (cachedFile && cachedFile.sourceType === sourceType && cachedFile.documentType !== 'NOT_INVOICE') return extractionResponse(await refreshCachedSupplier(cachedFile),started,true);
     if (cachedFile?.documentType === 'NOT_INVOICE') return extractionResponse(cachedFile,started,true);
 
@@ -316,6 +320,7 @@ async function handlePOST(req: NextRequest) {
 
       // Scanned PDFs have no text layer; send their original PDF bytes to Gemini Vision.
       if (Object.keys(rawData).length === 0) {
+        if (!allowVisionCall(user.id)) return visionBudgetExceeded();
         try {
           const vision = await extractInvoiceImageWithGeminiVision(buffer.toString('base64'), 'application/pdf', file.name);
           rawData = vision.data as Record<string, unknown>;
@@ -340,6 +345,7 @@ async function handlePOST(req: NextRequest) {
       const optimized = await optimizeImageBuffer(buffer, mimeType);
       console.log(`[Parse Perf] Optimize Image: ${Date.now() - t_opt0}ms`);
 
+      if (!allowVisionCall(user.id)) return visionBudgetExceeded();
       try {
         const t_ai0 = Date.now();
         const vision = await extractInvoiceImageWithGeminiVision(
