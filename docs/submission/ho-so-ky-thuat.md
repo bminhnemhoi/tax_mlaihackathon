@@ -140,7 +140,7 @@ Các chuyển dịch phụ:
 
 - **CSRF:** `middleware.ts` kiểm tra `Sec-Fetch-Site` (dự phòng: so Origin với Host) cho mọi POST/PUT/PATCH/DELETE vào `/api`, trừ webhook.
 - **XXE:** từ chối `DOCTYPE`/`ENTITY` trước khi parse (`lib/documentParser.ts`).
-- **Giới hạn tần suất và ngân sách AI (OWASP LLM10):** tạo phiên demo mặc định 30 lần/giờ mỗi IP (`TAX_REFEREE_DEMO_PER_HOUR`); đọc ảnh bằng Vision 60 lần/giờ mỗi người dùng và 600 lần/giờ toàn tiến trình; tra cứu có grounding 60 lần/giờ mỗi phiên và 300 lần/giờ toàn tiến trình, vượt thì fail-closed; tra cứu MST qua API 60 lần/giờ mỗi người dùng; phép thử bảo mật 10 lần/10 phút; toàn hệ thống tối đa 2.000 phiên demo (`lib/server/aiBudget.ts`, `lib/server/rateLimit.ts`, `app/api/demo/session/route.ts`).
+- **Giới hạn tần suất và ngân sách AI (OWASP LLM10):** tạo phiên demo mặc định 200 lần/giờ mỗi IP (`TAX_REFEREE_DEMO_PER_HOUR`); đọc ảnh bằng Vision 60 lần/giờ mỗi người dùng và 600 lần/giờ toàn tiến trình; tra cứu có grounding 60 lần/giờ mỗi phiên và 300 lần/giờ toàn tiến trình, vượt thì fail-closed; tra cứu MST qua API 60 lần/giờ mỗi người dùng; phép thử bảo mật 10 lần/10 phút; toàn hệ thống tối đa 2.000 phiên demo (`lib/server/aiBudget.ts`, `lib/server/rateLimit.ts`, `app/api/demo/session/route.ts`).
 - **Hiển thị chứng từ:** `nosniff`, CSP có `default-src 'none'` và `sandbox` cho mọi loại trừ PDF; header toàn cục `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: same-origin` (`next.config.ts`).
 - **Quota lưu trữ:** mỗi phiên demo 100 file/100MB; database nội bộ 10.000 file/1GB (`lib/server/artifactQuota.ts`).
 - **Webhook pháp lý:** secret từ 24 ký tự, so bằng `timingSafeEqual`.

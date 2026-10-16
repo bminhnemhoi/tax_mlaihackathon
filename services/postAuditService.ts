@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { getDatabase, jsonNow } from '@/lib/server/db';
-import { appendAuditEvent } from '@/lib/server/audit';
+import { appendAuditEvent, auditKey } from '@/lib/server/audit';
 import { wilson95 } from './feedbackService';
 
 /**
@@ -23,7 +23,7 @@ function ensureTable(): void {
  * bị chọn để né — như Amazon A2I lấy mẫu "để kiểm toán mô hình"); không có khóa thì băm thường. Cùng hồ sơ, cùng nội dung → cùng kết quả.
  */
 export function postAuditDraw(invoiceId: string, contentHash: string): number {
-  const key = process.env.TAX_REFEREE_AUDIT_KEY && process.env.TAX_REFEREE_AUDIT_KEY.length >= 32 ? process.env.TAX_REFEREE_AUDIT_KEY : '';
+  const key = auditKey() || '';
   const digest = key ? crypto.createHmac('sha256', key).update(`post-audit|${invoiceId}|${contentHash}`).digest('hex') : crypto.createHash('sha256').update(`${invoiceId}|${contentHash}`).digest('hex');
   return parseInt(digest.slice(0, 8), 16) / 0x100000000;
 }

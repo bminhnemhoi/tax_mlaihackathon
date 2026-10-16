@@ -110,3 +110,25 @@ test('chống hạ cấp HMAC: xóa hết chữ ký rồi tính lại chuỗi �
     for (const [k, v] of [['TAX_REFEREE_AUDIT_KEY', saved.key], ['TAX_REFEREE_AUDIT_SIGNED_SINCE', saved.since]] as const) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
 });
+
+test('production không đặt khóa audit: tự sinh khóa một lần, lưu file cạnh database, các lần sau dùng lại cùng khóa', async () => {
+  const fsm = await import('node:fs'), os = await import('node:os'), pathm = await import('node:path');
+  const { auditKey, auditKeySource } = await import('../../lib/server/audit');
+  const dir = fsm.mkdtempSync(pathm.join(os.tmpdir(), 'audit-key-'));
+  const file = pathm.join(dir, '.audit-key');
+  const saved = { env: process.env.NODE_ENV, key: process.env.TAX_REFEREE_AUDIT_KEY, file: process.env.TAX_REFEREE_AUDIT_KEY_FILE };
+  const env = process.env as Record<string, string | undefined>;
+  try {
+    delete env.TAX_REFEREE_AUDIT_KEY; env.NODE_ENV = 'production'; env.TAX_REFEREE_AUDIT_KEY_FILE = file;
+    const first = auditKey();
+    assert.match(first || '', /^[0-9a-f]{64}$/);
+    assert.equal(fsm.readFileSync(file, 'utf8'), first);
+    assert.equal(auditKey(), first, 'cùng khóa ở lần sau');
+    assert.equal(auditKeySource(), 'file');
+    env.TAX_REFEREE_AUDIT_KEY = 'e'.repeat(40);
+    assert.equal(auditKey(), 'e'.repeat(40), 'biến môi trường được ưu tiên');
+    assert.equal(auditKeySource(), 'env');
+  } finally {
+    for (const [k, v] of [['NODE_ENV', saved.env], ['TAX_REFEREE_AUDIT_KEY', saved.key], ['TAX_REFEREE_AUDIT_KEY_FILE', saved.file]] as const) if (v === undefined) delete env[k]; else env[k] = v;
+  }
+});
