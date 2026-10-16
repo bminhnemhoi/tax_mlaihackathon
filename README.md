@@ -204,7 +204,7 @@ Sao chép [`.env.example`](.env.example) thành `.env.local`. Không commit file
 
 ## Kiểm thử và chất lượng
 
-- **`npm test`**: 16 bộ — 103 kiểm tra unit (20 file trong [`tests/unit/`](tests/unit)) và 15 bộ hồi quy, gồm 72 ca red team. Bộ nào in ít kiểm tra hơn ngưỡng `minChecks` bị tính là FAIL.
+- **`npm test`**: 16 bộ — 110 kiểm tra unit (21 file trong [`tests/unit/`](tests/unit)) và 15 bộ hồi quy, gồm 72 ca red team. Bộ nào in ít kiểm tra hơn ngưỡng `minChecks` bị tính là FAIL.
 - **Kiểm thử thuộc tính** (fast-check, ~1.500 hóa đơn sinh ngẫu nhiên, seed cố định) cho các bất biến của engine.
 - **Ma trận quyền** gọi hàm thực thi với từng vai trò; **12 phép thử bảo mật** của `/trust` chạy cả trong CI.
 - **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): Ubuntu (Node 22 và 24) và Windows (Node 22) — typecheck, lint, test; build sau khi test đạt. Action ghim theo SHA, token chỉ quyền đọc.
@@ -264,6 +264,7 @@ brainstorming/  Ghi chú nháp do AI hỗ trợ soạn — không phải bằng 
 - **Định danh:** demo dùng **vai trò mô phỏng** — một người đổi được 3 vai trong phiên demo (ngoài sandbox bị chặn); đăng nhập nội bộ là MVP. Production cần SSO/OIDC và MFA.
 - **Phạm vi SOP:** "ngoài phạm vi" nhận diện bằng danh sách từ khóa, nên chi cá nhân ghi tên khác vẫn có thể lọt (ca bẫy U2 của buổi thử đã đóng ở `02b8a24`); đảo sang danh sách trắng hạng mục là việc tiếp theo.
 - **Cô lập:** tiến trình đọc PDF không nhận biến bí mật nhưng chưa chạy trong container/UID riêng; khóa HMAC nằm cùng host với database; điểm neo do `/api/audit/anchor` cấp, người vận hành phải tự lưu ra ngoài.
+- **Đọc XML:** trích theo tên thẻ, chưa theo đường dẫn schema. CDATA, chú thích, processing instruction, tham chiếu ký tự đã được chuẩn hóa và cấu trúc mơ hồ (phần tử trùng tên, dòng hàng lồng) bị từ chối; thẻ đồng nghĩa ưu tiên cao hơn vẫn có thể được chọn (phép kiểm số học bắt trường hợp số không khớp).
 - **Khác:** SQLite một instance; ảnh/PDF scan đi qua proxy AI bên thứ ba; chưa xác thực chữ ký số XML; tách nhỏ hóa đơn mới cộng dồn trong cùng ngày, cùng bên bán; ngày lập ở tương lai gần chưa bị chặn (chỉ chặn khi quá 6 tháng).
 - **Pháp lý:** quy tắc mô tả SOP nội bộ; điều khoản luật được dẫn nguồn nhưng diễn giải cần kế toán xác nhận.
 

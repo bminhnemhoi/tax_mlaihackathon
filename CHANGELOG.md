@@ -4,6 +4,15 @@
 
 ## [Chưa phát hành]
 
+### Bảo mật
+- **Đọc XML không còn lệch do CDATA, chú thích, processing instruction, `>` trong thuộc tính hay tham chiếu ký tự:** chuẩn hóa trước mọi trích xuất. Trước đây hóa đơn chứa `2<![CDATA[2]]>880000` được đọc thành 2.880.000₫ trong khi phần mềm kế toán và cơ quan thuế đọc 22.880.000₫ — đủ để lọt ngưỡng tiền mặt và hạn mức Kế toán trưởng.
+- **XML mơ hồ bị từ chối (fail-closed):** phần tử tổng tiền/số hóa đơn trùng tên ở phần đầu, khối bên bán/bên mua trùng, dòng hàng lồng nhau; tham chiếu tới ký tự cấm, `&` lẻ. Trước đây regex lấy phần tử trùng tên đầu tiên, nên một khối mở rộng đặt trước phần tổng thật làm hóa đơn 220 triệu thành 2,2 triệu và được tự duyệt.
+- **XML và CSV sổ cái (beta):** escape mọi giá trị và loại ký tự cấm trong XML; CSV nhân đôi nháy kép, vô hiệu công thức — chặn chèn phần tử, cột hay dòng giả.
+- **File tạm PDF:** thư mục riêng quyền 700, file 600, luôn được dọn; xóa hàm PDF→PNG không còn dùng.
+- Bộ đệm trích xuất đổi phiên bản (`xml-canon-1`) để kết quả đọc theo cách cũ không bị dùng lại.
+- Phát hiện nhờ CodeQL; mỗi cảnh báo được phân loại và phản biện độc lập, bản sửa được phản biện lần hai (tìm ra và đã chặn một đường lệch mới qua processing instruction). Test hồi quy `tests/unit/xmlIntegrity.test.ts` (unit 103 → 110 kiểm tra), kiểm chứng ngược: 6/7 ca thất bại trên mã cũ.
+- **Giới hạn còn lại:** trích theo tên thẻ, chưa theo đường dẫn schema — thẻ đồng nghĩa ưu tiên cao hơn (ví dụ `GrandTotal` so với `TotalAmount`) vẫn có thể được chọn (phép kiểm số học bắt trường hợp số không khớp); chuyển chuỗi thành số còn dễ dãi.
+
 ### Tài liệu
 - README viết lại: mục lục, kiến trúc (Mermaid), bảng bảo mật 4 trụ, cấu hình, API, giới hạn.
 - Thêm `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, `THIRD_PARTY_NOTICES.md`, mẫu issue/PR, mục lục tài liệu [`docs/README.md`](docs/README.md).

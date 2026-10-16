@@ -178,6 +178,10 @@ Trần theo giờ (`lib/server/aiBudget.ts`): Vision 60 lần/người dùng và
 | LLM10 | Gọi Vision/grounding không ngân sách; `forceRefresh` vượt cache | `lib/server/aiBudget.ts`, fail-closed; bỏ `forceRefresh`; trả 413 sớm | `e88eace` | `aiBudget.test.ts` |
 | SBX-06 | Xóa hết HMAC rồi tính lại chuỗi vẫn "hợp lệ kèm cảnh báo" | Mốc `TAX_REFEREE_AUDIT_SIGNED_SINCE` đặt ngoài DB | `482f831` | `auditIntegrity.test.ts` |
 | F7 | Cấu hình fail-open âm thầm: thiếu khóa audit, commit `unknown` | `warnings` trên `/api/health`; đọc commit từ `.git` | `482f831`, `8bcfbb0` | Chưa có test đơn vị; kiểm `/api/health` theo checklist A5c |
+| XML-01 | Bộ trích XML bằng regex bỏ nội dung CDATA, không giải mã `&#NN;`, bị PI và `>` trong thuộc tính đánh lừa: app đọc 2.880.000₫ trong khi bộ đọc chuẩn đọc 22.880.000₫ (CodeQL + phản biện, 17/10) | `canonicalXmlForRegex` (bỏ chú thích, PI, thuộc tính; mở CDATA) + `decodeXmlText` chặt cho cả regex lẫn cây dự phòng; từ chối tham chiếu tới ký tự cấm | `221c614` và bản sửa tiếp theo | `xmlIntegrity.test.ts` |
+| XML-03 | Regex lấy phần tử trùng tên đầu tiên: khối mở rộng đặt trước phần tổng thật làm hóa đơn 220 triệu thành 2,2 triệu, tự duyệt | `assertUnambiguousXml`: trùng tên ở phần đầu, trùng khối bên bán/mua, dòng hàng lồng → từ chối (fail-closed). Còn lại: thẻ đồng nghĩa ưu tiên cao hơn — cần trích theo đường dẫn schema | bản sửa tiếp theo | `xmlIntegrity.test.ts` |
+| XML-02 | XML sổ cái (beta) chèn giá trị thô: số hóa đơn tạo được phần tử giả; CSV không nhân đôi nháy kép tạo được dòng tiền giả | `xmlEscape` (kèm loại ký tự cấm), `csvCell` (nháy kép, vô hiệu công thức) | `781aa0e` và bản sửa tiếp theo | `xmlIntegrity.test.ts` |
+| TMP-01 | PDF tải lên ghi vào `/tmp` dùng chung với quyền mặc định | `mkdtemp` riêng, file 600, luôn dọn; xóa `convertPdfToPngBase64` không dùng | `2c5cf09` | `xmlIntegrity.test.ts` |
 
 ## 7. Rủi ro còn lại và lộ trình
 
