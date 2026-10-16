@@ -16,8 +16,8 @@ _Chưa có thay đổi._
 - **XML và CSV sổ cái (beta):** escape mọi giá trị và loại ký tự cấm trong XML; CSV nhân đôi nháy kép, vô hiệu công thức — chặn chèn phần tử, cột hay dòng giả.
 - **File tạm PDF:** thư mục riêng quyền 700, file 600, luôn được dọn; xóa hàm PDF→PNG không còn dùng.
 - Bộ đệm trích xuất đổi phiên bản (`xml-canon-1`) để kết quả đọc theo cách cũ không bị dùng lại.
-- Phát hiện nhờ CodeQL; mỗi cảnh báo được phân loại và phản biện độc lập, bản sửa được phản biện lần hai (tìm ra và đã chặn một đường lệch mới qua processing instruction). Test hồi quy `tests/unit/xmlIntegrity.test.ts` (unit 103 → 110 kiểm tra), kiểm chứng ngược: 6/7 ca thất bại trên mã cũ.
-- **Giới hạn còn lại:** trích theo tên thẻ, chưa theo đường dẫn schema — thẻ đồng nghĩa ưu tiên cao hơn (ví dụ `GrandTotal` so với `TotalAmount`) vẫn có thể được chọn (phép kiểm số học bắt trường hợp số không khớp); chuyển chuỗi thành số còn dễ dãi.
+- Nguồn phát hiện: cảnh báo CodeQL cho lỗi đọc XML (CDATA, tham chiếu ký tự) và file tạm PDF; lỗi XML/CSV sổ cái và XML mơ hồ không có cảnh báo CodeQL riêng, được tìm ra khi phân loại và phản biện. Mỗi cảnh báo được phân loại và phản biện độc lập, bản sửa được phản biện lần hai (tìm ra và đã chặn một đường lệch mới qua processing instruction). Test hồi quy `tests/unit/xmlIntegrity.test.ts` (unit 103 → 110 kiểm tra), kiểm chứng ngược: 6/7 ca thất bại trên mã cũ.
+- **Giới hạn còn lại:** trích theo tên thẻ, chưa theo đường dẫn schema — thẻ đồng nghĩa ưu tiên cao hơn (ví dụ `GrandTotal` so với `TotalAmount`) vẫn có thể được chọn (phép kiểm số học bắt trường hợp số không khớp); chuyển chuỗi thành số còn dễ dãi. Phép kiểm trùng tên có thể từ chối nhầm hóa đơn có bảng tổng hợp theo thuế suất dùng thẻ `TaxAmount`/`VATAmount`/`TotalAmount` ngoài dòng hàng (khi đó dùng PDF hoặc nhập tay) — cần thử với XML nhiều thuế suất thật trước khi đưa lên live.
 
 ### Tài liệu
 - README viết lại: mục lục, kiến trúc (Mermaid), bảng bảo mật 4 trụ, cấu hình, API, giới hạn.
@@ -28,7 +28,7 @@ _Chưa có thay đổi._
 
 ### Hạ tầng repo
 - CI: quyền token tối thiểu (`contents: read`), action ghim theo SHA, `concurrency`, `timeout-minutes`, thêm Node 24 trên Ubuntu.
-- CodeQL quét JavaScript/TypeScript, Python và workflow; Dependabot cập nhật hằng tuần (bỏ qua `better-sqlite3` đang ghim cho Hostinger).
+- CodeQL quét JavaScript/TypeScript, Python và workflow; Dependabot cập nhật hằng tuần (bỏ qua `better-sqlite3` đang ghim cho Hostinger và mọi bản nâng major).
 - `CODEOWNERS`, `.gitattributes` (LF), `.nvmrc` (Node 22); `.gitignore` chặn gói nộp bài `.zip` và bộ cài Python cục bộ.
 
 ## [1.0.0] — 2026-10-16 — Bảo mật hệ có agent AI cho Demo Day (PR [#6](https://github.com/khanhle1406/Tax-Referee/pull/6), [#7](https://github.com/khanhle1406/Tax-Referee/pull/7), [#8](https://github.com/khanhle1406/Tax-Referee/pull/8))

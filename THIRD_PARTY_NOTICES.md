@@ -38,7 +38,7 @@ Logo TR và các favicon trong `public/` do đội tạo bằng công cụ sinh 
 ## Phụ thuộc phần mềm
 
 - **Gói npm** (Next.js, React, better-sqlite3, Zod, fast-xml-parser, sharp, Radix UI, lucide-react…) được cài qua `npm ci`, không nằm trong repo. Phần lớn theo MIT, ISC, BSD hoặc Apache-2.0; danh sách đầy đủ và phiên bản khóa trong [`package-lock.json`](package-lock.json). Kiểm tra giấy phép: `npx license-checker --summary`.
-- **PyMuPDF** (tùy chọn, dùng để đọc lớp chữ và dựng ảnh từ PDF trong `lib/server/pdfToImage.ts`) theo **AGPL-3.0** hoặc giấy phép thương mại của Artifex. Repo không chứa PyMuPDF; `Dockerfile` cài nó vào image. Nếu phân phối image hoặc cung cấp dịch vụ có PyMuPDF, hãy tuân thủ AGPL-3.0 hoặc mua giấy phép thương mại.
+- **PyMuPDF** (tùy chọn, dùng để đọc lớp chữ PDF trong `lib/server/pdfToImage.ts`) theo **AGPL-3.0** hoặc giấy phép thương mại của Artifex. Repo không chứa PyMuPDF; `Dockerfile` cài nó vào image. Nếu phân phối image hoặc cung cấp dịch vụ có PyMuPDF, hãy tuân thủ AGPL-3.0 hoặc mua giấy phép thương mại.
 - **Poppler** (`poppler-utils`, GPL) được `Dockerfile` cài từ kho của hệ điều hành.
 
 ## Dịch vụ bên ngoài

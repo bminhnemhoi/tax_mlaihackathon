@@ -27,7 +27,7 @@ MLAI Hackathon 2026 · Track VNG · Đề A — *The Escalation Referee* · Đ�
 </div>
 
 > [!NOTE]
-> **Về repo này:** bản phát triển của Minh ([@bminhnemhoi](https://github.com/bminhnemhoi)), thành viên đội Fprinciples, giữ nguyên toàn bộ lịch sử commit của đội (cùng mã hash, không squash, không viết lại). Repo chính thức của đội — nơi review Pull Request, nộp bài và là nguồn deploy production — là [khanhle1406/Tax-Referee](https://github.com/khanhle1406/Tax-Referee). Các số PR `#1`–`#10` trong lịch sử commit thuộc repo gốc đó.
+> **Về repo này:** bản phát triển của Minh ([@bminhnemhoi](https://github.com/bminhnemhoi)), thành viên đội Fprinciples, giữ nguyên toàn bộ lịch sử commit của đội (cùng mã hash, không squash, không viết lại). Repo chính thức của đội — nơi review Pull Request, nộp bài và là nguồn deploy production — là [khanhle1406/Tax-Referee](https://github.com/khanhle1406/Tax-Referee). Các số PR `#1`–`#9` nhắc trong lịch sử commit là PR của repo gốc đó; riêng `#10` trong merge commit `5ef3bf5` (bản sửa bảo mật đọc XML) là PR của repo này.
 
 <p align="center"><img src="docs/screenshots/inbox.png" alt="Hộp thẩm định: 4 hóa đơn mẫu — 1 đã tự xử lý, 2 chờ Kế toán trưởng, 1 chờ CFO" width="880"></p>
 
@@ -208,7 +208,7 @@ Sao chép [`.env.example`](.env.example) thành `.env.local`. Không commit file
 - **Kiểm thử thuộc tính** (fast-check, ~1.500 hóa đơn sinh ngẫu nhiên, seed cố định) cho các bất biến của engine.
 - **Ma trận quyền** gọi hàm thực thi với từng vai trò; **12 phép thử bảo mật** của `/trust` chạy cả trong CI.
 - **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): Ubuntu (Node 22 và 24) và Windows (Node 22) — typecheck, lint, test; build sau khi test đạt. Action ghim theo SHA, token chỉ quyền đọc.
-- **Bảo mật chuỗi cung ứng:** CodeQL ([`.github/workflows/codeql.yml`](.github/workflows/codeql.yml)) quét JavaScript/TypeScript, Python và workflow mỗi lần push và hằng tuần; Dependabot ([`.github/dependabot.yml`](.github/dependabot.yml)) đề xuất cập nhật phụ thuộc hằng tuần.
+- **Bảo mật chuỗi cung ứng:** CodeQL ([`.github/workflows/codeql.yml`](.github/workflows/codeql.yml)) quét JavaScript/TypeScript, Python và workflow khi push lên `main`, khi mở PR vào `main` và hằng tuần; Dependabot ([`.github/dependabot.yml`](.github/dependabot.yml)) đề xuất cập nhật phụ thuộc hằng tuần.
 - **Verify** tất định, không gọi AI: 9/9 trên live, có run ID và commit.
 
 ## Triển khai
@@ -264,7 +264,7 @@ brainstorming/  Ghi chú nháp do AI hỗ trợ soạn — không phải bằng 
 - **Định danh:** demo dùng **vai trò mô phỏng** — một người đổi được 3 vai trong phiên demo (ngoài sandbox bị chặn); đăng nhập nội bộ là MVP. Production cần SSO/OIDC và MFA.
 - **Phạm vi SOP:** "ngoài phạm vi" nhận diện bằng danh sách từ khóa, nên chi cá nhân ghi tên khác vẫn có thể lọt (ca bẫy U2 của buổi thử đã đóng ở `02b8a24`); đảo sang danh sách trắng hạng mục là việc tiếp theo.
 - **Cô lập:** tiến trình đọc PDF không nhận biến bí mật nhưng chưa chạy trong container/UID riêng; khóa HMAC nằm cùng host với database; điểm neo do `/api/audit/anchor` cấp, người vận hành phải tự lưu ra ngoài.
-- **Đọc XML:** trích theo tên thẻ, chưa theo đường dẫn schema. CDATA, chú thích, processing instruction, tham chiếu ký tự đã được chuẩn hóa và cấu trúc mơ hồ (phần tử trùng tên, dòng hàng lồng) bị từ chối; thẻ đồng nghĩa ưu tiên cao hơn vẫn có thể được chọn (phép kiểm số học bắt trường hợp số không khớp).
+- **Đọc XML:** trích theo tên thẻ, chưa theo đường dẫn schema. Từ `v1.1.0`, CDATA, chú thích, processing instruction, tham chiếu ký tự được chuẩn hóa và cấu trúc mơ hồ (phần tử trùng tên, dòng hàng lồng) bị từ chối; bản live (`v1.0.0`) chưa có bản sửa này. Thẻ đồng nghĩa ưu tiên cao hơn vẫn có thể được chọn (phép kiểm số học bắt trường hợp số không khớp); bước chuyển chuỗi thành số còn dễ dãi. Phép kiểm trùng tên có thể từ chối nhầm hóa đơn có bảng tổng hợp theo thuế suất dùng `TaxAmount`/`VATAmount`/`TotalAmount` ngoài dòng hàng (khi đó dùng PDF hoặc nhập tay).
 - **Khác:** SQLite một instance; ảnh/PDF scan đi qua proxy AI bên thứ ba; chưa xác thực chữ ký số XML; tách nhỏ hóa đơn mới cộng dồn trong cùng ngày, cùng bên bán; ngày lập ở tương lai gần chưa bị chặn (chỉ chặn khi quá 6 tháng).
 - **Pháp lý:** quy tắc mô tả SOP nội bộ; điều khoản luật được dẫn nguồn nhưng diễn giải cần kế toán xác nhận.
 

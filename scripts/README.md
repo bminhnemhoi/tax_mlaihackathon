@@ -15,7 +15,7 @@ Bảng dưới đây ghi script nào được `npm test` chạy, script nào ch�
 
 | Bộ | File | Lệnh npm chạy riêng |
 |---|---|---|
-| `unit` | `tests/unit/*.test.ts` (node:test, `minChecks` 103) | `npm run test:unit` |
+| `unit` | `tests/unit/*.test.ts` (node:test, `minChecks` 110) | `npm run test:unit` |
 | `manifest` | `qa/test-regression-manifest.ts` | `test:manifest` |
 | `referee-core` | `qa/test-referee-core.ts` | `test:referee-core` |
 | `redteam` | `qa/test-redteam.ts` (72 ca trong `data/verification/redteam/cases.json`) | — |

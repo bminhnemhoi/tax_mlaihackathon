@@ -9,7 +9,7 @@ Repo chính thức của đội (nguồn deploy production và bài nộp): http
 ## 1. Yêu cầu
 - Node.js 22 (giống CI và production) hoặc 24, kèm npm.
 - Windows, macOS hoặc Linux. Các lệnh test chạy được trên cả Windows (không cần WSL).
-- Tùy chọn cho PDF: Python 3 với `PyMuPDF` (đọc lớp chữ và dựng ảnh trang PDF); thiếu PyMuPDF thì `pypdf` được dùng làm phương án dự phòng chỉ đọc chữ. `Pillow` chỉ cần cho OCR Apple Vision trên macOS (`scripts/ocr/apple_vision_ocr.py`).
+- Tùy chọn cho PDF: Python 3 với `PyMuPDF` (đọc lớp chữ PDF); thiếu PyMuPDF thì `pypdf` được dùng làm phương án dự phòng chỉ đọc chữ. `Pillow` chỉ cần cho OCR Apple Vision trên macOS (`scripts/ocr/apple_vision_ocr.py`).
 - Không cần AI key để chạy Verify và bộ test: quy tắc phân luồng là tất định. AI key (Gemini) chỉ cần cho đọc ảnh/PDF scan.
 
 ## 2. Clone sạch → chạy
