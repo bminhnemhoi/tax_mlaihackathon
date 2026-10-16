@@ -11,7 +11,7 @@ import {buildHandoff,describeRuleEvidence} from './handoffService';
 import {concreteIssue} from './questionBuilder';
 import {groupOf,orderFindings,riskGroupsOf} from '@/lib/riskTaxonomy';
 import {fieldLabels} from '@/lib/workflowPresentation';
-import {invoiceFrameworkAt,vat8Basis,vat8ExcludedPhrases,vatReductionAt} from '@/lib/legalBasis';
+import {buyerTaxCodeBasis,cashPaymentBasis,closedSellerBasis,inSentence,invoiceFrameworkAt,sameDayCashBasis,seriesYearBasis,taxAuthorityCodeBasis,vat8Basis,vat8ExcludedPhrases,vatReductionAt} from '@/lib/legalBasis';
 
 /** Cụm từ chứa từ khóa loại trừ nhưng là hàng hóa thông thường (VD "mũ bảo hiểm" không phải dịch vụ bảo hiểm). */
 const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HIỂM','GĂNG TAY BẢO HIỂM',
@@ -176,7 +176,7 @@ export function validateLineItems(
   };
 }
 
-// Tính toán Tham số nguồn hàng K thời gian thực (Công văn 2392/TCT-QLRR & TT 94/2026/TT-BTC)
+// Tính toán Tham số nguồn hàng K thời gian thực (ngưỡng nội bộ Điều 4.3 Tax-SOP-2026)
 export function calculateKFactor(
   additionalPurchase: number = 0,
   safeMin: number = 1.05,
@@ -362,7 +362,7 @@ function evaluateInvoiceLocallyInternal(
     });
   }
 
-  // 5. STATUTORY: Kiểm tra Danh bạ nhà cung cấp rủi ro cao (CV 2392/TCT-QLRR)
+  // 5. Kiểm tra danh bạ nhà cung cấp rủi ro cao (quy chế quản lý rủi ro nhà cung cấp nội bộ)
   if (registeredSupplier) {
     if (registeredSupplier.status === 'CLOSED' || registeredSupplier.status === 'SUSPENDED') {
       inv.sellerStatus = registeredSupplier.status;
@@ -374,9 +374,9 @@ function evaluateInvoiceLocallyInternal(
         severity: 'HIGH',
         riskGroup: 'OUT_OF_POLICY',
         flaggedReason: `Nhà cung cấp [${inv.supplierName} - MST ${inv.supplierTaxCode}] nằm trong danh bạ cảnh báo rủi ro cao về hóa đơn (High Risk Supplier)`,
-        plainExplanation: 'Nhà cung cấp này đã bị cơ quan quản lý gắn cờ rủi ro hóa đơn hoặc có dấu hiệu gian lận theo Công văn 2392/TCT-QLRR. Cần KTT/CFO kiểm tra kỹ lưỡng hồ sơ hàng hóa thực tế và hợp đồng trước khi phê duyệt.',
-        legalBasis: 'Công văn 2392/TCT-QLRR & Quy chế Quản lý rủi ro nhà cung cấp',
-        sopClause: 'Công văn 2392/TCT-QLRR & Quy chế Quản lý rủi ro nhà cung cấp',
+        plainExplanation: 'Nhà cung cấp này nằm trong danh bạ cảnh báo rủi ro hóa đơn của doanh nghiệp (quy chế quản lý rủi ro nhà cung cấp nội bộ). Cần KTT/CFO kiểm tra kỹ lưỡng hồ sơ hàng hóa thực tế và hợp đồng trước khi phê duyệt.',
+        legalBasis: 'Quy chế Quản lý rủi ro nhà cung cấp (SOP nội bộ)',
+        sopClause: 'Quy chế Quản lý rủi ro nhà cung cấp (SOP nội bộ)',
         actionableQuestion: `Nhà cung cấp ${inv.supplierName} thuộc diện cảnh báo rủi ro cao. KTT/CFO quyết định thế nào?`,
         options: [
           {
@@ -408,9 +408,9 @@ function evaluateInvoiceLocallyInternal(
         severity: 'CRITICAL',
         riskGroup: 'OUT_OF_POLICY',
         flaggedReason: `Mã số thuế người mua trên hóa đơn (${inv.buyerTaxCode}) không trùng khớp với MST doanh nghiệp (${config.companyTaxCode})`,
-        plainExplanation: 'Hóa đơn không ghi nhận MST của doanh nghiệp mình (nghi vấn lấy nhầm hóa đơn công ty khác hoặc hóa đơn cá nhân người lao động). Theo Khoản 1 Điều 14 Luật Thuế GTGT 48/2024/QH15 và Điều 10 Nghị định 123/2020/NĐ-CP, hóa đơn không đúng tên và MST người mua không đủ điều kiện khấu trừ thuế GTGT đầu vào và không được tính vào chi phí được trừ khi tính thuế TNDN.',
-        legalBasis: 'Khoản 1 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 10 Nghị định 123/2020/NĐ-CP',
-        sopClause: 'Khoản 1 Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 10 Nghị định 123/2020/NĐ-CP',
+        plainExplanation: `Hóa đơn không ghi nhận MST của doanh nghiệp mình (nghi vấn lấy nhầm hóa đơn công ty khác hoặc hóa đơn cá nhân người lao động). Theo ${inSentence(buyerTaxCodeBasis(inv.invoiceDate))}, hóa đơn phải ghi đúng tên, mã số thuế người mua; hóa đơn ghi MST của đơn vị khác không đủ điều kiện để doanh nghiệp khấu trừ thuế GTGT đầu vào.`,
+        legalBasis: buyerTaxCodeBasis(inv.invoiceDate),
+        sopClause: buyerTaxCodeBasis(inv.invoiceDate),
         actionableQuestion: `Hóa đơn ${inv.invoiceNumber} từ ${inv.supplierName} ghi sai MST người mua (${inv.buyerTaxCode} thay vì ${config.companyTaxCode}). KTT xử lý thế nào?`,
         options: [
           {
@@ -443,9 +443,9 @@ function evaluateInvoiceLocallyInternal(
           severity: 'HIGH',
           riskGroup: 'UNCERTAIN_INFO',
           flaggedReason: `Ký hiệu hóa đơn '${inv.invoiceSeries}' là loại có mã của Cơ quan thuế (ký tự thứ 2 là 'C') nhưng thiếu hoặc sai định dạng chuỗi MCCQT 34 ký tự (hiện có: ${mccqt ? mccqt.length + ' ký tự' : 'Trống'}).`,
-          plainExplanation: `Theo ${invoiceFrameworkAt(inv.invoiceDate).decree} và ${invoiceFrameworkAt(inv.invoiceDate).circular}, hóa đơn điện tử có mã của cơ quan thuế bắt buộc phải có chuỗi mã của cơ quan thuế (34 ký tự) trước khi gửi cho người mua. Hóa đơn chưa có mã CQT hợp lệ thì chưa có giá trị pháp lý để kê khai thuế.`,
-          legalBasis: invoiceFrameworkAt(inv.invoiceDate).legacy ? 'Điều 14 Nghị định 123/2020/NĐ-CP & Điều 4 Thông tư 78/2021/TT-BTC' : `${invoiceFrameworkAt(inv.invoiceDate).decree} & ${invoiceFrameworkAt(inv.invoiceDate).circular} (hóa đơn có mã của cơ quan thuế)`,
-          sopClause: invoiceFrameworkAt(inv.invoiceDate).legacy ? 'Điều 14 Nghị định 123/2020/NĐ-CP & Điều 4 Thông tư 78/2021/TT-BTC' : `${invoiceFrameworkAt(inv.invoiceDate).decree} & ${invoiceFrameworkAt(inv.invoiceDate).circular}`,
+          plainExplanation: `Theo ${inSentence(taxAuthorityCodeBasis(inv.invoiceDate))}, hóa đơn điện tử có mã của cơ quan thuế phải được cơ quan thuế cấp mã trước khi gửi cho người mua, và mã này là nội dung của hóa đơn (theo đặc tả kỹ thuật của cơ quan thuế là chuỗi 34 ký tự). Chưa có mã hợp lệ thì cần tra cứu lại trước khi kê khai.`,
+          legalBasis: taxAuthorityCodeBasis(inv.invoiceDate),
+          sopClause: taxAuthorityCodeBasis(inv.invoiceDate),
           actionableQuestion: `Hóa đơn ${inv.invoiceNumber} thuộc nhóm có mã CQT nhưng chưa có mã MCCQT 34 ký tự hợp lệ. KTT xử lý thế nào?`,
           options: [
             {
@@ -478,9 +478,9 @@ function evaluateInvoiceLocallyInternal(
           severity: 'HIGH',
           riskGroup: 'UNCERTAIN_INFO',
           flaggedReason: `Ký hiệu hóa đơn '${inv.invoiceSeries}' (dải năm ${seriesYear}) không khớp với năm lập hóa đơn (${inv.invoiceDate}, năm ${invYear}).`,
-          plainExplanation: `Theo quy định về ký hiệu hóa đơn (${invoiceFrameworkAt(inv.invoiceDate).legacy ? 'điểm a khoản 1 Điều 4 Thông tư 78/2021/TT-BTC' : invoiceFrameworkAt(inv.invoiceDate).circular}), hai chữ số năm trong ký hiệu hóa đơn thể hiện năm lập hóa đơn điện tử. Việc lệch dải năm phản ánh nguy cơ phát hành lùi ngày bất hợp pháp hoặc xuất hóa đơn trên dải ký hiệu cũ chưa thông báo phát hành lại.`,
-          legalBasis: invoiceFrameworkAt(inv.invoiceDate).legacy ? 'Điểm a Khoản 1 Điều 4 Thông tư 78/2021/TT-BTC' : `${invoiceFrameworkAt(inv.invoiceDate).circular} (ký hiệu hóa đơn)`,
-          sopClause: invoiceFrameworkAt(inv.invoiceDate).legacy ? 'Điểm a Khoản 1 Điều 4 Thông tư 78/2021/TT-BTC' : `${invoiceFrameworkAt(inv.invoiceDate).circular} (ký hiệu hóa đơn)`,
+          plainExplanation: `Theo ${inSentence(seriesYearBasis(inv.invoiceDate))}, hai chữ số năm trong ký hiệu hóa đơn thể hiện năm lập hóa đơn điện tử. Lệch năm cần được người bán giải trình hoặc điều chỉnh trước khi kê khai.`,
+          legalBasis: seriesYearBasis(inv.invoiceDate),
+          sopClause: seriesYearBasis(inv.invoiceDate),
           actionableQuestion: `Hóa đơn ${inv.invoiceNumber} có ký hiệu dải năm '${seriesYear}' khác năm lập thực tế '${invYear}'. KTT xử lý thế nào?`,
           options: [
             {
@@ -558,8 +558,8 @@ function evaluateInvoiceLocallyInternal(
       riskGroup: 'OUT_OF_POLICY',
       flaggedReason: 'Hóa đơn lập ngày ' + inv.invoiceDate + ', SAU ngày người bán bị đóng MST (' + inv.sellerSuspensionDate + ')',
       plainExplanation: 'Ngày lập hóa đơn sau ngày đóng MST đã ghi nhận; cần đối chiếu chứng từ và nguồn xác minh trước khi xử lý.',
-      legalBasis: 'Điều 2.2 Quy chế Tax-SOP-2026 & Nghị định 254/2026/NĐ-CP',
-      sopClause: 'Điều 2.2 Quy chế Tax-SOP-2026 & Nghị định 254/2026/NĐ-CP',
+      legalBasis: `Điều 2.2 Quy chế Tax-SOP-2026 & ${closedSellerBasis(inv.invoiceDate)}`,
+      sopClause: `Điều 2.2 Quy chế Tax-SOP-2026 & ${closedSellerBasis(inv.invoiceDate)}`,
       actionableQuestion: 'Hóa đơn ' + inv.invoiceNumber + ' phát hành sau ngày bên bán đóng MST (' + inv.sellerSuspensionDate + '). Hệ thống khuyến nghị loại bỏ ngay. ' + (isExceedKtt ? 'CFO' : 'KTT') + ' xác nhận?',
       options: [
         {
@@ -590,9 +590,9 @@ function evaluateInvoiceLocallyInternal(
         severity: 'CRITICAL',
         riskGroup: 'OUT_OF_POLICY',
         flaggedReason: 'Hóa đơn từ ' + (nonCashThreshold / 1_000_000) + ' triệu đồng thanh toán TIỀN MẶT' + (isExceedKtt ? ' (vượt hạn mức KTT)' : '') + ' cần đối chiếu điều kiện thanh toán theo SOP',
-        plainExplanation: 'Luật thuế quy định hóa đơn từng lần từ ' + (nonCashThreshold / 1_000_000) + ' triệu VNĐ trở lên bắt buộc phải có chứng từ thanh toán không dùng tiền mặt (Ủy nhiệm chi ngân hàng) để được khấu trừ. Tuyệt đối không áp dụng tiền lệ tự duyệt cho vi phạm luật định.',
-        legalBasis: inv.invoiceDate < '2025-07-01' ? 'Khoản 2 Điều 15 Thông tư 219/2013/TT-BTC & Điều 1.2 Tax-SOP-2026' : 'Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 26 Nghị định 181/2025/NĐ-CP & Điều 1.2 Tax-SOP-2026',
-        sopClause: inv.invoiceDate < '2025-07-01' ? 'Khoản 2 Điều 15 Thông tư 219/2013/TT-BTC & Điều 1.2 Tax-SOP-2026' : 'Điều 14 Luật Thuế GTGT 48/2024/QH15 & Điều 26 Nghị định 181/2025/NĐ-CP & Điều 1.2 Tax-SOP-2026',
+        plainExplanation: 'Theo ' + inSentence(cashPaymentBasis(inv.invoiceDate)) + ', hàng hóa, dịch vụ mua vào từ ' + (nonCashThreshold / 1_000_000) + ' triệu đồng trở lên (đã gồm thuế GTGT) phải có chứng từ thanh toán không dùng tiền mặt (ví dụ ủy nhiệm chi ngân hàng) để được khấu trừ. Không áp dụng tiền lệ tự duyệt cho điều kiện luật định.',
+        legalBasis: cashPaymentBasis(inv.invoiceDate) + ' & Điều 1.2 Tax-SOP-2026',
+        sopClause: cashPaymentBasis(inv.invoiceDate) + ' & Điều 1.2 Tax-SOP-2026',
         actionableQuestion: 'Hóa đơn ' + inv.invoiceNumber + ' trị giá ' + inv.totalAmount.toLocaleString('vi-VN') + '₫ thanh toán Tiền mặt' + (isExceedKtt ? ' (vượt thẩm quyền KTT)' : '') + '. ' + (isExceedKtt ? 'CFO' : 'KTT') + ' xử lý thế nào?',
         options: [
           {
@@ -645,9 +645,9 @@ function evaluateInvoiceLocallyInternal(
           severity: 'CRITICAL',
           riskGroup: 'OUT_OF_POLICY',
           flaggedReason: `Cụm ${sameDayCheck.invoiceCount} hóa đơn cùng ngày (${inv.invoiceDate}) từ NCC [${inv.supplierName}] có tổng giá trị ${sameDayCheck.dailyTotal.toLocaleString('vi-VN')}₫ (≥ ${nonCashThreshold / 1_000_000} triệu đồng) thanh toán TIỀN MẶT`,
-          plainExplanation: 'Theo khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP (hướng dẫn Luật Thuế GTGT 48/2024/QH15), mua hàng hóa/dịch vụ của cùng một người bán nhiều lần trong cùng một ngày, mỗi lần dưới 5 triệu nhưng tổng từ 5 triệu đồng trở lên, chỉ được khấu trừ thuế khi có chứng từ thanh toán không dùng tiền mặt (Ủy nhiệm chi ngân hàng).',
-          legalBasis: 'Khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP & Luật Thuế GTGT 48/2024/QH15',
-          sopClause: 'Khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP & Luật Thuế GTGT 48/2024/QH15',
+          plainExplanation: `Theo ${inSentence(sameDayCashBasis(inv.invoiceDate))}, mua hàng hóa, dịch vụ của cùng một người bán có giá trị dưới ${nonCashThreshold / 1_000_000} triệu đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ ${nonCashThreshold / 1_000_000} triệu đồng trở lên thì chỉ được khấu trừ thuế khi có chứng từ thanh toán không dùng tiền mặt.`,
+          legalBasis: sameDayCashBasis(inv.invoiceDate),
+          sopClause: sameDayCashBasis(inv.invoiceDate),
           actionableQuestion: `Phát hiện cụm hóa đơn cùng ngày từ ${inv.supplierName} đạt ${sameDayCheck.dailyTotal.toLocaleString('vi-VN')}₫ thanh toán tiền mặt. KTT xử lý thế nào?`,
           options: [
             {
@@ -720,7 +720,7 @@ function evaluateInvoiceLocallyInternal(
       riskGroup: 'OUT_OF_POLICY',
       flaggedReason: 'Khoản chi có đồ uống có cồn/tiếp khách: Cần làm rõ mục đích phục vụ sản xuất kinh doanh hay phúc lợi nhân viên theo quy chế tài chính (Luật Thuế TNDN)',
       plainExplanation: 'Hóa đơn có đồ uống có cồn hoặc chi phí tiếp khách/giải trí. Theo quy định thuế TNDN, chi phí này chỉ được trừ và khấu trừ thuế khi phục vụ trực tiếp SXKD, có quy chế tiếp khách, danh sách đối tác hoặc thỏa mãn trần chi phúc lợi.',
-      legalBasis: 'Điều 2.1 Quy chế Tax-SOP-2026 & Khoản 1 Điều 9 Luật Thuế TNDN 67/2025/QH15',
+      legalBasis: 'Điều 2.1 Quy chế Tax-SOP-2026 (chi tiếp khách theo quy chế nội bộ)',
       sopClause: 'Điều 2.1 Quy chế Tax-SOP-2026 & Luật Thuế TNDN',
       actionableQuestion: `Hóa đơn ${inv.invoiceNumber} có khoản chi tiếp khách/đồ uống (${inv.totalAmount.toLocaleString('vi-VN')}₫). Khoản chi này phục vụ tiếp khách đối tác nào hay phúc lợi nhân viên? Có quy chế không? ${isExceedKtt ? 'CFO' : 'KTT'} xử lý thế nào?`,
       options: [
@@ -787,10 +787,10 @@ function evaluateInvoiceLocallyInternal(
       kind: 'AUTHORITY',
       severity: 'HIGH',
       riskGroup: 'EXCEED_AUTHORITY',
-      flaggedReason: 'Lô hàng mua sắm lớn đẩy Tham số nguồn hàng K kỳ này sang mức ' + kFactor + ' (Vùng Đỏ theo Công văn 2392/TCT-QLRR)',
+      flaggedReason: 'Lô hàng mua sắm lớn đẩy Tham số nguồn hàng K kỳ này sang mức ' + kFactor + ' (vùng đỏ theo ngưỡng nội bộ Điều 4.3 Tax-SOP-2026)',
       plainExplanation: 'Mua sắm vật tư lớn làm mẫu số tăng mạnh khiến chỉ số K chạm Vùng Đỏ (' + kFactor + '), có nguy cơ bị hệ thống quản lý rủi ro của Cục Thuế gửi văn bản tra soát.',
-      legalBasis: 'Điều 4.2 & Điều 4.3 Quy chế Tax-SOP-2026 (CV 2392/TCT-QLRR & TT 94/2026/TT-BTC)',
-      sopClause: 'Điều 4.2 & Điều 4.3 Quy chế Tax-SOP-2026 (CV 2392/TCT-QLRR & TT 94/2026/TT-BTC)',
+      legalBasis: 'Điều 4.2 & Điều 4.3 Quy chế Tax-SOP-2026 (ngưỡng hệ số K nội bộ)',
+      sopClause: 'Điều 4.2 & Điều 4.3 Quy chế Tax-SOP-2026 (ngưỡng hệ số K nội bộ)',
       actionableQuestion: 'Hóa đơn vật tư ' + inv.invoiceNumber + ' (' + inv.totalAmount.toLocaleString('vi-VN') + '₫) làm Hệ số K chạm Vùng Đỏ (' + kFactor + '). CFO phê duyệt chiến lược xử lý?',
       options: [
         {
@@ -959,9 +959,9 @@ function evaluateInvoiceLocallyInternal(
       severity: 'MEDIUM',
       riskGroup: 'UNCERTAIN_INFO',
       flaggedReason: 'Hóa đơn điều chỉnh nhưng không tìm thấy số hóa đơn gốc trong CSDL nội bộ',
-      plainExplanation: 'Hóa đơn ghi là điều chỉnh giảm tiền nhưng hệ thống không tìm thấy hóa đơn gốc tương ứng theo quy định tại Nghị định 254/2026/NĐ-CP.',
-      legalBasis: 'Điều 1.4 Quy chế Tax-SOP-2026 & Nghị định 254/2026/NĐ-CP',
-      sopClause: 'Điều 1.4 Quy chế Tax-SOP-2026 & Nghị định 254/2026/NĐ-CP',
+      plainExplanation: 'Hóa đơn ghi là điều chỉnh giảm tiền nhưng hệ thống không tìm thấy hóa đơn gốc tương ứng theo ${invoiceFrameworkAt(inv.invoiceDate).decree}.',
+      legalBasis: `Điều 1.4 Quy chế Tax-SOP-2026 & ${invoiceFrameworkAt(inv.invoiceDate).decree}`,
+      sopClause: `Điều 1.4 Quy chế Tax-SOP-2026 & ${invoiceFrameworkAt(inv.invoiceDate).decree}`,
       actionableQuestion: 'Hóa đơn điều chỉnh ' + inv.invoiceNumber + ' không tìm thấy số hóa đơn gốc. KTT xử lý thế nào?',
       options: [
         {

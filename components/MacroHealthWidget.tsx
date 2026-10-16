@@ -55,7 +55,7 @@ export const MacroHealthWidget: React.FC<MacroHealthWidgetProps> = ({ macroState
               Giám sát Rủi ro Toàn cục & Hệ số K
             </h3>
             <p className="text-xs text-muted-foreground">
-              Công văn 2392/TCT-QLRR · Chu kỳ giám sát Q3/2026
+              Ngưỡng nội bộ Điều 4.3 Tax-SOP-2026 · Chu kỳ giám sát Q3/2026
             </p>
           </div>
         </div>

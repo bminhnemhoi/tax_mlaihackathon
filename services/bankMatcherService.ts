@@ -196,7 +196,7 @@ export function applyAutoMatchToDatabase(matches: InvoiceBankMatch[], user: AppU
 
 /**
  * QUY TẮC GỘP NHIỀU HÓA ĐƠN TRONG NGÀY >= 5.000.000 VNĐ (Luật Thuế GTGT 48/2024/QH15)
- * Căn cứ: Khoản 2 Điều 14 Luật 48/2024/QH15 & Khoản 1 Điều 9 Luật 67/2025/QH15
+ * Căn cứ: khoản 3 Điều 26 NĐ 181/2025/NĐ-CP (từ 01/7/2025); khoản 5 Điều 15 TT 219/2013/TT-BTC (trước đó)
  */
 export function checkSameDayMultipleInvoicesRule(
   currentInvoice: InvoiceInput,

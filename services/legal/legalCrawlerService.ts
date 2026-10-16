@@ -28,7 +28,8 @@ export const OFFICIAL_2026_TAX_LEGAL_UPDATES: CrawledLegalDoc[] = [
     publishedDate: '2026-06-15',
     effectiveFrom: '2026-07-01',
     summary: 'Chuẩn hóa cấu trúc hóa đơn điện tử XML gốc, chế độ xác thực mã Cục Thuế và quy định gửi Mẫu 04/SS-HĐĐT khi sai sót chỉ tiêu người mua.',
-    content: `Điều 1. Phạm vi điều chỉnh và đối tượng áp dụng
+    content: `[DỮ LIỆU MẪU MÔ PHỎNG cho tính năng cập nhật văn bản (beta) — không phải nguyên văn; căn cứ đã đối chiếu xem data/regulatoryRegistry.ts]
+Điều 1. Phạm vi điều chỉnh và đối tượng áp dụng
 Nghị định này quy định về việc quản lý, sử dụng hóa đơn điện tử khi bán hàng hóa, cung cấp dịch vụ.
 Điều 2. Nguyên tắc khởi tạo và lưu trữ hóa đơn điện tử
 1. Hóa đơn điện tử phải được khởi tạo, gửi, nhận, lưu trữ và quản lý bằng phương tiện điện tử theo định dạng chuẩn dữ liệu XML do Tổng cục Thuế quy định.
@@ -45,7 +46,8 @@ Hóa đơn điện tử bắt buộc phải có chữ ký số hợp lệ của 
     publishedDate: '2026-06-25',
     effectiveFrom: '2026-07-01',
     summary: 'Quy định chi tiết việc đối soát mã Cục Thuế, xử lý hóa đơn điện tử khởi tạo từ máy tính tiền và biên lai thuế.',
-    content: `Điều 5. Xử lý hóa đơn điều chỉnh và hóa đơn thay thế
+    content: `[DỮ LIỆU MẪU MÔ PHỎNG cho tính năng cập nhật văn bản (beta) — không phải nguyên văn; căn cứ đã đối chiếu xem data/regulatoryRegistry.ts]
+Điều 5. Xử lý hóa đơn điều chỉnh và hóa đơn thay thế
 1. Khi lập hóa đơn điều chỉnh hoặc hóa đơn thay thế, người bán phải ghi rõ thông tin: "Điều chỉnh/thay thế cho hóa đơn Mẫu số... Ký hiệu... Số... ngày... tháng... năm...".
 2. Trường hợp điều chỉnh giảm giá trị, các chỉ tiêu phản ánh số âm để phục vụ tự động trừ doanh thu và thuế GTGT đầu ra, đầu vào.`,
     sourceUrl: 'https://mof.gov.vn/webcenter/portal/vbtwqppl',
@@ -58,7 +60,8 @@ Hóa đơn điện tử bắt buộc phải có chữ ký số hợp lệ của 
     publishedDate: '2026-04-10',
     effectiveFrom: '2026-06-01',
     summary: 'Hướng dẫn điều kiện khấu trừ chi phí vé máy bay điện tử và ngoại lệ thanh toán hoàn ứng ủy quyền cá nhân cho nhân viên.',
-    content: `Điều 6. Các khoản chi phí được trừ khi xác định thu nhập chịu thuế TNDN
+    content: `[DỮ LIỆU MẪU MÔ PHỎNG cho tính năng cập nhật văn bản (beta) — không phải nguyên văn; căn cứ đã đối chiếu xem data/regulatoryRegistry.ts]
+Điều 6. Các khoản chi phí được trừ khi xác định thu nhập chịu thuế TNDN
 1. Doanh nghiệp được tính vào chi phí được trừ nếu đáp ứng đủ:
 a) Khoản chi thực tế phát sinh liên quan đến hoạt động sản xuất, kinh doanh.
 b) Có đủ hóa đơn, chứng từ hợp pháp theo quy định.
@@ -74,7 +77,8 @@ c) Có chứng từ thanh toán không dùng tiền mặt đối với hóa đơ
     publishedDate: '2026-05-18',
     effectiveFrom: '2026-05-18',
     summary: 'Chỉ đạo toàn ngành thuế theo dõi sát sao hệ số K (tổng giá trị hàng hóa mua vào so với doanh thu bán ra), cảnh báo rủi ro hóa đơn bất thường.',
-    content: `Kính gửi: Cục Thuế các tỉnh, thành phố trực thuộc Trung ương.
+    content: `[DỮ LIỆU MẪU MÔ PHỎNG cho tính năng cập nhật văn bản (beta) — không phải nguyên văn; căn cứ đã đối chiếu xem data/regulatoryRegistry.ts]
+Kính gửi: Cục Thuế các tỉnh, thành phố trực thuộc Trung ương.
 Nhằm ngăn chặn kịp thời hành vi mua bán hóa đơn bất hợp pháp, Tổng cục Thuế yêu cầu:
 1. Áp dụng thuật toán giám sát hệ số K = (Tổng giá trị mua vào + Tồn kho đầu kỳ) / Doanh thu bán ra.
 2. Khi hệ số K vượt ngưỡng 1.35 hoặc giảm dưới 0.95 bất thường mà không có giải trình căn cứ hàng hóa nhập kho/dự trữ theo chu kỳ kinh doanh, cơ quan thuế xếp doanh nghiệp vào diện rủi ro cao (Nhóm 3) để kiểm tra đột xuất.`,
@@ -88,11 +92,12 @@ Nhằm ngăn chặn kịp thời hành vi mua bán hóa đơn bất hợp pháp,
     publishedDate: '2024-11-26',
     effectiveFrom: '2025-07-01',
     summary: 'Bãi bỏ ngưỡng 20.000.000 VNĐ cũ, quy định ngưỡng thanh toán không dùng tiền mặt bắt buộc là 5.000.000 VNĐ.',
-    content: `Điều 15. Điều kiện khấu trừ thuế giá trị gia tăng đầu vào
+    content: `[DỮ LIỆU MẪU MÔ PHỎNG cho tính năng cập nhật văn bản (beta) — không phải nguyên văn; căn cứ đã đối chiếu xem data/regulatoryRegistry.ts]
+Điều 15. Điều kiện khấu trừ thuế giá trị gia tăng đầu vào
 1. Có hóa đơn giá trị gia tăng hợp pháp của hàng hóa, dịch vụ mua vào.
 2. Có chứng từ thanh toán không dùng tiền mặt đối với hàng hóa, dịch vụ mua vào từng lần từ 5.000.000 đồng trở lên (đã bao gồm thuế giá trị gia tăng).
 Trường hợp mua hàng hóa, dịch vụ của một nhà cung cấp có giá trị dưới 5.000.000 đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ 5.000.000 đồng trở lên thì chỉ được khấu trừ thuế đối với trường hợp có chứng từ thanh toán không dùng tiền mặt.`,
-    sourceUrl: 'https://vanban.chinhphu.vn/?docid=214188',
+    sourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=212476',
     affectedRules: ['RULE_5M_THRESHOLD']
   },
   {
@@ -103,7 +108,8 @@ Trường hợp mua hàng hóa, dịch vụ của một nhà cung cấp có giá
     effectiveFrom: '2025-07-01',
     effectiveTo: '2026-12-31',
     summary: 'Giảm 2% thuế suất thuế GTGT (từ 10% xuống 8%) áp dụng đối với các nhóm hàng hóa, dịch vụ đang áp dụng mức thuế suất 10%, trừ 10 nhóm loại trừ.',
-    content: `Điều 1. Giảm thuế giá trị gia tăng
+    content: `[DỮ LIỆU MẪU MÔ PHỎNG cho tính năng cập nhật văn bản (beta) — không phải nguyên văn; căn cứ đã đối chiếu xem data/regulatoryRegistry.ts]
+Điều 1. Giảm thuế giá trị gia tăng
 1. Giảm 2% thuế suất thuế giá trị gia tăng, áp dụng đối với các nhóm hàng hóa, dịch vụ đang áp dụng mức thuế suất 10% (còn 8%), trừ một số nhóm hàng hóa, dịch vụ sau:
 a) Viễn thông, hoạt động tài chính, ngân hàng, chứng khoán, bảo hiểm, kinh doanh bất động sản, kim loại và sản phẩm từ kim loại đúc sẵn, sản phẩm khai khoáng (không kể khai thác than), than cốc, dầu mỏ tinh chế, sản phẩm hóa chất.
 b) Sản phẩm hàng hóa và dịch vụ chịu thuế tiêu thụ đặc biệt.`,

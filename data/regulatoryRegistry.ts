@@ -2,6 +2,10 @@
  * DANH MỤC VĂN BẢN QUY PHẠM PHÁP LUẬT & QUẢN LÝ PHIÊN BẢN THEO THỜI GIAN (TEMPORAL LEGAL REGISTRY)
  * Đồng bộ Khung Pháp lý Thuế Hiện hành (Niên độ 2025 - 2026)
  * Đảm bảo Context AI đối chiếu đúng Luật, Nghị định, Thông tư có hiệu lực tại thời điểm xuất hóa đơn.
+ *
+ * Đối chiếu ngày 17/10/2026: mọi officialUrl có docid trên vanban.chinhphu.vn đã mở đúng văn bản; trích dẫn "nguyên văn" chỉ giữ
+ * những câu đã đối chiếu với bản PDF chính thức (bản quét, đọc bằng OCR — có thể lệch vài ký tự). Văn bản hoặc nội dung chưa
+ * đối chiếu được ghi rõ "chưa đối chiếu nguyên văn"; engine không dựa vào chúng để kết luận.
  */
 
 import { LegalCitation } from '@/lib/schemas';
@@ -19,6 +23,8 @@ export interface RegulatoryDocument {
   officialUrl?: string;
 }
 
+const UNVERIFIED = 'Nguồn thứ cấp — chưa đối chiếu nguyên văn; engine không dùng văn bản này để kết luận.';
+
 export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
   // --- KHUNG PHÁP LUẬT 2025 - 2026 HIỆN HÀNH ---
   {
@@ -28,14 +34,41 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
     issuer: 'QUỐC HỘI',
     effectiveFrom: '2025-07-01',
     status: 'ACTIVE',
-    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=212450',
+    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=212476',
     keyRules: [
-      'Ngưỡng thanh toán không dùng tiền mặt bắt buộc: Hàng hóa, dịch vụ mua vào từng lần từ 5.000.000 VNĐ trở lên (đã bao gồm VAT) phải có chứng từ thanh toán không dùng tiền mặt để được khấu trừ thuế GTGT',
-      'Chấp nhận các phương thức thanh toán không tiền mặt hợp lệ: Ủy nhiệm chi ngân hàng, thẻ doanh nghiệp, ví điện tử định danh doanh nghiệp, bù trừ công nợ hợp pháp, và hoàn ứng nhân viên có ủy quyền theo quy chế',
-      'Hóa đơn dưới 5 triệu mua nhiều lần trong cùng ngày của cùng một nhà cung cấp có tổng giá trị từ 5 triệu trở lên bắt buộc phải chuyển khoản qua ngân hàng',
-      'Điều kiện khấu trừ: Phải có hóa đơn GTGT hợp pháp ghi nhận đúng tên, địa chỉ, mã số thuế người mua'
+      'Điểm b khoản 2 Điều 14: có chứng từ thanh toán không dùng tiền mặt đối với hàng hóa, dịch vụ mua vào, trừ một số trường hợp đặc thù theo quy định của Chính phủ — ngưỡng 5 triệu đồng do Điều 26 Nghị định 181/2025/NĐ-CP quy định',
+      'Điểm a khoản 2 Điều 14: điều kiện về hóa đơn giá trị gia tăng để khấu trừ thuế GTGT đầu vào'
     ],
-    summary: 'Quy định then chốt bãi bỏ ngưỡng 20 triệu cũ, áp dụng ngưỡng 5 triệu đồng cho điều kiện khấu trừ thuế GTGT đầu vào.'
+    summary: 'Luật Thuế GTGT hiện hành: nêu nguyên tắc khấu trừ và chứng từ thanh toán không dùng tiền mặt; ngưỡng cụ thể nằm ở Nghị định 181/2025/NĐ-CP.'
+  },
+  {
+    id: 'ND-181-2025',
+    code: '181/2025/NĐ-CP',
+    title: 'Nghị định quy định chi tiết thi hành một số điều của Luật Thuế giá trị gia tăng',
+    issuer: 'CHÍNH PHỦ',
+    effectiveFrom: '2025-07-01',
+    status: 'ACTIVE',
+    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=214336',
+    keyRules: [
+      'Điều 26: phải có chứng từ thanh toán không dùng tiền mặt đối với hàng hóa, dịch vụ mua vào (bao gồm cả hàng hóa nhập khẩu) từ 05 triệu đồng trở lên đã bao gồm thuế GTGT',
+      'Khoản 3 Điều 26: mua của một người nộp thuế có giá trị dưới 05 triệu đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ 05 triệu đồng trở lên thì chỉ được khấu trừ đối với trường hợp có chứng từ thanh toán không dùng tiền mặt',
+      'Khoản 1 Điều 26: không tính chứng từ bên mua nộp tiền mặt vào tài khoản của bên bán',
+      'Điểm g khoản 2 Điều 26 (sửa đổi bởi Nghị định 144/2026/NĐ-CP, hiệu lực 20/6/2026): hàng mua trả chậm, trả góp từ 05 triệu đồng chưa có chứng từ thanh toán do chưa đến thời điểm thanh toán theo hợp đồng vẫn được khấu trừ'
+    ],
+    summary: 'Ngưỡng 5 triệu đồng (đã gồm thuế GTGT) và quy tắc mua nhiều lần trong ngày cho điều kiện khấu trừ thuế GTGT đầu vào từ 01/7/2025. Sửa đổi bởi Nghị định 359/2025/NĐ-CP và Nghị định 144/2026/NĐ-CP (không sửa đoạn mở đầu và khoản 3 Điều 26).'
+  },
+  {
+    id: 'ND-144-2026',
+    code: '144/2026/NĐ-CP',
+    title: 'Nghị định sửa đổi, bổ sung Nghị định 181/2025/NĐ-CP (điểm g khoản 2 Điều 26)',
+    issuer: 'CHÍNH PHỦ',
+    effectiveFrom: '2026-06-20',
+    status: 'ACTIVE',
+    officialUrl: 'https://vanban.chinhphu.vn/?docid=218020&pageid=27160',
+    keyRules: [
+      'Điều 4: sửa đổi, bổ sung điểm g khoản 2 Điều 26 Nghị định 181/2025/NĐ-CP — hàng mua trả chậm, trả góp từ 05 triệu đồng chưa có chứng từ thanh toán do chưa đến thời điểm thanh toán theo hợp đồng vẫn được khấu trừ'
+    ],
+    summary: 'Sửa đổi điều kiện chứng từ thanh toán đối với hàng mua trả chậm, trả góp; không sửa khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP.'
   },
   {
     id: 'NQ-204-2025',
@@ -45,30 +78,30 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
     effectiveFrom: '2025-07-01',
     effectiveTo: '2026-12-31',
     status: 'ACTIVE',
-    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=213890',
+    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=214209',
     keyRules: [
       'Tiếp tục giảm 2% thuế suất thuế GTGT (từ 10% xuống 8%) áp dụng đến hết ngày 31/12/2026',
       'DANH MỤC LOẠI TRỪ (giữ 10%), theo nguyên văn Điều 1 khoản 1: viễn thông, hoạt động tài chính, ngân hàng, chứng khoán, bảo hiểm, kinh doanh bất động sản, sản phẩm kim loại, sản phẩm khai khoáng (trừ than), sản phẩm hàng hóa và dịch vụ chịu thuế tiêu thụ đặc biệt (trừ xăng)',
-      'So với NQ 174/2024: than cốc, dầu mỏ tinh chế, sản phẩm hóa chất và hàng hóa/dịch vụ công nghệ thông tin KHÔNG còn bị loại trừ; xăng, nhiên liệu dầu, than ở mọi khâu được giảm 8% (Phụ lục NĐ 174/2025/NĐ-CP)',
-      'Dịch vụ phần mềm thuộc đối tượng không chịu thuế GTGT (trường hợp riêng, không phải 8%/10%)'
+      'So với NQ 174/2024: than cốc, dầu mỏ tinh chế, sản phẩm hóa chất và hàng hóa/dịch vụ công nghệ thông tin KHÔNG còn bị loại trừ; xăng, nhiên liệu dầu, than ở mọi khâu được giảm 8% (Phụ lục Nghị định 174/2025/NĐ-CP)'
     ],
-    summary: 'Chính sách giảm thuế GTGT 8% và danh mục ngành nghề loại trừ nghiêm ngặt áp dụng suốt niên độ 2025 - 2026.'
+    summary: 'Chính sách giảm thuế GTGT 8% và danh mục ngành nghề loại trừ áp dụng từ 01/7/2025 đến 31/12/2026.'
   },
   {
     id: 'ND-123-2020',
     code: '123/2020/NĐ-CP',
-    title: 'Nghị định quy định về hóa đơn, chứng từ điện tử (hết hiệu lực từ 01/7/2026, thay bằng NĐ 254/2026/NĐ-CP)',
+    title: 'Nghị định quy định về hóa đơn, chứng từ (sửa đổi bởi NĐ 70/2025/NĐ-CP từ 01/6/2025; thay bằng NĐ 254/2026/NĐ-CP từ 01/7/2026)',
     issuer: 'CHÍNH PHỦ',
     effectiveFrom: '2022-07-01',
     effectiveTo: '2026-06-30',
     status: 'ACTIVE',
-    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=201509',
+    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=201365',
     keyRules: [
-      'Hóa đơn điện tử có mã của cơ quan thuế bắt buộc phải có chuỗi mã xác thực MCCQT 34 ký tự hợp lệ trước khi gửi cho người mua',
-      'Hóa đơn phải phản ánh đúng tên, địa chỉ, mã số thuế của bên bán và bên mua',
-      'Thời điểm ký số và thời điểm lập hóa đơn: Trường hợp thời điểm ký số khác thời điểm lập hóa đơn thì thời điểm khai thuế là thời điểm lập hóa đơn nếu hóa đơn đáp ứng tính hợp pháp'
+      'Điểm a khoản 2 Điều 3: hóa đơn điện tử có mã của cơ quan thuế được cơ quan thuế cấp mã trước khi gửi cho người mua; mã gồm số giao dịch duy nhất và chuỗi ký tự do cơ quan thuế mã hóa (độ dài 34 ký tự theo đặc tả kỹ thuật của cơ quan thuế — nguồn thứ cấp)',
+      'Điều 10: nội dung hóa đơn — khoản 5 tên, địa chỉ, mã số thuế người mua; khoản 10 mã của cơ quan thuế đối với hóa đơn có mã',
+      'Khoản 9 Điều 10 (đến 31/5/2025): thời điểm ký số khác thời điểm lập thì thời điểm khai thuế là thời điểm lập hóa đơn; từ 01/6/2025 (sửa đổi bởi Nghị định 70/2025/NĐ-CP): người bán khai theo thời điểm lập hóa đơn, người mua khai theo thời điểm nhận hóa đơn đúng, đủ về hình thức và nội dung',
+      'Điều 16 (sửa đổi bởi NĐ 70/2025/NĐ-CP): ngừng sử dụng hóa đơn điện tử khi chấm dứt hiệu lực mã số thuế hoặc tạm ngừng kinh doanh'
     ],
-    summary: 'Nghị định nền tảng của Chính phủ quy định toàn diện về chế độ quản lý và sử dụng hóa đơn điện tử tại Việt Nam.'
+    summary: 'Nghị định nền tảng về hóa đơn điện tử áp dụng cho hóa đơn lập trước 01/7/2026.'
   },
   {
     id: 'TT-78-2021',
@@ -78,13 +111,12 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
     effectiveFrom: '2022-07-01',
     effectiveTo: '2025-05-31',
     status: 'ACTIVE',
-    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=204090',
+    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=204200',
     keyRules: [
-      'Quy chuẩn cấu trúc ký hiệu hóa đơn 6 ký tự: Ký tự 1 (loại HĐ), ký tự 2 (C: có mã, K: không mã), 2 ký tự 3-4 (năm phát hành), ký tự 5 (loại hình), 2 ký tự cuối (quản lý nội bộ)',
-      'Hai chữ số năm trên ký hiệu hóa đơn phải tương ứng với năm phát hành hóa đơn',
-      'Xử lý hóa đơn điện tử sai sót: Lập hóa đơn điều chỉnh hoặc hóa đơn thay thế và gửi mẫu 04/SS-HĐĐT cho cơ quan thuế'
+      'Điểm a khoản 1 Điều 4: ký hiệu mẫu số hóa đơn là một chữ số tự nhiên từ 1 đến 6 phản ánh loại hóa đơn',
+      'Điểm b khoản 1 Điều 4: ký hiệu hóa đơn gồm 6 ký tự — C (có mã) hoặc K (không mã), hai chữ số cuối của năm lập hóa đơn, một chữ cái thể hiện loại hóa đơn, hai ký tự do người bán tự xác định'
     ],
-    summary: 'Thông tư hướng dẫn chi tiết về cấu trúc ký hiệu, mã cơ quan thuế và xử lý sai sót hóa đơn điện tử.'
+    summary: 'Hướng dẫn cấu trúc ký hiệu mẫu số và ký hiệu hóa đơn điện tử (áp dụng cho hóa đơn lập trước 01/6/2025).'
   },
   {
     id: 'TT-32-2025',
@@ -94,33 +126,32 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
     effectiveFrom: '2025-06-01',
     effectiveTo: '2026-06-30',
     status: 'ACTIVE',
-    officialUrl: 'https://luatvietnam.vn/thue/thong-tu-32-2025-tt-btc-huong-dan-luat-quan-ly-thue-va-nghi-dinh-ve-hoa-don-chung-tu-401781-d1.html',
+    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=213855',
     keyRules: [
-      'Ký hiệu mẫu số và ký hiệu hóa đơn: hai chữ số năm trong ký hiệu thể hiện năm lập hóa đơn',
-      'Xử lý hóa đơn điện tử có sai sót; hóa đơn điện tử khởi tạo từ máy tính tiền'
+      'Điểm b khoản 1 Điều 5: hai chữ số năm trong ký hiệu hóa đơn thể hiện năm lập hóa đơn',
+      'Hướng dẫn hóa đơn điện tử có sai sót và hóa đơn khởi tạo từ máy tính tiền (điều khoản cụ thể chưa đối chiếu nguyên văn)'
     ],
     summary: 'Thông tư hướng dẫn hóa đơn điện tử áp dụng từ 01/6/2025 đến 30/6/2026.'
   },
   {
     id: 'ND-254-2026',
     code: '254/2026/NĐ-CP',
-    title: 'Nghị định quy định về hóa đơn, chứng từ điện tử, hướng dẫn Luật Quản lý thuế 108/2025/QH15 (thay NĐ 123/2020 và NĐ 70/2025; kèm TT 91/2026/TT-BTC)',
+    title: 'Nghị định quy định chi tiết một số điều và biện pháp để tổ chức, hướng dẫn thi hành Luật Quản lý thuế số 108/2025/QH15 về hóa đơn điện tử, chứng từ điện tử',
     issuer: 'CHÍNH PHỦ',
     effectiveFrom: '2026-07-01',
     status: 'ACTIVE',
     officialUrl: 'https://vanban.chinhphu.vn/?docid=218689&pageid=27160',
     keyRules: [
-      'Bắt buộc lưu trữ và đối soát dữ liệu hóa đơn điện tử gốc định dạng XML có chữ ký số CA hợp lệ',
-      'Hóa đơn điều chỉnh/thay thế bắt buộc phải ghi rõ thông tin tham chiếu Số hóa đơn, Ký hiệu, Ngày lập của hóa đơn gốc',
-      'Cơ chế xử lý sai sót: Trường hợp sai tên hoặc địa chỉ người mua nhưng ĐÚNG MÃ SỐ THUẾ thì gửi Mẫu 04/SS-HĐĐT cho Cục Thuế, hóa đơn vẫn được khấu trừ bình thường, không phải hủy bỏ',
-      'Hóa đơn xuất sau thời điểm bên bán bị cơ quan thuế thông báo đóng MST hoặc bỏ trốn là hóa đơn bất hợp pháp 100%'
+      'Khoản 2 Điều 43: Nghị định 123/2020/NĐ-CP và Nghị định 70/2025/NĐ-CP hết hiệu lực từ 01/7/2026',
+      'Hướng dẫn chi tiết tại Thông tư 91/2026/TT-BTC; ký hiệu hóa đơn theo Điều 4 và Phụ lục I Thông tư 91/2026/TT-BTC',
+      'Các nội dung cụ thể khác của Nghị định chưa đối chiếu nguyên văn trong bộ quy tắc này; engine chỉ viện dẫn số hiệu văn bản'
     ],
-    summary: 'Khung pháp lý cao nhất về hóa đơn điện tử thế hệ mới và cơ chế xử lý sai sót chứng từ điện tử.'
+    summary: 'Khung pháp lý về hóa đơn điện tử áp dụng cho hóa đơn lập từ 01/7/2026.'
   },
   {
     id: 'TT-89-2026',
     code: '89/2026/TT-BTC',
-    title: 'Thông tư hướng dẫn về mẫu biểu hồ sơ khai thuế GTGT',
+    title: 'Thông tư hướng dẫn về mẫu biểu hồ sơ khai thuế GTGT (chưa đối chiếu nguyên văn)',
     issuer: 'BỘ TÀI CHÍNH',
     effectiveFrom: '2026-07-01',
     status: 'ACTIVE',
@@ -132,27 +163,26 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
       'Chỉ tiêu [30] & [31]: Doanh thu và thuế GTGT đầu ra áp dụng thuế suất ưu đãi giảm 8%',
       'Chỉ tiêu [32] & [33]: Doanh thu và thuế GTGT đầu ra áp dụng thuế suất chuẩn 10%'
     ],
-    summary: 'Quy chuẩn biểu mẫu Tờ khai thuế GTGT 01/GTGT mới nhất của Bộ Tài chính.'
+    summary: 'Biểu mẫu Tờ khai thuế GTGT 01/GTGT dùng cho tính năng mở rộng (beta). ' + UNVERIFIED
   },
   {
     id: 'LUAT-67-2025',
     code: '67/2025/QH15',
-    title: 'Luật Thuế Thu nhập doanh nghiệp số 67/2025/QH15 (kèm NĐ 320/2025/NĐ-CP)',
+    title: 'Luật Thuế Thu nhập doanh nghiệp số 67/2025/QH15 (kèm NĐ 320/2025/NĐ-CP) (chưa đối chiếu nguyên văn)',
     issuer: 'QUỐC HỘI',
     effectiveFrom: '2026-01-01',
     status: 'ACTIVE',
-    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=214020',
     keyRules: [
       'Áp dụng thuế suất TNDN phân tầng linh hoạt: 15% (Doanh thu năm <= 3 tỷ đồng - DN siêu nhỏ); 17% (Doanh thu năm từ trên 3 đến 50 tỷ đồng - SME); 20% (Doanh thu năm trên 50 tỷ đồng - phổ thông)',
       'Ngưỡng chi phí được trừ: Khoản chi mua hàng hóa, dịch vụ từ 5 triệu đồng trở lên phải có chứng từ thanh toán không dùng tiền mặt',
       'Quy tắc tạm nộp thuế TNDN theo quý: Tổng 4 quý phải đạt tối thiểu 80% số thuế quyết toán năm'
     ],
-    summary: 'Thuế suất TNDN phân tầng nuôi dưỡng SME và đồng bộ ngưỡng thanh toán 5 triệu đồng vào chi phí được trừ.'
+    summary: 'Thuế TNDN — ngoài phạm vi quyết định khấu trừ GTGT của Đề A. ' + UNVERIFIED
   },
   {
     id: 'LUAT-109-2025',
     code: '109/2025/QH15',
-    title: 'Luật Thuế Thu nhập cá nhân số 109/2025/QH15 & NQ 110/2025/UBTVQH15 (kèm TT 87/2026/TT-BTC)',
+    title: 'Luật Thuế Thu nhập cá nhân số 109/2025/QH15 & NQ 110/2025/UBTVQH15 (kèm TT 87/2026/TT-BTC) (chưa đối chiếu nguyên văn)',
     issuer: 'QUỐC HỘI',
     effectiveFrom: '2026-01-01',
     status: 'ACTIVE',
@@ -162,28 +192,27 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
       'Biểu thuế lũy tiến từng phần rút gọn 5 bậc: 5%, 10%, 20%, 30%, 35%',
       'Khấu trừ thuế thu nhập vãng lai/thời vụ: Khấu trừ 10% tại nguồn cho mỗi lần chi trả từ 5.000.000 VNĐ trở lên'
     ],
-    summary: 'Quy định về thuế TNCN mới, mức giảm trừ gia cảnh nâng cao và ngưỡng khấu trừ vãng lai 5 triệu đồng.'
+    summary: 'Thuế TNCN — ngoài phạm vi quyết định khấu trừ GTGT của Đề A. ' + UNVERIFIED
   },
   {
     id: 'CV-2392-TCT',
     code: '2392/TCT-QLRR',
-    title: 'Công văn Tổng cục Thuế về quản trị rủi ro hóa đơn điện tử và Tham số nguồn hàng K (kèm TT 94/2026/TT-BTC)',
+    title: 'Công văn Tổng cục Thuế về quản trị rủi ro hóa đơn điện tử và Tham số nguồn hàng K (chưa đối chiếu nguyên văn)',
     issuer: 'TỔNG CỤC THUẾ',
     effectiveFrom: '2023-06-20',
     status: 'ACTIVE',
     officialUrl: 'https://www.gdt.gov.vn',
     keyRules: [
       'Áp dụng thuật toán giám sát rủi ro gian lận hóa đơn qua Tham số K = Doanh thu bán ra / (Tồn kho đầu kỳ + Mua vào trong kỳ)',
-      'Bản chất pháp lý: Tham số K là Tín hiệu Cảnh báo Rủi ro Nội bộ (Heuristic Risk Indicator) của Cơ quan Thuế, không phải tỷ số pháp lý bắt buộc trên BCTC',
-      'Dải ngưỡng tham khảo: 1.05 <= K <= 1.25 (Vùng Xanh - An toàn); K < 0.95 hoặc K > 1.35 (Vùng Đỏ - Rủi ro cao)',
-      'Hành động chuẩn mực khi K chạm Vùng Đỏ: Không được trì hoãn kê khai hợp pháp; KTT và CFO phải chủ động chuẩn bị Bộ Hồ sơ Phòng vệ Nguồn hàng (Tax Defense Dossier) để sẵn sàng giải trình'
+      'Bản chất: Tham số K là tín hiệu cảnh báo rủi ro nội bộ (heuristic), không phải tỷ số pháp lý bắt buộc',
+      'Ngưỡng vùng đỏ trong engine (K < 0,95 hoặc K > 1,35) là ngưỡng nội bộ Điều 4.3 Tax-SOP-2026'
     ],
-    summary: 'Hệ thống Heuristic giám sát rủi ro tương quan Xuất - Nhập - Tồn kho của ngành Thuế.'
+    summary: 'Heuristic giám sát tương quan Xuất - Nhập - Tồn kho. ' + UNVERIFIED
   },
   {
     id: 'ND-255-2026',
     code: '255/2026/NĐ-CP',
-    title: 'Nghị định quy định về quản lý thuế đối với doanh nghiệp có giao dịch liên kết',
+    title: 'Nghị định quy định về quản lý thuế đối với doanh nghiệp có giao dịch liên kết (chưa đối chiếu nguyên văn)',
     issuer: 'CHÍNH PHỦ',
     effectiveFrom: '2026-07-01',
     status: 'ACTIVE',
@@ -192,21 +221,22 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
       'Khống chế trần chi phí lãi vay được trừ khi tính thuế TNDN ở mức 30% EBITDA',
       'Phần chi phí lãi vay vượt mức 30% EBITDA được chuyển sang kỳ tính thuế tiếp theo trong thời hạn tối đa 5 năm'
     ],
-    summary: 'Trần khống chế chi phí lãi vay 30% EBITDA đối với doanh nghiệp có quan hệ liên kết.'
+    summary: 'Giao dịch liên kết — ngoài phạm vi quyết định khấu trừ GTGT của Đề A. ' + UNVERIFIED
   },
 
   // --- VĂN BẢN LỊCH SỬ PHỤC VỤ ĐỐI SOÁT HỒI TỐ (HISTORICAL / LEGACY) ---
   {
     id: 'TT-219-2013',
     code: '219/2013/TT-BTC',
-    title: 'Thông tư hướng dẫn thi hành Luật Thuế giá trị gia tăng (Khung cũ trước 01/07/2025)',
+    title: 'Thông tư hướng dẫn thi hành Luật Thuế giá trị gia tăng (Khung cũ trước 01/07/2025; VBHN 01/VBHN-BTC)',
     issuer: 'BỘ TÀI CHÍNH',
     effectiveFrom: '2014-01-01',
     effectiveTo: '2025-06-30',
     status: 'EXPIRED',
-    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=171954',
+    officialUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=209521',
     keyRules: [
-      'Ngưỡng thanh toán không dùng tiền mặt cũ: Hóa đơn từ 20.000.000 VNĐ trở lên bắt buộc phải có chứng từ ngân hàng',
+      'Khoản 2 Điều 15: hàng hóa, dịch vụ mua vào từ hai mươi triệu đồng trở lên phải có chứng từ thanh toán không dùng tiền mặt',
+      'Khoản 5 Điều 15: mua của một nhà cung cấp có giá trị dưới hai mươi triệu đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ hai mươi triệu đồng trở lên thì chỉ được khấu trừ đối với trường hợp có chứng từ thanh toán qua ngân hàng',
       'Áp dụng cho các hóa đơn phát sinh trước ngày 01/07/2025'
     ],
     summary: 'Khung pháp lý cũ với ngưỡng thanh toán không dùng tiền mặt 20 triệu đồng (hết hiệu lực từ 01/07/2025).'
@@ -214,6 +244,7 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
 ];
 
 // --- CĂN CỨ PHÁP LÝ CHUẨN MỰC (LEGAL CITATIONS REGISTRY - MODULE 7) ---
+// exactQuote chỉ chứa câu đã đối chiếu với bản PDF chính thức (OCR, có thể lệch vài ký tự); "…" đánh dấu phần lược.
 export const LEGAL_CITATIONS_REGISTRY: Record<string, LegalCitation> = {
   'LUAT-48-2024-D14-K2': {
     documentCode: '48/2024/QH15',
@@ -221,21 +252,44 @@ export const LEGAL_CITATIONS_REGISTRY: Record<string, LegalCitation> = {
     issuingAuthority: 'Quốc hội',
     article: 'Điều 14',
     clause: 'Khoản 2',
+    point: 'Điểm b',
     effectiveFrom: '2025-07-01',
-    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=212450',
-    exactQuote: 'Hàng hóa, dịch vụ mua vào từng lần theo hóa đơn từ 05 triệu đồng trở lên phải có chứng từ thanh toán không dùng tiền mặt, trừ trường hợp đặc thù theo quy định của Chính phủ.',
-    summary: 'Quy định điều kiện khấu trừ thuế GTGT đầu vào bắt buộc phải có chứng từ thanh toán không dùng tiền mặt với hóa đơn từ 5 triệu đồng trở lên.'
+    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=212476',
+    exactQuote: 'Có chứng từ thanh toán không dùng tiền mặt đối với hàng hóa, dịch vụ mua vào, trừ một số trường hợp đặc thù theo quy định của Chính phủ',
+    summary: 'Nguyên tắc chứng từ thanh toán không dùng tiền mặt để khấu trừ thuế GTGT đầu vào; ngưỡng 5 triệu đồng quy định tại Điều 26 Nghị định 181/2025/NĐ-CP.'
   },
-  'LUAT-48-2024-D14-K1': {
-    documentCode: '48/2024/QH15',
-    documentTitle: 'Luật Thuế Giá trị gia tăng số 48/2024/QH15',
-    issuingAuthority: 'Quốc hội',
-    article: 'Điều 14',
-    clause: 'Khoản 1',
+  'ND-181-2025-D26': {
+    documentCode: '181/2025/NĐ-CP',
+    documentTitle: 'Nghị định quy định chi tiết thi hành một số điều của Luật Thuế giá trị gia tăng',
+    issuingAuthority: 'Chính phủ',
+    article: 'Điều 26',
     effectiveFrom: '2025-07-01',
-    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=212450',
-    exactQuote: 'Thuế giá trị gia tăng đầu vào của hàng hóa, dịch vụ sử dụng cho sản xuất, kinh doanh hàng hóa, dịch vụ chịu thuế giá trị gia tăng được khấu trừ toàn bộ nếu có hóa đơn giá trị gia tăng hợp pháp ghi đúng tên, địa chỉ, mã số thuế người mua.',
-    summary: 'Hóa đơn phải ghi nhận chính xác mã số thuế và tên người mua để được khấu trừ thuế GTGT đầu vào.'
+    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=214336',
+    exactQuote: 'Cơ sở kinh doanh phải có chứng từ thanh toán không dùng tiền mặt đối với hàng hóa, dịch vụ mua vào (bao gồm cả hàng hóa nhập khẩu) từ 05 triệu đồng trở lên đã bao gồm thuế giá trị gia tăng.',
+    summary: 'Ngưỡng 5 triệu đồng (đã gồm thuế GTGT) cho điều kiện chứng từ thanh toán không dùng tiền mặt từ 01/7/2025.'
+  },
+  'ND-181-2025-D26-K3': {
+    documentCode: '181/2025/NĐ-CP',
+    documentTitle: 'Nghị định quy định chi tiết thi hành một số điều của Luật Thuế giá trị gia tăng',
+    issuingAuthority: 'Chính phủ',
+    article: 'Điều 26',
+    clause: 'Khoản 3',
+    effectiveFrom: '2025-07-01',
+    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=214336',
+    exactQuote: 'Trường hợp mua hàng hóa, dịch vụ của một người nộp thuế có giá trị dưới 05 triệu đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ 05 triệu đồng trở lên thì chỉ được khấu trừ thuế đối với trường hợp có chứng từ thanh toán không dùng tiền mặt.',
+    summary: 'Mua nhiều lần trong ngày của cùng một người bán, mỗi lần dưới 5 triệu nhưng tổng từ 5 triệu đồng trở lên.'
+  },
+  'TT-219-2013-D15-K5': {
+    documentCode: '219/2013/TT-BTC',
+    documentTitle: 'Thông tư hướng dẫn thi hành Luật Thuế giá trị gia tăng (VBHN 01/VBHN-BTC)',
+    issuingAuthority: 'Bộ Tài chính',
+    article: 'Điều 15',
+    clause: 'Khoản 5',
+    effectiveFrom: '2014-01-01',
+    effectiveTo: '2025-06-30',
+    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=209521',
+    exactQuote: 'Trường hợp mua hàng hóa, dịch vụ của một nhà cung cấp có giá trị dưới hai mươi triệu đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ hai mươi triệu đồng trở lên thì chỉ được khấu trừ thuế đối với trường hợp có chứng từ thanh toán qua ngân hàng.',
+    summary: 'Quy tắc mua nhiều lần trong ngày với ngưỡng 20 triệu đồng, áp dụng cho hóa đơn lập trước 01/7/2025.'
   },
   'NQ-204-2025-D1': {
     documentCode: '204/2025/QH15',
@@ -244,42 +298,33 @@ export const LEGAL_CITATIONS_REGISTRY: Record<string, LegalCitation> = {
     article: 'Điều 1',
     effectiveFrom: '2025-07-01',
     effectiveTo: '2026-12-31',
-    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=213890',
+    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=214209',
     exactQuote: 'Giảm 2% thuế suất thuế giá trị gia tăng, áp dụng đối với các nhóm hàng hóa, dịch vụ quy định tại khoản 3 Điều 9 … trừ một số nhóm hàng hóa, dịch vụ sau: viễn thông, hoạt động tài chính, ngân hàng, chứng khoán, bảo hiểm, kinh doanh bất động sản, sản phẩm kim loại, sản phẩm khai khoáng (trừ than), sản phẩm hàng hóa và dịch vụ chịu thuế tiêu thụ đặc biệt (trừ xăng).',
     summary: 'Giảm 2% thuế suất thuế GTGT từ 01/7/2025 đến 31/12/2026; xăng và than được giảm, kim loại/viễn thông/TTĐB khác vẫn 10%.'
   },
-  'LUAT-67-2025-D9-K1': {
-    documentCode: '67/2025/QH15',
-    documentTitle: 'Luật Thuế Thu nhập doanh nghiệp số 67/2025/QH15',
-    issuingAuthority: 'Quốc hội',
-    article: 'Điều 9',
-    clause: 'Khoản 1',
-    point: 'Điểm b',
-    effectiveFrom: '2026-01-01',
-    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=214020',
-    exactQuote: 'Khoản chi nếu có hóa đơn mua hàng hóa, dịch vụ từng lần có giá trị từ 05 triệu đồng trở lên (giá đã bao gồm thuế giá trị gia tăng) khi thanh toán phải có chứng từ thanh toán không dùng tiền mặt.',
-    summary: 'Đồng bộ điều kiện chi phí được trừ khi tính thuế TNDN với ngưỡng không dùng tiền mặt từ 5 triệu đồng trở lên.'
-  },
   'ND-123-2020-D10-K9': {
     documentCode: '123/2020/NĐ-CP',
-    documentTitle: 'Nghị định quy định về hóa đơn, chứng từ điện tử',
+    documentTitle: 'Nghị định quy định về hóa đơn, chứng từ',
     issuingAuthority: 'Chính phủ',
     article: 'Điều 10',
     clause: 'Khoản 9',
     effectiveFrom: '2022-07-01',
-    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=201509',
-    exactQuote: 'Thời điểm ký số trên hóa đơn điện tử là thời điểm người bán, người mua sử dụng chữ ký số để ký trên hóa đơn điện tử được hiển thị theo định dạng ngày, tháng, năm của năm dương lịch. Trường hợp thời điểm ký số khác thời điểm lập hóa đơn thì thời điểm khai thuế là thời điểm lập hóa đơn.',
-    summary: 'Quy định về thời điểm lập và thời điểm ký số trên hóa đơn điện tử.'
+    effectiveTo: '2025-05-31',
+    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=201365',
+    exactQuote: '… Trường hợp hóa đơn điện tử đã lập có thời điểm ký số trên hóa đơn khác thời điểm lập hóa đơn thì thời điểm khai thuế là thời điểm lập hóa đơn.',
+    summary: 'Thời điểm ký số khác thời điểm lập hóa đơn (bản gốc, áp dụng đến 31/5/2025; từ 01/6/2025 khoản 9 được thay bởi Nghị định 70/2025/NĐ-CP: người mua khai theo thời điểm nhận hóa đơn đúng, đủ hình thức và nội dung).'
   },
-  'ND-123-2020-D14': {
+  'ND-123-2020-D3-K2': {
     documentCode: '123/2020/NĐ-CP',
-    documentTitle: 'Nghị định quy định về hóa đơn, chứng từ điện tử',
+    documentTitle: 'Nghị định quy định về hóa đơn, chứng từ',
     issuingAuthority: 'Chính phủ',
-    article: 'Điều 14',
+    article: 'Điều 3',
+    clause: 'Khoản 2',
+    point: 'Điểm a',
     effectiveFrom: '2022-07-01',
-    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=201509',
-    exactQuote: 'Hóa đơn điện tử có mã của cơ quan thuế là hóa đơn điện tử được cơ quan thuế cấp mã trước khi tổ chức, cá nhân bán hàng hóa, cung cấp dịch vụ gửi cho người mua. Mã của cơ quan thuế trên hóa đơn điện tử bao gồm số giao dịch là một dãy số duy nhất do hệ thống của cơ quan thuế tạo ra và một chuỗi ký tự do cơ quan thuế mã hóa.',
-    summary: 'Quy định bắt buộc về mã xác thực của cơ quan thuế (MCCQT 34 ký tự) đối với hóa đơn có mã.'
+    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=201365',
+    exactQuote: 'Hóa đơn điện tử có mã của cơ quan thuế … Mã của cơ quan thuế trên hóa đơn điện tử bao gồm số giao dịch là một dãy số duy nhất … và một chuỗi ký tự được cơ quan thuế mã hóa …',
+    summary: 'Định nghĩa hóa đơn điện tử có mã của cơ quan thuế; mã là nội dung của hóa đơn (khoản 10 Điều 10). Độ dài 34 ký tự theo đặc tả kỹ thuật của cơ quan thuế (nguồn thứ cấp).'
   },
   'TT-78-2021-D4-K1': {
     documentCode: '78/2021/TT-BTC',
@@ -287,21 +332,12 @@ export const LEGAL_CITATIONS_REGISTRY: Record<string, LegalCitation> = {
     issuingAuthority: 'Bộ Tài chính',
     article: 'Điều 4',
     clause: 'Khoản 1',
-    point: 'Điểm a',
+    point: 'Điểm a và điểm b',
     effectiveFrom: '2022-07-01',
-    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=204090',
-    exactQuote: 'Ký hiệu mẫu số hóa đơn điện tử là một ký tự có một chữ số tự nhiên là các số tự nhiên 1, 2, 3, 4, 5, 6 để phản ánh loại hóa đơn điện tử. Ký hiệu hóa đơn điện tử là nhóm gồm 6 ký tự gồm cả chữ viết và chữ số thể hiện các thông tin về loại hóa đơn có mã hay không có mã, năm lập hóa đơn, loại hóa đơn điện tử được sử dụng.',
-    summary: 'Quy định cấu trúc ký hiệu hóa đơn 6 ký tự và tính đồng bộ giữa 2 chữ số năm trong ký hiệu và năm phát hành.'
-  },
-  'CV-2392-TCT-QLRR': {
-    documentCode: '2392/TCT-QLRR',
-    documentTitle: 'Công văn Tổng cục Thuế về quản trị rủi ro hóa đơn điện tử và Tham số nguồn hàng K',
-    issuingAuthority: 'Tổng cục Thuế',
-    article: 'Mục 2',
-    effectiveFrom: '2023-06-20',
-    officialSourceUrl: 'https://www.gdt.gov.vn',
-    exactQuote: 'Cơ quan thuế áp dụng chỉ số K = Tổng doanh thu bán ra / (Tồn kho đầu kỳ + Tổng giá trị mua vào trong kỳ) để nhận diện các doanh nghiệp có dấu hiệu phát hành hóa đơn khống hoặc mua bán hóa đơn bất hợp pháp.',
-    summary: 'Bộ tiêu chí giám sát hệ số K và quản trị rủi ro hóa đơn gian lận của cơ quan thuế.'
+    effectiveTo: '2025-05-31',
+    officialSourceUrl: 'https://vanban.chinhphu.vn/?pageid=27160&docid=204200',
+    exactQuote: 'Ký hiệu mẫu số hóa đơn điện tử là ký tự có một chữ số tự nhiên là các số tự nhiên 1, 2, 3, 4, 5, 6 để phản ánh loại hóa đơn điện tử … Ký hiệu hóa đơn điện tử là nhóm 6 ký tự gồm cả chữ viết và chữ số thể hiện ký hiệu hóa đơn điện tử để phản ánh các thông tin về loại hóa đơn điện tử có mã của cơ quan thuế hoặc hóa đơn điện tử không mã, năm lập hóa đơn, loại hóa đơn điện tử được sử dụng …',
+    summary: 'Ký hiệu mẫu số (điểm a) và ký hiệu hóa đơn 6 ký tự, trong đó hai chữ số năm thể hiện năm lập hóa đơn (điểm b).'
   }
 };
 
@@ -351,10 +387,10 @@ export function getApplicableRegulations(invoiceDateStr: string): {
   });
 
   // Xác định ngưỡng không tiền mặt theo mốc thời gian
-  // Trước 01/07/2025: 20 triệu (TT 219/2013); Từ 01/07/2025: 5 triệu (Luật 48/2024/QH15)
+  // Trước 01/07/2025: 20 triệu (khoản 2 Điều 15 TT 219/2013); từ 01/07/2025: 5 triệu (Điều 26 NĐ 181/2025, hướng dẫn Luật 48/2024/QH15)
   const isLaw48Active = invDate >= new Date('2025-07-01');
   const nonCashThreshold = isLaw48Active ? 5_000_000 : 20_000_000;
-  const thresholdLawCode = isLaw48Active ? '48/2024/QH15' : '219/2013/TT-BTC';
+  const thresholdLawCode = isLaw48Active ? 'Điều 26 Nghị định 181/2025/NĐ-CP' : 'khoản 2 Điều 15 Thông tư 219/2013/TT-BTC';
 
   // Xác định chính sách giảm thuế 8% (NQ 204/2025 áp dụng đến 31/12/2026)
   const hasVatReduction = activeDocs.some((d) => d.id === 'NQ-204-2025');
