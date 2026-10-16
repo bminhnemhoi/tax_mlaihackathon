@@ -244,7 +244,7 @@ services/       Nghiệp vụ: engine quy tắc, workflow, câu hỏi, policy, h
 lib/            Lõi dùng chung: schema (Zod), phân loại rủi ro, căn cứ pháp lý, server (DB, audit, auth)
 data/           Hợp đồng quy tắc/SOP, sổ văn bản pháp luật, fixture kiểm chứng
 tests/unit/     Unit test (node:test)
-scripts/qa/     Bộ hồi quy và runner đa nền tảng; scripts/ops/ vận hành
+scripts/        Bộ hồi quy, runner đa nền tảng, vận hành, benchmark — mục lục: scripts/README.md
 deployment/     Hostinger, Docker, sao lưu
 docs/           Tài liệu nộp thi, kiến trúc, bảo mật, nghiên cứu, bằng chứng, bàn giao, ảnh giao diện
 input-sample/   Chứng từ mẫu (XML, PDF, ảnh)
