@@ -20,10 +20,11 @@ export function pdfChildEnv(env: NodeJS.ProcessEnv): Record<string, string> {
 export function extractTextFromPdfBuffer(pdfBuffer: Buffer): string | null {
   // Thư mục tạm riêng (mkdtemp: quyền 700 trên POSIX) và file chỉ chủ sở hữu đọc được: user khác trên cùng host
   // không đọc được chứng từ trong /tmp dùng chung, không đặt sẵn file hay symlink được (CodeQL js/insecure-temporary-file).
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tax-referee-text-'));
-  const tmpPdfPath = path.join(tmpDir, 'input.pdf');
+  let tmpDir: string | undefined;
 
   try {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tax-referee-text-'));
+    const tmpPdfPath = path.join(tmpDir, 'input.pdf');
     fs.writeFileSync(tmpPdfPath, pdfBuffer, { flag: 'wx', mode: 0o600 });
 
     // Dùng Python PyMuPDF (fitz) hoặc pypdf có sẵn trên máy để đọc trực tiếp text stream
@@ -63,7 +64,7 @@ sys.stdout.write(text.strip())
     console.warn('[PDF Extractor] Lỗi đọc text stream trực tiếp từ PDF:', err?.message);
   } finally {
     try {
-      fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+      if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
     } catch {
       // Không để lỗi dọn dẹp (Windows: tiến trình con còn giữ thư mục) làm hỏng lượt đọc; thư mục chỉ chủ sở hữu truy cập được.
     }
