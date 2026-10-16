@@ -166,18 +166,18 @@ Các chuyển dịch phụ:
 
 | Nhóm quy tắc | Văn bản dẫn chiếu | Mức xác minh |
 |---|---|---|
-| Thanh toán không dùng tiền mặt (5 triệu từ 01/07/2025; 20 triệu trước đó theo TT 219/2013/TT-BTC); gộp mua cùng bên bán trong ngày | Luật 48/2024/QH15; Điều 26 NĐ 181/2025/NĐ-CP (mua nhiều lần trong ngày: khoản 3) | DOCUMENT_CONFIRMED_RULE_PENDING (hóa đơn từ 01/07/2025) |
+| Thanh toán không dùng tiền mặt (5 triệu từ 01/07/2025; 20 triệu trước đó theo TT 219/2013/TT-BTC); gộp mua cùng bên bán trong ngày | Từ 01/7/2025: điểm b khoản 2 Điều 14 Luật 48/2024/QH15 (nguyên tắc) và Điều 26 NĐ 181/2025/NĐ-CP (ngưỡng; mua nhiều lần trong ngày: khoản 3). Trước đó: khoản 2 và khoản 5 Điều 15 TT 219/2013/TT-BTC | DOCUMENT_CONFIRMED_RULE_PENDING |
 | Thuế suất 8% cho hàng thuộc danh mục loại trừ **của kỳ lập hóa đơn**, hoặc hóa đơn lập ngoài mọi kỳ giảm thuế (bảng kỳ trong `lib/legalBasis.ts`: 02–12/2022, 07/2023–12/2026) | Từ 01/7/2025: NQ 204/2025/QH15 + NĐ 174/2025/NĐ-CP; các kỳ trước: NQ 43/2022 … NQ 174/2024 + nghị định hướng dẫn | DOCUMENT_CONFIRMED_RULE_PENDING |
-| Hóa đơn lập sau ngày bên bán đóng MST; sai MST người mua | NĐ 70/2025/NĐ-CP; NĐ 254/2026/NĐ-CP (theo ghi nhận trong repo), chọn theo ngày lập | DOCUMENT_CONFIRMED_RULE_PENDING (hóa đơn từ 01/06/2025) |
-| Ký hiệu, mã CQT, ngày ký, hóa đơn điều chỉnh | Chọn theo ngày lập: NĐ 123/2020 + TT 78/2021 (trước 01/6/2025); NĐ 123/2020 sửa bởi NĐ 70/2025 + TT 32/2025 (01/6/2025–30/6/2026); NĐ 254/2026 + TT 91/2026 (từ 01/7/2026) | DOCUMENT_CONFIRMED_RULE_PENDING |
+| Hóa đơn lập sau ngày bên bán đóng MST; sai MST người mua | Đóng MST: Điều 16 NĐ 123/2020/NĐ-CP (sửa bởi NĐ 70/2025/NĐ-CP từ 01/6/2025); NĐ 254/2026/NĐ-CP từ 01/7/2026. Sai MST người mua: điểm a khoản 2 Điều 14 Luật 48/2024/QH15 và khoản 5 Điều 10 NĐ 123/2020/NĐ-CP (trước 01/7/2025: khoản 1 Điều 15, khoản 15 Điều 14 TT 219/2013/TT-BTC) | DOCUMENT_CONFIRMED_RULE_PENDING |
+| Ký hiệu, mã CQT, ngày ký, hóa đơn điều chỉnh | Chọn theo ngày lập: NĐ 123/2020 + TT 78/2021 (trước 01/6/2025); NĐ 123/2020 sửa bởi NĐ 70/2025 + TT 32/2025 (01/6/2025–30/6/2026); NĐ 254/2026 + TT 91/2026 (từ 01/7/2026). Mã CQT: điểm a khoản 2 Điều 3 và khoản 10 Điều 10 NĐ 123/2020; năm trong ký hiệu: điểm b khoản 1 Điều 4 TT 78/2021, điểm b khoản 1 Điều 5 TT 32/2025, Điều 4 và Phụ lục I TT 91/2026 | DOCUMENT_CONFIRMED_RULE_PENDING |
 | Hóa đơn trùng; nhà cung cấp có cảnh báo | Kiểm soát nội bộ | INTERNAL_POLICY / UNVERIFIED |
 | Tiếp khách, chi ngoài phạm vi; hạn mức KTT; hệ số K | SOP mẫu Điều 2.1, 2.3, 3.3, 4.3 | INTERNAL_POLICY |
 
 `DOCUMENT_CONFIRMED_RULE_PENDING` chỉ xác nhận văn bản tồn tại và ngày hiệu lực, chưa xác nhận diễn giải điều khoản. Ba điểm cần chuyên gia thuế chốt:
 
-1. ~~Căn cứ ngưỡng 5 triệu ghi "Khoản 2 Điều 14 Luật 48/2024/QH15"~~ → **đã sửa 15/10**: Điều 14 Luật 48/2024 và Điều 26 NĐ 181/2025 (cụm trong ngày: khoản 3 Điều 26, đã đối chiếu). Số khoản trong Điều 14 Luật 48 vẫn cần chuyên gia chốt.
+1. ~~Căn cứ ngưỡng 5 triệu ghi "Khoản 2 Điều 14 Luật 48/2024/QH15"~~ → **đã sửa 15/10**: Điều 14 Luật 48/2024 và Điều 26 NĐ 181/2025 (cụm trong ngày: khoản 3 Điều 26, đã đối chiếu). **17/10**: đối chiếu nguyên văn trên vanban.chinhphu.vn — nguyên tắc ở điểm b khoản 2 Điều 14 Luật 48/2024, ngưỡng 5 triệu ở Điều 26 NĐ 181/2025; hóa đơn trước 01/7/2025 dẫn khoản 2, khoản 5 Điều 15 TT 219/2013 (ngưỡng 20 triệu).
 2. ~~Danh mục loại trừ 8% còn chứa CNTT, xăng, hóa chất~~ → **đã sửa 15/10**: đối chiếu nguyên văn NQ 204/2025 Điều 1 ("khai khoáng (trừ than)", "chịu thuế TTĐB (trừ xăng)") và NĐ 174/2025; danh mục loại trừ chọn theo kỳ lập hóa đơn. Nhận diện vẫn dựa trên từ khóa tên hàng nên quy tắc chỉ chuyển tiếp để đối chiếu, không tự loại thuế.
-3. Hệ số K được registry gắn với CV 2392/TCT-QLRR nhưng hợp đồng quy tắc xếp là ngưỡng nội bộ (CV 2392 nói về cảnh báo theo hệ số K, không phải danh bạ nhà cung cấp rủi ro).
+3. ~~Hệ số K được registry gắn với CV 2392/TCT-QLRR~~ → **đã sửa 17/10**: CV 2392 chưa đối chiếu được nguyên văn nên gỡ khỏi sổ trích dẫn và câu hỏi; hệ số K và danh bạ nhà cung cấp rủi ro ghi là ngưỡng/quy chế nội bộ. Sổ văn bản (`data/regulatoryRegistry.ts`) chỉ giữ liên kết có docid đã kiểm; văn bản chưa đối chiếu gắn nhãn UNVERIFIED.
 
 Chi tiết đối chiếu pháp lý, nguồn và giới hạn: [docs/research/nghien-cuu-lien-quan.md](../research/nghien-cuu-lien-quan.md) mục 5.1.
 
