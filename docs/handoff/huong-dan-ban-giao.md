@@ -99,6 +99,24 @@ Nhánh này đã merge `main` mới nhất; review như A1 (merge commit, không
 - Policy Studio: tạo bản nháp nâng hạn mức KTT bằng vai KTT → bấm duyệt bị chặn (cần CFO khác người soạn) → chuyển vai CFO → khối "Bản nháp chờ duyệt" → Duyệt & áp dụng.
 - Ca thử nhanh: "Xăng RON95" thuế 8% ngày 2026-10-05 phải **tự xử lý** (NQ 204/2025 cho xăng 8%); "Thép hộp" 8% vẫn bị chặn.
 
+### A5c. Deploy tối 16/10 — PR `feat/demo-day-security` (bảo mật hệ agent + trang /trust)
+**Lưu ý quan trọng:** live khởi động lại khoảng 97 giây sau khi PR #5 được merge, tức hPanel **tự deploy khi `main` đổi**. Merge PR chính là deploy production, nên chỉ merge khi CI xanh.
+1. **Trước khi merge:** ghi lại `curl -s https://limegreen-salamander-517622.hostingersite.com/api/health` (số `audit.events`, ngày 16/10 là 42) để so sau deploy. Sau deploy số này phải **≥** số cũ; nếu về 0 thì DB đang nằm trong thư mục release, rollback ngay.
+2. Merge PR bằng **Create a merge commit** (không squash).
+3. **Biến môi trường** (hPanel → Environment, hoặc `hbuilds/config/.env`; chỉ kiểm tra tên biến, không in giá trị):
+   - `TAX_REFEREE_AUDIT_KEY` = kết quả `openssl rand -hex 32`. **Lưu một bản sao ngoài host** (mất khóa thì không kiểm được chữ ký cũ).
+   - `TAX_REFEREE_DEMO_PER_HOUR=300` (giám khảo dùng chung NAT hội trường).
+   - **Không** đặt `QGEN_AI` và `TAX_REFEREE_ALLOW_INTERNAL_ROLE_LOGIN`.
+   - Commit: nếu hPanel deploy bằng git thì `/api/health` tự đọc commit từ `.git`; nếu vẫn `unknown` thì đặt `GIT_COMMIT_SHA` bằng `git rev-parse origin/main`, và nhớ cập nhật mỗi lần deploy.
+   - Tùy chọn, làm sau cùng: sau khi khóa audit đã chạy và đã restart, đặt `TAX_REFEREE_AUDIT_SIGNED_SINCE` bằng thời điểm hiện tại (ISO, ví dụ `2026-10-16T17:30:00Z`) rồi restart lần nữa. Từ mốc này, sự kiện thiếu chữ ký bị coi là không hợp lệ (chống hạ cấp HMAC). **Không** đặt mốc sớm hơn lúc khóa có hiệu lực.
+4. Restart app, rồi làm **checklist** (lưu JSON vào `docs/evidence/live-2026-10-17.json`):
+   - `/api/health`: `hmac:true`, `warnings: []`, commit đúng, `ai.decisionPathLlmCalls: 0`.
+   - `/api/audit?verify=1` (đăng nhập demo): `valid:true`.
+   - `/verify`: 9/9.
+   - `/trust` → bấm "Chạy 12 phép thử tấn công": **12/12 đạt**.
+   - Thử tay: ca U2 ("tiệc cưới người thân giám đốc") nay **chuyển người** (đã đóng ca bẫy sau buổi thử); "Xăng RON95" 8% tự xử lý; mở một chứng từ tên tiếng Việt không còn lỗi.
+5. Có mục đỏ thì rollback ngay (revert merge commit trên GitHub để hPanel deploy lại bản trước, hoặc trỏ symlink release cũ). Sau rollback, các sự kiện đã ký bằng khóa mới vẫn kiểm được miễn là giữ nguyên khóa.
+
 ### A6. Trước Demo Day 17/10
 - Đặt `TAX_REFEREE_DEMO_PER_HOUR=200`; sao lưu SQLite bằng `deployment/backup.sh` (hoặc SQLite backup API) trước khi trình diễn.
 - Diễn tập: 8 phút theo [docs/judge-cheat-sheet-8-mins.md](../judge-cheat-sheet-8-mins.md) trên live; mời người ngoài tự gõ ca mới.
