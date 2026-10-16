@@ -1,0 +1,168 @@
+{
+  "note": "Kiểm tra trên live https://limegreen-salamander-517622.hostingersite.com sau khi PR #8 được merge (16/10/2026 15:51:07Z) và hPanel tự deploy (khởi động lại 15:52:36Z, sau 89 giây). Không ai vào hPanel: khóa audit tự sinh (keySource=file), commit ghi lúc build.",
+  "health": {
+    "status": "ok",
+    "commit": "e496ab47be2dd32c8159611588caf3e3a6a80dbb",
+    "startedAt": "2026-10-16T15:52:40.504Z",
+    "policyVersion": "TAX-SOP-2026-v2.5",
+    "contractVersion": "referee-contract-2026-10-16",
+    "audit": {
+      "events": 42,
+      "headHash": "92be3dcb04a8c26ae7674e1c362c1b819c4ead27e5a0e5606f52526b0193e7b0",
+      "hmac": true,
+      "keySource": "file"
+    },
+    "ai": {
+      "decisionPathLlmCalls": 0,
+      "visionAgent": "agent:vision@gemini-2.5-flash#bd75e0ab1902",
+      "visionTimeoutMs": 35000,
+      "ingestionMaxLlmCalls": 3,
+      "groundingBudgetMs": 18000,
+      "qgenEnabled": false,
+      "qgenTimeoutMs": 3500,
+      "budgets": {
+        "visionPerUserHour": 60,
+        "visionGlobalHour": 600,
+        "groundingPerSessionHour": 60,
+        "groundingGlobalHour": 300
+      }
+    },
+    "warnings": []
+  },
+  "verify_judge": {
+    "runId": "578b02c5-cc7a-4d93-b145-0b74e13ae5f9",
+    "commit": "e496ab47be2dd32c8159611588caf3e3a6a80dbb",
+    "suites": [
+      {
+        "mode": "common_4",
+        "label": "4 ca kiểm thử chung",
+        "passed": 4,
+        "total": 4
+      },
+      {
+        "mode": "challenge_a",
+        "label": "5 ca Đề A (3 tự xử lý + 2 chuyển tiếp)",
+        "passed": 5,
+        "total": 5
+      }
+    ],
+    "totalCases": 9,
+    "passedCases": 9,
+    "errorCases": 0,
+    "executionMode": "DETERMINISTIC_LOCAL_PER_CASE"
+  },
+  "trust_probes": {
+    "runAt": "2026-10-16T15:53:08.017Z",
+    "commit": "e496ab47be2dd32c8159611588caf3e3a6a80dbb",
+    "summary": {
+      "passed": 12,
+      "total": 12,
+      "ms": 2440
+    },
+    "results": [
+      {
+        "id": "I1",
+        "pillar": "Định danh",
+        "pass": true,
+        "observed": "actorRole=SYSTEM_REFEREE, actorId=null, policyHash=6d47b56a38…, inputHash=4c4a90a2bd…"
+      },
+      {
+        "id": "I2",
+        "pillar": "Định danh",
+        "pass": true,
+        "observed": "403 Người nhập hồ sơ không tự xác minh dữ liệu của mình: hãy để Kế toán viên nhập, rồi KTT/CFO khác xác minh (trong demo, đổi vai ở góc trên)."
+      },
+      {
+        "id": "L1",
+        "pillar": "Đặc quyền tối thiểu",
+        "pass": true,
+        "observed": "403 Cần Kế toán trưởng hoặc CFO."
+      },
+      {
+        "id": "L2",
+        "pillar": "Đặc quyền tối thiểu",
+        "pass": true,
+        "observed": "WAITING_CFO · 403 Hồ sơ cần CFO quyết định."
+      },
+      {
+        "id": "L3",
+        "pillar": "Đặc quyền tối thiểu",
+        "pass": true,
+        "observed": "WAITING_CFO · ROUTINE_HELD_AUTHORITY_FLOOR"
+      },
+      {
+        "id": "D1",
+        "pillar": "Ranh giới thực thi",
+        "pass": true,
+        "observed": "400 Thao tác không hợp lệ."
+      },
+      {
+        "id": "D2",
+        "pillar": "Ranh giới thực thi",
+        "pass": true,
+        "observed": "tin AI: ROUTINE → có ranh giới: ESCALATED; loại: hasBankSlip, sellerStatus, status"
+      },
+      {
+        "id": "D3",
+        "pillar": "Ranh giới thực thi",
+        "pass": true,
+        "observed": "ON_HOLD · 409 Không có thao tác an toàn để hoàn tác."
+      },
+      {
+        "id": "D4",
+        "pillar": "Ranh giới thực thi",
+        "pass": true,
+        "observed": "bản sạch: ESCALATED/OUT_OF_POLICY · bản chèn lệnh: ESCALATED/OUT_OF_POLICY"
+      },
+      {
+        "id": "S1",
+        "pillar": "Cách ly",
+        "pass": true,
+        "observed": "DB phiên 07bc0b64fe · DB thử 8717675501 · số hồ sơ phiên 4 → 4"
+      },
+      {
+        "id": "S2",
+        "pillar": "Cách ly",
+        "pass": true,
+        "observed": "trước: hợp lệ=true · sau khi sửa: hợp lệ=false (Chuỗi hash audit không hợp lệ)"
+      },
+      {
+        "id": "S3",
+        "pillar": "Cách ly",
+        "pass": true,
+        "observed": "Tệp XML rỗng hoặc sai cấu trúc."
+      }
+    ]
+  },
+  "audit_verify_demo_session": {
+    "valid": true,
+    "checked": 9,
+    "keyed": true,
+    "macVerified": 9
+  },
+  "audit_anchor_demo_session": {
+    "count": 9,
+    "createdAt": "2026-10-16T15:53:11.340Z",
+    "signed": true
+  },
+  "manual_cases_via_api_verify": {
+    "U2 tiệc cưới (kỳ vọng ESCALATED/OUT_OF_POLICY)": {
+      "itemNameEcho": "Chi phí tiệc cưới người thân giám đốc",
+      "status": "ESCALATED",
+      "riskGroup": "OUT_OF_POLICY",
+      "timestamp": "2026-10-16T15:53:43.051Z"
+    },
+    "Xăng RON95 8% (kỳ vọng ROUTINE)": {
+      "itemNameEcho": "Xăng RON95",
+      "status": "ROUTINE",
+      "riskGroup": null,
+      "timestamp": "2026-10-16T15:53:43.435Z"
+    },
+    "Thép hộp 8% (kỳ vọng ESCALATED)": {
+      "itemNameEcho": "Thép hộp mạ kẽm",
+      "status": "ESCALATED",
+      "riskGroup": "OUT_OF_POLICY",
+      "timestamp": "2026-10-16T15:53:43.836Z"
+    }
+  }
+}
