@@ -124,10 +124,11 @@ export function TrustCenter() {
           <h2 className="text-lg font-medium">Giới hạn đã biết — nói thẳng</h2>
           <ul className="list-disc space-y-1 pl-5 text-xs leading-5">
             <li>Định danh trong demo là <strong>vai trò mô phỏng</strong>: một người đổi được 3 vai (chỉ trong phiên demo; ngoài sandbox bị chặn). Production cần SSO/OIDC, MFA khi CFO duyệt, SCIM thu hồi quyền.</li>
-            <li>Tiến trình đọc PDF chạy cùng máy, cùng người dùng hệ điều hành với ứng dụng; chưa cô lập bằng container/UID riêng.</li>
+            <li>Tiến trình đọc PDF không còn thừa hưởng biến bí mật (khóa API, khóa audit), nhưng vẫn chạy cùng máy, cùng người dùng hệ điều hành với ứng dụng; chưa cô lập bằng container/UID riêng.</li>
             <li>Khóa HMAC nằm cùng host với database: chống được người chỉ ghi được DB, không chống được người chiếm cả máy — vì vậy cần điểm neo lưu ra ngoài (<code>/api/audit/anchor</code>) và mốc bắt buộc ký.</li>
             <li>Một instance SQLite; giới hạn tần suất nằm trong bộ nhớ một tiến trình.</li>
-            <li>Ảnh/PDF scan đi qua proxy AI bên thứ ba (dữ liệu ra nước ngoài); XML không qua AI. Chưa xác thực mật mã chữ ký số XML.</li>
+            <li>Ảnh/PDF scan đi qua proxy AI bên thứ ba (dữ liệu ra nước ngoài). Nội dung XML được đọc tất định, nhưng tên/MST bên bán (của mọi loại chứng từ) có thể được gửi đi tra cứu có grounding qua cùng proxy khi tra cứu có cấu trúc không xác nhận được. Chưa xác thực mật mã chữ ký số XML.</li>
+            <li>Trường AI đọc được trên ảnh (số tiền, MST…) vẫn mang trạng thái “đã đọc” nếu không có cờ nghi vấn; khóa audit chưa có mã phiên bản nên chưa xoay khóa được.</li>
             <li>Agent đọc ảnh vẫn có thể đọc sai số tiền một cách cân đối; lớp phòng vệ là kiểm tra số học, ngưỡng trọng yếu, xác minh của người và hậu kiểm ngẫu nhiên — không phải bảo đảm tuyệt đối.</li>
           </ul>
           <p className="pt-1 text-xs">Tài liệu: <a className="underline" href={`${GITHUB}/docs/security/threat-model.md`}>mô hình mối đe dọa</a> · <a className="underline" href={`${GITHUB}/docs/architecture/demo-to-production.md`}>kiến trúc và lộ trình production</a> · <Link className="underline" href="/verify">Kiểm chứng đề A</Link> · <Link className="underline" href="/sop">Quy tắc SOP</Link></p>
