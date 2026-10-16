@@ -1,7 +1,7 @@
 # Mô hình mối đe dọa và bảo mật hệ có agent AI
 
 > **Tax Referee** · trả lời câu hỏi Q1 của BTC Track VNG: định danh, đặc quyền tối thiểu, ranh giới thực thi tất định, cách ly.
-> Phạm vi: mã trên nhánh `docs/demo-day-q1-q2` (gồm PR #6), cập nhật 16/10/2026. Mỗi khẳng định về hệ thống trỏ tới file và hàm.
+> Phạm vi: mã trên `main` từ merge PR #7 (`d882768`, gồm nội dung PR #6); PR #8 (`e496ab4`) bổ sung tự sinh khóa audit và ghi commit vào bản build. Cập nhật 16/10/2026. Những chỗ trong bài ghi live 16/10 còn `hmac:false` và commit `unknown` là trạng thái trước deploy; sau deploy PR #8, live báo commit `e496ab4`, HMAC bật (`keySource: file`) ([`live-2026-10-16-post-deploy.json`](../evidence/live-2026-10-16-post-deploy.json)). Mỗi khẳng định về hệ thống trỏ tới file và hàm.
 > OWASP, NIST và các bài báo được dẫn là **chuẩn tham chiếu tự nguyện**, không phải tuyên bố tuân thủ. Mã LLMxx theo bản OWASP LLM Top 10 2025; theo nguồn thứ cấp, bản 2026 đã xếp lại thứ tự.
 
 ## 1. Tóm tắt
