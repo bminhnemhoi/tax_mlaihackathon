@@ -30,3 +30,23 @@ test('dừng tự động hóa: ca thường quy không được tự duyệt, c
     assert.ok(heldEvent, 'ca bị giữ do công tắc có sự kiện audit riêng');
   });
 });
+
+test('bật lại tự động hóa là KIỂM LẠI: ca đang giữ không còn thường quy theo policy hiện hành thì không được duyệt bằng quyết định cũ', async () => {
+  const { releaseHeldRoutineCases } = await import('../../services/workflowService');
+  await runIsolated(async () => {
+    const db = getDatabase(), policy = getActivePolicy();
+    policy.config.companyTaxCode = demoCompanyTaxCode;
+    db.prepare('UPDATE policy_versions SET payload_json=? WHERE version=?').run(JSON.stringify(policy), policy.version);
+    setAutomationPaused(true, chief, 'Tạm dừng vì nghi policy sai');
+    await evaluateWorkflow({ ...challengeCases[0].invoice, id: 'HELD-2', invoiceNumber: 'HELD2' }, accountant, { forceLocalOnly: true });
+    assert.equal(readRecord('HELD-2').status, 'WAITING_CHIEF_ACCOUNTANT');
+    // Trong lúc dừng, policy hiện hành được sửa: mặt hàng của ca đang giữ bị xếp vào nhóm ngoài phạm vi SOP.
+    const fixed = getActivePolicy();
+    fixed.config.scopeNotCoveredCategories = [String(challengeCases[0].invoice.itemName).toLocaleUpperCase('vi-VN')];
+    db.prepare('UPDATE policy_versions SET payload_json=? WHERE version=?').run(JSON.stringify(fixed), fixed.version);
+    setAutomationPaused(false, chief, 'Đã sửa policy, bật lại tự động hóa');
+    assert.equal(releaseHeldRoutineCases(chief), 0);
+    assert.equal(readRecord('HELD-2').status, 'WAITING_CHIEF_ACCOUNTANT');
+    assert.ok(db.prepare("SELECT 1 FROM audit_events WHERE entity_id='HELD-2' AND event_type='ROUTINE_RECHECK_FAILED_AFTER_RESUME'").get());
+  });
+});

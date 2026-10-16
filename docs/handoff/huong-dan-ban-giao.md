@@ -114,6 +114,7 @@ Nhánh này đã merge `main` mới nhất; review như A1 (merge commit, không
    - `/api/audit?verify=1` (đăng nhập demo): `valid:true`.
    - `/verify`: 9/9.
    - `/trust` → bấm "Chạy 12 phép thử tấn công": **12/12 đạt**.
+   - Tải một PDF hóa đơn điện tử có lớp chữ (VD `input-sample/06_real_einvoice_vinhlong.pdf`): phải thấy cảnh báo "Đã đọc lớp chữ trực tiếp từ PDF". Tiến trình Python nay chạy với env đã lọc (chỉ PATH/PYTHONPATH…); nếu cảnh báo này không còn mà PDF chuyển sang đọc bằng Vision thì báo lại ngay.
    - Thử tay: ca U2 ("tiệc cưới người thân giám đốc") nay **chuyển người** (đã đóng ca bẫy sau buổi thử); "Xăng RON95" 8% tự xử lý; mở một chứng từ tên tiếng Việt không còn lỗi.
 5. Có mục đỏ thì rollback ngay (revert merge commit trên GitHub để hPanel deploy lại bản trước, hoặc trỏ symlink release cũ). Sau rollback, các sự kiện đã ký bằng khóa mới vẫn kiểm được miễn là giữ nguyên khóa.
 

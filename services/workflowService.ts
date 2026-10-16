@@ -5,7 +5,7 @@ import { appendAuditEvent, appendImmutableAudit } from '@/lib/server/audit';
 import { getActivePolicy, getDatabase, getMacroState, hashPayload, jsonNow, saveMacroState } from '@/lib/server/db';
 import { generateCanonicalVoucher } from '@/lib/accounting/ledgerMapper';
 import { queryJevReferee } from './jevService';
-import { calculateKFactor,sameDayPurchaseTotal } from './policyEngine';
+import { calculateKFactor,evaluateInvoiceLocally,sameDayPurchaseTotal } from './policyEngine';
 import {coreDecisionFields,missingBusinessFacts,paymentThreshold,requiredDecisionFields} from '@/lib/refereeRequirements';
 import {groupOf,hasNonAcceptableFinding,orderFindings,riskGroupsOf,taxonomyOf} from '@/lib/riskTaxonomy';
 import {fieldAsk,type FieldAsk} from './questionBuilder';
@@ -354,16 +354,23 @@ export function releaseHeldRoutineCases(user: AppUser): number {
   const db=getDatabase();
   const ids=(db.prepare("SELECT i.id FROM invoices i JOIN evaluations e ON e.id=(SELECT id FROM evaluations WHERE invoice_id=i.id ORDER BY rowid DESC LIMIT 1) WHERE i.status='WAITING_CHIEF_ACCOUNTANT' AND i.tax_hold=0 AND json_extract(e.decision_json,'$.status')='ROUTINE'").all() as {id:string}[]).map(r=>r.id);
   if(!ids.length)return 0;
+  const policy=getActivePolicy();
   return db.transaction(()=>{
+    let released=0;
     for(const id of ids){
       const row=readRecord(id),before=snapshot(row),d=RefereeDecisionSchema.parse(JSON.parse(row.decision_json!));
       if(d.status!=='ROUTINE')continue;
+      // Bật lại nghĩa là KIỂM LẠI: nếu đội dừng tự động hóa vì policy sai rồi sửa policy, ca đang giữ phải chạy lại theo policy hiện hành
+      // trước khi duyệt — không duyệt bằng quyết định cũ.
+      const recheck=evaluateInvoiceLocally(InvoiceInputSchema.parse(JSON.parse(row.payload_json)),policy.config,policy.version);
+      if(recheck.status!=='ROUTINE'){recordAction(row,user,'ROUTINE_RECHECK_FAILED_AFTER_RESUME',`Bật lại tự động hóa: kiểm lại theo policy ${policy.version} thì không còn là ca thường quy — giữ chờ Kế toán trưởng.`,before);continue;}
+      released++;
       db.prepare("UPDATE invoices SET status='APPROVED',approved_deductible_tax=?,revision=revision+1,updated_at=? WHERE id=?").run(d.approvedTaxAmount,jsonNow(),id);
       syncVoucher(readRecord(id));
-      recordAction(row,user,'ROUTINE_RELEASED_AFTER_RESUME','Bật lại tự động hóa: ca thường quy đang chờ được hoàn tất theo SOP.',before);
+      recordAction(row,user,'ROUTINE_RELEASED_AFTER_RESUME',`Bật lại tự động hóa: kiểm lại theo policy ${policy.version} vẫn là ca thường quy — hoàn tất theo SOP.`,before);
     }
     recomputeMacro();
-    return ids.length;
+    return released;
   })();
 }
 

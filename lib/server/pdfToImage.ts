@@ -5,10 +5,19 @@ import { execSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
 
+/** Chỉ chuyển các biến cần để chạy Python (đường dẫn, mã hóa, thư mục tạm); mọi biến khác — gồm khóa bí mật — bị bỏ. */
+const PDF_CHILD_ENV_KEYS = ['PATH', 'PYTHONPATH', 'LANG', 'LC_ALL', 'HOME', 'TMPDIR', 'TEMP', 'TMP', 'SystemRoot', 'SYSTEMROOT', 'windir', 'PATHEXT', 'COMSPEC'];
+export function pdfChildEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  const out: Record<string, string> = { PYTHONIOENCODING: 'utf-8' };
+  for (const key of PDF_CHILD_ENV_KEYS) { const value = env[key]; if (value !== undefined) out[key] = value; }
+  return out;
+}
+
 /**
  * Trích xuất text trực tiếp từ Digital PDF (hóa đơn điện tử PDF vector).
  * Tốc độ thực thi cực nhanh (< 30ms), hoàn toàn không cần qua OCR hình ảnh.
  */
+
 export function extractTextFromPdfBuffer(pdfBuffer: Buffer): string | null {
   const tmpId = crypto.randomUUID();
   const tmpPdfPath = path.join(os.tmpdir(), `tax-referee-text-${tmpId}.pdf`);
@@ -39,7 +48,10 @@ sys.stdout.write(text.strip())
     const output = execSync(`python3 -c '${pyScript.replace(/'/g, "'\\''")}' "${tmpPdfPath}"`, {
       encoding: 'utf-8',
       timeout: 3000,
-      stdio: ['pipe', 'pipe', 'ignore']
+      maxBuffer: 4 * 1024 * 1024,
+      stdio: ['pipe', 'pipe', 'ignore'],
+      // Cách ly tối thiểu: tiến trình đọc PDF không tin cậy KHÔNG thừa hưởng khóa API, khóa audit hay mật khẩu trong env.
+      env: pdfChildEnv(process.env) as unknown as NodeJS.ProcessEnv
     });
 
     const cleanText = (output || '').trim();
