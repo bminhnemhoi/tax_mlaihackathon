@@ -336,7 +336,11 @@ export async function evaluateWorkflow(raw: unknown, user: AppUser | null, optio
       // Hậu kiểm ngẫu nhiên: một tỉ lệ ca tự duyệt được đưa vào danh sách để Kế toán trưởng xem lại (không làm chậm luồng duyệt).
       if(autoApprove){const strat=stratifiedRate(policy.config.postAuditRate ?? DEFAULT_POST_AUDIT_RATE,invoice.totalAmount,[paymentThreshold(invoice,policy.config),policy.config.sellerStatusMaterialityVnd ?? 20_000_000,policy.config.kttApprovalLimit]);samplePostAudit({id,content_hash:row.content_hash,evaluation_id:evaluationId},strat.rate,false,strat.nearThreshold);}
       // Cụm tiền mặt cùng ngày vượt ngưỡng: hóa đơn tiền mặt cùng bên bán đã tự duyệt trước đó cũng mất điều kiện khấu trừ → giữ thuế cả cụm.
-      if(decision.status==='ESCALATED' && decision.findings?.some((f:{ruleId:string})=>f.ruleId==='STATUTORY_SAME_DAY_CASH_5M') && holdLinkedCashInvoices(row,invoice).length) recomputeMacro();
+      // Không phụ thuộc thứ tự đến: hóa đơn này trả chuyển khoản vẫn làm cụm (mỗi tờ dưới ngưỡng) vượt ngưỡng, nên các hóa đơn TIỀN MẶT
+      // đã tự duyệt trong cụm phải giữ thuế (khoản 3 Điều 26 NĐ 181/2025).
+      const cashThreshold=paymentThreshold(invoice,policy.config);
+      const clusterOverThreshold=!invoice.isAdjustment && Math.abs(invoice.totalAmount)<cashThreshold && sameDayPurchaseTotal(invoice,undefined,cashThreshold)>=cashThreshold;
+      if((clusterOverThreshold || (decision.status==='ESCALATED' && decision.findings?.some((f:{ruleId:string})=>f.ruleId==='STATUTORY_SAME_DAY_CASH_5M'))) && holdLinkedCashInvoices(row,invoice).length) recomputeMacro();
     })();
     const row=readRecord(id);
     return {...result,decision,workflow:{status:row.status,revision,evaluationId,autoApproved:row.status==='APPROVED',externalSync:'MANUAL',internalVoucherId:(db.prepare('SELECT id FROM internal_vouchers WHERE invoice_id=?').get(id) as {id:string}|undefined)?.id || null},policy};

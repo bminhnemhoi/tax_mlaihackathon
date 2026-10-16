@@ -33,3 +33,14 @@ test('hóa đơn chuyển khoản cùng ngày không bị giữ thuế theo cụ
     assert.equal(readRecord('CC-0006201').status, 'APPROVED');
   });
 });
+
+test('không phụ thuộc thứ tự: hóa đơn tiền mặt đã tự duyệt bị giữ thuế khi hóa đơn chuyển khoản sau làm cụm vượt ngưỡng', async () => {
+  await runIsolated(async () => {
+    const acc = switchRole('ACCOUNTANT')!.user;
+    await evaluateWorkflow(cash('0006301'), acc, { forceLocalOnly: true });
+    assert.equal(readRecord('CC-0006301').status, 'APPROVED');
+    await evaluateWorkflow({ ...cash('0006302', 'BANK_TRANSFER'), hasBankSlip: true }, acc, { forceLocalOnly: true });
+    assert.equal(readRecord('CC-0006302').status, 'APPROVED', 'hóa đơn chuyển khoản có UNC vẫn khấu trừ được');
+    assert.equal(readRecord('CC-0006301').status, 'ON_HOLD', 'hóa đơn tiền mặt trong cụm mất điều kiện khấu trừ');
+  });
+});
