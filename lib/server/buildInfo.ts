@@ -4,7 +4,7 @@ import path from 'node:path';
 let fileCommit: string | null | undefined;
 /** Commit đang chạy: biến môi trường của nền tảng triển khai, hoặc file .git-commit do script đóng gói ghi (Hostinger). */
 export function runningCommit(): string | undefined {
-  const fromEnv = process.env.GIT_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || process.env.SOURCE_COMMIT;
+  const fromEnv = process.env.GIT_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || process.env.SOURCE_COMMIT || process.env.BUILD_COMMIT_SHA;
   if (fromEnv) return fromEnv;
   if (fileCommit === undefined) {
     fileCommit = null;

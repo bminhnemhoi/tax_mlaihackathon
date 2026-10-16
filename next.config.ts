@@ -1,7 +1,15 @@
 import type { NextConfig } from 'next';
+import { execSync } from 'node:child_process';
+
+/** Commit của bản build: lấy lúc build (nền tảng như hPanel build từ git nhưng không giữ .git khi chạy). */
+function buildCommit(): string {
+  if (process.env.GIT_COMMIT_SHA) return process.env.GIT_COMMIT_SHA;
+  try { const sha = execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); return /^[0-9a-f]{40}$/.test(sha) ? sha : ''; } catch { return ''; }
+}
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  env: { BUILD_COMMIT_SHA: buildCommit() },
   experimental: { cpus: 1, webpackBuildWorker: false },
   output:'standalone',
   async headers() {
