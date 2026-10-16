@@ -411,7 +411,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                       <Sliders className="w-3.5 h-3.5 text-slate-500" />
-                      3. Dải an toàn hệ số K (CV 2392)
+                      3. Dải an toàn hệ số K (ngưỡng nội bộ)
                     </span>
                     <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-900 border border-slate-200 font-numeric">
                       {dynamicConfig.kFactorSafeMin} - {dynamicConfig.kFactorSafeMax}
@@ -467,7 +467,7 @@ export const PolicyViewerModal: React.FC<PolicyViewerModalProps> = ({
                   <span className="font-semibold text-slate-900">Phiên bản hiện hành: {policyMetadata.version}</span>
                   <span className="text-[11px] text-slate-500 ml-2">({policyMetadata.releaseDate})</span>
                   <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                    Căn cứ tích hợp: Luật Thuế GTGT 48/2024/QH15, Nghị quyết 204/2025/QH15, Nghị định 254/2026/NĐ-CP, Thông tư 89/2026/TT-BTC, Công văn 2392/TCT-QLRR.
+                    Căn cứ tích hợp (chọn theo ngày lập hóa đơn): Luật Thuế GTGT 48/2024/QH15, Nghị định 181/2025/NĐ-CP, Nghị quyết 204/2025/QH15, Nghị định 123/2020/NĐ-CP, Nghị định 254/2026/NĐ-CP. Hệ số K là ngưỡng nội bộ.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

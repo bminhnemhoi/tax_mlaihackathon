@@ -616,7 +616,7 @@ function initializeDatabase(db: Database.Database): void {
       {
         id: 'notif-risk-k-factor',
         type: 'INVOICE_RISK',
-        title: 'Giám sát Hệ số K: An toàn (Công văn 2392/TCT-QLRR)',
+        title: 'Giám sát Hệ số K: An toàn (ngưỡng nội bộ)',
         message: 'Tỷ lệ chi phí mua vào/doanh thu lũy kế đang ở mức an toàn (K = 1.20, Vùng Xanh).',
         link: 'reports',
         isRead: 1,
