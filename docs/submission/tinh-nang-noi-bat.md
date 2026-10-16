@@ -22,7 +22,7 @@ Hệ thống kiểm tra tiền hàng cộng thuế có khớp tổng, so giá tr
 *Bằng chứng:* `lib/invoiceMathValidator.ts`, `services/workflowService.ts`, `services/questionBuilder.ts`, `components/VerifyHarness.tsx`.
 
 ## 3. Đúng ba kiểu dừng, không hỏi thừa
-SOP, engine (24 quy tắc) và workflow dùng **một bảng phân loại duy nhất**, ưu tiên Ngoài quy định → Vượt thẩm quyền → Chưa rõ thông tin. Dữ kiện không làm đổi kết quả thì không hỏi: chỉ hỏi cách thanh toán khi tổng tiền (cộng cùng bên bán trong ngày) từ 5 triệu, chỉ hỏi trạng thái mã số thuế bên bán từ 20 triệu. Trên 11 ca diễn tập kiểu giám khảo (dữ liệu tổng hợp do đội viết): xử lý đúng **3/11 → 11/11**, chuyển tiếp thừa **3/3 → 0/3**.
+SOP (25 quy tắc), engine và workflow dùng **một bảng phân loại duy nhất**, ưu tiên Ngoài quy định → Vượt thẩm quyền → Chưa rõ thông tin. Dữ kiện không làm đổi kết quả thì không hỏi: chỉ hỏi cách thanh toán khi tổng tiền (cộng cùng bên bán trong ngày) từ 5 triệu, chỉ hỏi trạng thái mã số thuế bên bán từ 20 triệu. Trên 11 ca diễn tập kiểu giám khảo (dữ liệu tổng hợp do đội viết): xử lý đúng **3/11 → 11/11**, chuyển tiếp thừa **3/3 → 0/3**.
 *Bằng chứng:* `lib/riskTaxonomy.ts`, `services/policyEngine.ts`, `lib/refereeRequirements.ts`, `tests/unit/judgeRehearsal.test.ts`, `tests/unit/taxonomy.test.ts`.
 
 ## 4. Một câu hỏi, đúng người

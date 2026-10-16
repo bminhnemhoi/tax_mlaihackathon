@@ -69,7 +69,7 @@ Hệ thống gồm sáu lớp:
 
 <p class="cap">Hình 2. Ba kiểu dừng và người nhận</p>
 
-- **Một bảng phân loại** `RULE_CATALOG` (`lib/riskTaxonomy.ts`) có 25 mục: 24 quy tắc của hợp đồng quy tắc (23 do policy engine kiểm, cộng `RULE_SOURCE_REVIEW` do workflow thêm) và mục dự phòng `RULE_SOURCE_CONFLICT` (hiện chưa có mã phát sinh). Phân bổ: 13 Chưa rõ thông tin, 10 Ngoài quy định, 2 Vượt thẩm quyền. SOP, engine và workflow cùng tra bảng này.
+- **Một bảng phân loại** `RULE_CATALOG` (`lib/riskTaxonomy.ts`) có 26 mục: 25 quy tắc của hợp đồng quy tắc (24 do policy engine kiểm, cộng `RULE_SOURCE_REVIEW` do workflow thêm) và mục dự phòng `RULE_SOURCE_CONFLICT` (hiện chưa có mã phát sinh). Phân bổ: 13 Chưa rõ thông tin, 10 Ngoài quy định, 3 Vượt thẩm quyền (thêm `AUTHORITY_SPLIT_PURCHASE` — tách nhỏ hóa đơn để né hạn mức, từ PR #5). SOP, engine và workflow cùng tra bảng này.
 - **Nhóm chính** theo thứ tự `OUT_OF_POLICY > EXCEED_AUTHORITY > UNCERTAIN_INFO`. Phát hiện dựa trên dữ kiện chưa xác minh (`triggerFields` còn nghi vấn) luôn xếp cuối.
 - **Người nhận:** `requiresCFO` khi tổng tiền từ hạn mức KTT (mặc định 200 triệu), có phát hiện loại AUTHORITY, hoặc nhà cung cấp nằm trong danh bạ cảnh báo (`RULE_HIGH_RISK_SUPPLIER`); còn lại gửi KTT.
 - **Ngưỡng trọng yếu** (`lib/refereeRequirements.ts`): hỏi hình thức thanh toán khi tổng tiền (gộp cùng bên bán trong ngày) đạt ngưỡng không dùng tiền mặt; hỏi trạng thái MST bên bán từ 20 triệu; đòi bảng kê với hóa đơn tư vấn, tiếp khách, ăn uống, hội nghị, dịch vụ tổng hợp thiếu chi tiết dòng.
