@@ -14,7 +14,9 @@ import {fieldLabels} from '@/lib/workflowPresentation';
 import {invoiceFrameworkAt,vat8Basis,vat8ExcludedPhrases,vatReductionAt} from '@/lib/legalBasis';
 
 /** Cụm từ chứa từ khóa loại trừ nhưng là hàng hóa thông thường (VD "mũ bảo hiểm" không phải dịch vụ bảo hiểm). */
-const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HIỂM','GĂNG TAY BẢO HIỂM'];
+const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HIỂM','GĂNG TAY BẢO HIỂM',
+  // Dịch vụ liên quan ô tô không phải hàng chịu thuế TTĐB (chỉ bản thân chiếc xe mới chịu TTĐB).
+  'THUÊ XE Ô TÔ','THUÊ Ô TÔ','SỬA CHỮA Ô TÔ','SỬA CHỮA XE Ô TÔ','BẢO DƯỠNG Ô TÔ','BẢO DƯỠNG XE Ô TÔ','RỬA XE Ô TÔ','GỬI XE Ô TÔ','VẬN CHUYỂN BẰNG Ô TÔ','PHỤ TÙNG Ô TÔ','LỐP Ô TÔ'];
 /**
  * So khớp nguyên cụm từ với danh mục loại trừ 8% CỦA KỲ LẬP HÓA ĐƠN (lib/legalBasis): từ 01/7/2025, NQ 204/2025 cho xăng,
  * nhiên liệu dầu, than, hóa chất, CNTT được giảm 8%; viễn thông, kim loại, hàng chịu TTĐB (trừ xăng) vẫn bị loại.
@@ -28,8 +30,8 @@ const SENSITIVE_ITEMS=['RƯỢU','BIA','WHISKY','WHISKEY','WINE','VODKA','CHAMPA
 const isSensitiveText=(textUpper:string)=>SENSITIVE_ITEMS.some(k=>matchesKeyword(textUpper,k));
 /** Khoản chi SOP không bao phủ → không tự duyệt (ngoài phạm vi quy định), dù số liệu hợp lệ. */
 // So khớp nguyên từ: "PHẠT" bắt mọi khoản phạt (tiền phạt, phí phạt chậm thanh toán…) mà không nhầm với "PHÁT".
-// Không thêm "tiệc cưới/người thân" trước buổi thử 16/10: ca U2 là ca bẫy đã công bố trong Proposal để đo mức tin máy quá mức.
-export const SCOPE_NOT_COVERED_DEFAULT=['TÀI TRỢ','TỪ THIỆN','ỦNG HỘ','QUYÊN GÓP','PHẠT','TIỀN PHẠT','PHÍ PHẠT','NỘP PHẠT','PHẠT CHẬM','PHẠT VI PHẠM','BỒI THƯỜNG','QUÀ BIẾU','BIẾU','QUÀ TẶNG','QUÀ TẾT','GIỎ QUÀ','HỘP QUÀ','QUÀ SINH NHẬT','CHI PHÍ CÁ NHÂN','CHI CÁ NHÂN','MỤC ĐÍCH CÁ NHÂN','SỬ DỤNG CÁ NHÂN','MỸ PHẨM','DU LỊCH GIA ĐÌNH','CHO GIA ĐÌNH','GIA ĐÌNH GIÁM ĐỐC','HỌC PHÍ','ĐỒ CHƠI','MUA VÀNG','VÀNG MIẾNG','NGOẠI TỆ','CỔ PHIẾU','TRÁI PHIẾU','CHARITY','DONATION','SPONSORSHIP','SPONSOR','GIFT','GIFTS','PENALTY'];
+// "Tiệc cưới/người thân" (ca bẫy U2 của buổi thử 16/10) được bổ sung SAU buổi thử: đóng ca bẫy đã công bố trong Proposal.
+export const SCOPE_NOT_COVERED_DEFAULT=['TIỆC CƯỚI','ĐÁM CƯỚI','CƯỚI HỎI','NGƯỜI THÂN','NGƯỜI NHÀ','THÂN NHÂN','TÀI TRỢ','TỪ THIỆN','ỦNG HỘ','QUYÊN GÓP','PHẠT','TIỀN PHẠT','PHÍ PHẠT','NỘP PHẠT','PHẠT CHẬM','PHẠT VI PHẠM','BỒI THƯỜNG','QUÀ BIẾU','BIẾU','QUÀ TẶNG','QUÀ TẾT','GIỎ QUÀ','HỘP QUÀ','QUÀ SINH NHẬT','CHI PHÍ CÁ NHÂN','CHI CÁ NHÂN','MỤC ĐÍCH CÁ NHÂN','SỬ DỤNG CÁ NHÂN','MỸ PHẨM','DU LỊCH GIA ĐÌNH','CHO GIA ĐÌNH','GIA ĐÌNH GIÁM ĐỐC','HỌC PHÍ','ĐỒ CHƠI','MUA VÀNG','VÀNG MIẾNG','NGOẠI TỆ','CỔ PHIẾU','TRÁI PHIẾU','CHARITY','DONATION','SPONSORSHIP','SPONSOR','GIFT','GIFTS','PENALTY'];
 const AMOUNT_TOLERANCE=10;
 const isWordChar=(c:string|undefined)=>c!==undefined && /[\p{L}\p{N}]/u.test(c);
 /** Tìm nguyên cụm từ (không khớp giữa từ khác). */
