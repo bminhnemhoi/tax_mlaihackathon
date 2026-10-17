@@ -4,7 +4,8 @@ import type { RefereeDecision } from '@/lib/schemas';
 import { evaluateWorkflow, readRecord } from './workflowService';
 import { samplePostAudit } from './postAuditService';
 
-const SAMPLE_SUPPLIER = { supplierTaxCode: '0312345678', supplierName: 'Công ty TNHH Dịch vụ Minh An (dữ liệu mẫu)' };
+// MST riêng cho dữ liệu nạp sẵn (số kiểm tra hợp lệ): ca giám khảo chép từ /verify (MST 0312345678) không bị gộp nhầm vào cụm cùng ngày với dữ liệu mẫu.
+const SAMPLE_SUPPLIER = { supplierTaxCode: '0319876546', supplierName: 'Công ty TNHH Dịch vụ Minh An (dữ liệu mẫu)' };
 const sample = (invoiceNumber: string, fields: Record<string, unknown>) => ({
   id: `MAU-${invoiceNumber}`, invoiceNumber, invoiceDate: '2026-10-05', ...SAMPLE_SUPPLIER, ...fields
 });
