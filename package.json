@@ -70,7 +70,8 @@
     "test:review-regressions": "tsx scripts/qa/run-all.ts review-regressions",
     "test:qa": "tsx scripts/qa/run-all.ts qa-regressions",
     "test:challenge-a": "tsx scripts/qa/run-all.ts challenge-a",
-    "test:workspace-ui": "tsx scripts/qa/test-workspace-ui.ts"
+    "test:workspace-ui": "tsx scripts/qa/test-workspace-ui.ts",
+    "demo:local": "bash scripts/demo/start-local-demo.sh"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
