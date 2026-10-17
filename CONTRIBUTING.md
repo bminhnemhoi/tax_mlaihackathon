@@ -1,77 +1,69 @@
-# Hướng dẫn đóng góp (Contributing Guidelines)
+# Hướng dẫn đóng góp
 
-Cảm ơn bạn đã quan tâm đến dự án **Tax Referee**! Dự án được phát triển nhằm mục tiêu tự động hóa việc rà soát và xử lý hóa đơn điện tử, leo thang (escalation) có kiểm soát và minh bạch.
+Cảm ơn bạn quan tâm tới **Tax Referee**. Dự án tự xử lý hóa đơn đầu vào thường quy và chuyển cho người những ca cần quyết định, có kiểm soát và nhật ký minh bạch. Vì hệ thống quyết định chuyện tiền thuế, mọi đóng góp đều đi qua kiểm thử và review.
 
----
+Khi tham gia, bạn đồng ý tuân theo [Quy tắc ứng xử](CODE_OF_CONDUCT.md). Lỗ hổng bảo mật xin báo theo [SECURITY.md](SECURITY.md), không mở issue công khai.
 
-## 1. Chuẩn bị môi trường phát triển
+## 1. Chuẩn bị môi trường
 
-1. **Yêu cầu hệ thống**:
-   - Node.js >= 20.19 (khuyến nghị Node 22 theo CI)
-   - npm >= 10
-
-2. **Cài đặt dependencies**:
-   ```bash
-   git clone https://github.com/khanhle1406/Tax-Referee.git
-   cd Tax-Referee
-   npm ci
-   ```
-
-3. **Cấu hình môi trường**:
-   ```bash
-   cp .env.example .env.local
-   ```
-   *Lưu ý: API Key Gemini chỉ cần khi chạy tính năng đọc ảnh/OCR hóa đơn scan. Chế độ Verify và Test chạy tất định không cần API key.*
-
-4. **Khởi chạy ứng dụng**:
-   ```bash
-   npm run dev
-   ```
-   Truy cập `http://localhost:3000` trên trình duyệt.
-
----
-
-## 2. Quy chuẩn kiểm thử & Chất lượng mã nguồn (Quality Gates)
-
-Trước khi gửi Pull Request, vui lòng đảm bảo mọi bước kiểm tra cục bộ đều vượt qua (CI sẽ chạy tự động trên Ubuntu và Windows):
+**Yêu cầu:** Node.js ≥ 20.19 (khuyến nghị 22, giống CI) kèm npm. Python 3 với PyMuPDF là tùy chọn (đọc lớp chữ PDF).
 
 ```bash
-# Kiểm tra TypeScript typecheck
-npm run typecheck
-npm run typecheck:referee
-
-# Kiểm tra linter
-npm run lint
-
-# Chạy toàn bộ test suites (unit tests + regression manifest)
-npm test
+git clone https://github.com/khanhle1406/Tax-Referee.git
+cd Tax-Referee
+npm ci
+cp .env.example .env.local   # khóa AI chỉ cần cho đọc ảnh/PDF scan
+npm run dev                  # http://localhost:3000
 ```
 
----
+Verify và toàn bộ test chạy tất định, **không cần khóa API**. Không commit file môi trường thật (`.env*` trừ `.env.example`, `env_*`).
 
-## 3. Quy trình gửi Pull Request (PR Workflow)
+## 2. Kiểm chứng trước khi mở PR
 
-1. **Tạo branch mới**:
-   - Tính năng mới: `feat/<ten-tinh-nang>`
-   - Tài liệu: `docs/<noi-dung>`
-   - Vá lỗi: `fix/<loi-can-sua>`
+Chạy **tuần tự** (CI chạy typecheck, lint, test trên Ubuntu và Windows; build chạy trên Ubuntu sau khi test đạt):
 
-2. **Commit message convention**:
-   - Sử dụng định dạng Conventional Commits:
-     - `feat: ...` cho tính năng
-     - `fix: ...` cho sửa lỗi
-     - `docs: ...` cho tài liệu
-     - `test: ...` cho kiểm thử
-     - `refactor: ...` cho tái cấu trúc mã nguồn
+```bash
+npm run typecheck
+npm run typecheck:referee
+npm run lint
+npm test          # 16 bộ, mỗi bộ trên database tạm riêng
+npm run build     # một lần, cuối cùng
+```
 
-3. **Mở Pull Request**:
-   - Mô tả rõ các thay đổi, lý do thay đổi và cách kiểm chứng.
-   - Đảm bảo toàn bộ các checks trong CI/CD đều vượt qua (`All checks passed`).
+Chạy một file test:
 
----
+```bash
+TAX_REFEREE_DATA_DIR=$(mktemp -d) NODE_ENV=test node --import tsx --test tests/unit/<file>.test.ts
+```
 
-## 4. Nguyên tắc cốt lõi của dự án
+**Viết test mới:**
+- Dùng `node:test` trong `tests/unit/`.
+- Bọc trong `runIsolated` (`lib/server/db.ts`) để chạy trên database `:memory:`.
+- Truyền `forceLocalOnly: true` khi gọi workflow để không gọi mạng.
+- Bộ unit có ngưỡng `minChecks` trong `scripts/qa/run-all.ts`; thêm test thì tăng ngưỡng tương ứng.
 
-- **Quy tắc tất định trước (Deterministic First)**: Engine phân loại chạy hoàn toàn theo 24 quy tắc SOP tất định; không phụ thuộc vòng lặp agent AI.
-- **Audit nối chuỗi SHA-256**: Mọi quyết định và thao tác đều phải ghi nhận nhật ký kiểm toán không thể đảo ngược hoặc giả mạo.
-- **Không đoán bừa, không chuyển tiếp thừa**: Dừng đúng lúc, hỏi đúng người, bằng một câu hỏi có thể trả lời được ngay.
+## 3. Quy trình Pull Request
+
+1. **Tạo nhánh từ `main`:** `feat/<tinh-nang>`, `fix/<loi>`, `docs/<noi-dung>`, `test/<pham-vi>`.
+2. **Commit nhỏ, một ý một commit**, message tiếng Việt theo dạng Conventional Commits:
+   - `feat(referee): ...`, `fix(auth): ...`, `docs: ...`, `test: ...`, `refactor: ...`, `chore: ...`
+   - Commit có trợ lý AI tham gia thì thêm trailer `Co-Authored-By:` tương ứng.
+3. **Mở PR vào `main`** theo mẫu có sẵn: mục đích, thay đổi, cách kiểm chứng, rủi ro. Reviewer: `@khanhle1406`.
+4. **CI phải xanh** trước khi merge.
+5. **Merge bằng *Create a merge commit*.** Không squash, không rebase, không force-push, không `--no-verify` — lịch sử git là bằng chứng quá trình làm.
+6. **Merge vào `main` = deploy production** (hPanel tự deploy sau khoảng 1,5 phút; chờ 2–5 phút rồi kiểm). Sau merge, kiểm `/api/health` (commit mới), `/verify` (9/9), `/trust` (12/12).
+
+## 4. Nguyên tắc cốt lõi
+
+- **Quy tắc tất định quyết định, AI chỉ đọc chứng từ.** Hệ thống chạy 25 quy tắc SOP (24 trong engine, 1 do workflow thêm khi dữ liệu chưa xác minh), không gọi LLM trên đường quyết định, không có vòng lặp agent. Trường nào AI viết ra mà quy tắc dùng tới phải nằm trong danh sách cho phép (`VISION_ALLOWED_KEYS`).
+- **Căn cứ pháp lý theo ngày lập hóa đơn** (`lib/legalBasis.ts`). Văn bản chưa đối chiếu nguyên văn thì không ghi số điều.
+- **Không đoán bừa, không chuyển tiếp thừa.** Dữ liệu nghi vấn thì hỏi; dữ kiện không làm đổi kết quả thì không hỏi.
+- **Kiểm soát không được nới lỏng ngầm.** Hoàn tác, sửa số tiền, đổi policy không được hạ thẩm quyền hay gỡ lệnh giữ của người khác.
+- **Nhật ký chỉ ghi thêm.** Mọi quyết định và thao tác ghi vào chuỗi SHA-256 + HMAC.
+- **Trung thực về bằng chứng.** Không bịa số liệu, tên, chức danh hay trích dẫn người dùng; tài liệu phải khớp mã.
+
+## 5. Tài liệu
+
+- Mục lục: [docs/README.md](docs/README.md).
+- Tài liệu nộp thi viết tiếng Việt có dấu. Bộ slide giữ đúng 5 slide theo thể lệ.
+- Đổi hành vi thì cập nhật README, `/trust` hoặc tài liệu liên quan trong cùng PR, và ghi vào [CHANGELOG.md](CHANGELOG.md) mục *Chưa phát hành*.
