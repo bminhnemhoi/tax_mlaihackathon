@@ -877,7 +877,7 @@ export const InteractiveInputForm: React.FC<InteractiveInputFormProps> = ({
     if (Object.keys(factPrompts).length > 0 && factPromptRef.current !== promptKey) {
       factPromptRef.current = promptKey;
       setFormErrors(factPrompts);
-      toast.warning('Quy định cần thêm dữ kiện cho số tiền này', { description: `${Object.values(factPrompts).join(' · ')}. Chưa biết thì bấm Thẩm định lần nữa: hồ sơ chuyển Kế toán trưởng xác minh (nhóm chưa xác định thông tin).` });
+      toast.warning('Quy định cần thêm dữ kiện cho hóa đơn này', { description: `${Object.values(factPrompts).join(' · ')}. Chưa biết thì bấm Thẩm định lần nữa: hồ sơ chuyển Kế toán trưởng xác minh (nhóm chưa xác định thông tin).` });
       return;
     }
     setFormErrors({});
