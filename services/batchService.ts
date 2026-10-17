@@ -14,6 +14,10 @@ import { InvoiceInputSchema, RefereeDecisionSchema, type RefereeDecision } from 
 import { answerHandoff, readRecord, WorkflowError } from '@/services/workflowService';
 import { getStaff } from '@/services/staffDirectory';
 
+/** Điều kiện SQL (bí danh hóa đơn `i`): hóa đơn không nằm trong lô chưa chốt. Sổ sách/xuất chứng từ chỉ lấy hóa đơn thỏa điều kiện này —
+ *  máy quyết từng hóa đơn, nhưng hóa đơn trong lô chỉ được ghi sổ sau khi người có thẩm quyền chốt lô. */
+export const NOT_IN_OPEN_BATCH_SQL = "NOT EXISTS (SELECT 1 FROM batch_items bi JOIN batches b ON b.id = bi.batch_id WHERE bi.invoice_id = i.id AND b.status <> 'SIGNED_OFF')";
+
 export type BatchSource = 'UPLOAD' | 'GMAIL' | 'ZALO' | 'MANUAL';
 export type BatchBucket = 'MACHINE_APPROVED' | 'HUMAN_APPROVED' | 'NEEDS_HUMAN' | 'ON_HOLD' | 'REJECTED' | 'ERROR' | 'PROCESSING';
 export const BUCKET_LABELS: Record<BatchBucket, string> = {

@@ -5,11 +5,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { explainDecision } from '../../lib/explainDecision';
-import { getActivePolicy, runIsolated } from '../../lib/server/db';
+import { getActivePolicy, getDatabase, runIsolated } from '../../lib/server/db';
 import { switchRole } from '../../lib/server/auth';
 import { listAuditEventsForEntity } from '../../lib/server/audit';
 import type { InvoiceInput } from '../../lib/schemas';
-import { answerGroup, attachToBatch, createBatch, getBatch, signOffBatch } from '../../services/batchService';
+import { answerGroup, attachToBatch, createBatch, getBatch, NOT_IN_OPEN_BATCH_SQL, signOffBatch } from '../../services/batchService';
 import { evaluateInvoiceLocally } from '../../services/policyEngine';
 import { answerHandoff, evaluateWorkflow, readRecord } from '../../services/workflowService';
 
@@ -123,3 +123,18 @@ test('một hóa đơn chỉ nằm trong một lô; chỉ người tạo lô đ�
   });
 });
 
+
+test('sổ sách chỉ lấy hóa đơn đã duyệt KHÔNG nằm trong lô chưa chốt: máy duyệt trong lô mở chưa được ghi sổ, chốt lô xong mới vào sổ', async () => {
+  await runIsolated(async () => {
+    const acc = switchRole('ACCOUNTANT')!.user;
+    await evaluateWorkflow(water('0000051'), acc, { forceLocalOnly: true });
+    await evaluateWorkflow(water('0000052'), acc, { forceLocalOnly: true });
+    const batch = createBatch(acc, { label: 'Lô chờ chốt' });
+    attachToBatch(acc, batch.id, { invoiceId: 'NUOC-0000052' });
+    const postable = () => (getDatabase().prepare(`SELECT i.id FROM invoices i WHERE i.status = 'APPROVED' AND ${NOT_IN_OPEN_BATCH_SQL} ORDER BY i.id`).all() as Array<{ id: string }>).map(r => r.id);
+    assert.equal(readRecord('NUOC-0000052').status, 'APPROVED', 'máy đề xuất duyệt');
+    assert.deepEqual(postable(), ['NUOC-0000051'], 'hóa đơn trong lô chưa chốt chưa được ghi sổ');
+    signOffBatch(batch.id, switchRole('CHIEF_ACCOUNTANT')!.user, 'Chốt lô sau khi xem phiếu giải trình');
+    assert.deepEqual(postable(), ['NUOC-0000051', 'NUOC-0000052']);
+  });
+});
