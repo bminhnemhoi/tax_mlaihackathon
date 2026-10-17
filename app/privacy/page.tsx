@@ -20,7 +20,7 @@ export default function PrivacyPage() {
     <header className="space-y-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tax Referee · Riêng tư</p>
       <h1 className="text-3xl font-semibold">Dữ liệu của bạn đi đâu</h1>
-      <p className="text-slate-600">Nói ngắn gọn: <strong>máy quyết định bằng quy tắc, không bằng AI</strong>. AI chỉ được nhìn ảnh để đọc chữ, và chỉ khi doanh nghiệp bật. Hóa đơn điện tử (XML) không bao giờ đi qua AI.</p>
+      <p className="text-slate-600">Nói ngắn gọn: <strong>máy quyết định bằng quy tắc, không bằng AI</strong>. AI chỉ được nhìn ảnh để đọc chữ, và chỉ khi doanh nghiệp bật. Nội dung hóa đơn điện tử (XML) do máy đọc, không gửi cho AI; riêng tên và mã số thuế người bán có thể được gửi đi tra cứu trên nguồn .gov.vn qua công cụ tìm kiếm của nhà cung cấp AI.</p>
     </header>
 
     <section className="space-y-3">

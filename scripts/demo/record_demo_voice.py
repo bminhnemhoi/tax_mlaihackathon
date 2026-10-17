@@ -35,8 +35,9 @@ LINES = {
     'signoff': 'Máy không tự ghi sổ. Kế toán trưởng xem tổng hợp, rồi ký chốt lô.',
     'dashboard': 'Sếp chỉ cần một màn hình để biết hóa đơn nào máy đã xử lý, hóa đơn nào đang chờ ai quyết.',
     'history': 'Mỗi người xem lại được lịch sử duyệt của chính mình.',
-    'channels': 'Hóa đơn gửi qua Gmail hay Zalo đều được nhận về. Hệ thống biết ai gửi, và chặn email giả danh nhân viên.',
-    'privacy': 'Dữ liệu đi đâu cũng nói rõ. Hóa đơn điện tử không bao giờ đi qua AI.',
+    'gmail': 'Nhân viên gửi hóa đơn qua Gmail, ở đây là hộp thư mô phỏng. Hệ thống nhận ra đúng người gửi nhờ chữ ký email, tự kiểm rồi gom vào lô. Thư giả danh nhân viên bị chặn lại.',
+    'zalo': 'Ảnh hóa đơn gửi qua Zalo vào hàng chờ đọc. Người lạ phải chờ kế toán trưởng xác nhận, còn người gửi được báo kết quả.',
+    'privacy': 'Trang riêng tư nói rõ dữ liệu đi đâu. Hóa đơn điện tử do máy đọc, và AI không quyết định hóa đơn nào.',
     'outro': 'Tax Referee. Máy kiểm nhanh, người quyết đúng chỗ.',
 }
 
@@ -45,7 +46,15 @@ async def synth_all(out_dir: str) -> dict[str, tuple[str, float]]:
     result: dict[str, tuple[str, float]] = {}
     for key, text in LINES.items():
         path = os.path.join(out_dir, f'{key}.mp3')
-        await edge_tts.Communicate(text, VOICE, rate='+8%').save(path)
+        for attempt in range(6):  # mạng 4G hay rớt: thử lại
+            try:
+                await edge_tts.Communicate(text, VOICE, rate='+12%').save(path)
+                break
+            except Exception as error:  # noqa: BLE001
+                if attempt == 5:
+                    raise
+                print('thử lại giọng', key, type(error).__name__, flush=True)
+                await asyncio.sleep(2 + attempt * 2)
         dur = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path]).decode().strip())
         result[key] = (path, dur)
     return result
@@ -72,7 +81,7 @@ def main() -> None:
     audio = asyncio.run(synth_all(tmp))
     print('giọng đọc tổng', round(sum(d for _, d in audio.values()), 1), 'giây', flush=True)
     files = sorted(glob.glob(os.path.join(DATA, '*.xml')))
-    marks: list[tuple[str, float]] = []
+    marks: list[tuple[str, float, float]] = []  # (đoạn, mốc bắt đầu, mốc kết thúc) theo giây trong video gốc
     os.makedirs(VIDEO_DIR, exist_ok=True)
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -84,12 +93,12 @@ def main() -> None:
 
         def step(key: str, action=None, settle: float = 0.0) -> None:
             start = time.monotonic()
-            marks.append((key, start - t0))
             caption(page, LINES[key])
             if action:
                 action()
             elapsed = time.monotonic() - start
             time.sleep(max(0.0, audio[key][1] + 0.35 - elapsed) + settle)
+            marks.append((key, start - t0, time.monotonic() - t0))
 
         page.goto(args.base + '/')
         step('intro')
@@ -139,24 +148,59 @@ def main() -> None:
 
         step('dashboard', lambda: (page.goto(args.base + '/workspace/dashboard'), page.wait_for_timeout(1200)))
         step('history', lambda: (page.goto(args.base + '/workspace/history'), page.wait_for_timeout(800)))
-        step('channels', lambda: (page.goto(args.base + '/workspace/channels'), page.wait_for_timeout(800)))
+        page.goto(args.base + '/workspace/channels')
+        page.wait_for_selector('text=Mô phỏng · dữ liệu mẫu', timeout=60_000)
+
+        def gmail() -> None:
+            page.get_by_role('button', name='Lấy hóa đơn từ Gmail').click()
+            page.wait_for_selector('text=Nghi mạo danh', timeout=60_000)
+            page.wait_for_timeout(900)
+            page.get_by_text('Nghi mạo danh').first.scroll_into_view_if_needed()
+        step('gmail', gmail)
+
+        def zalo() -> None:
+            page.mouse.wheel(0, -4000)
+            page.get_by_role('button', name='Lấy hóa đơn từ Zalo').click()
+            page.wait_for_selector('text=zalo-demo-zalo-318', timeout=60_000)
+            page.wait_for_timeout(900)
+            page.get_by_text('Mô phỏng — không gửi thật').first.scroll_into_view_if_needed()
+        step('zalo', zalo)
         step('privacy', lambda: (page.goto(args.base + '/privacy'), page.wait_for_timeout(600)))
         step('outro', lambda: page.goto(args.base + '/'), settle=0.6)
 
         video_path = page.video.path() if page.video else None
+        end_mark = time.monotonic() - t0
         ctx.close()
         browser.close()
     if not video_path:
         sys.exit('Không có video')
+    # Playwright bắt đầu ghi khi có khung hình đầu (sau t0): dời mốc theo độ lệch = thời lượng đo được − thời lượng video gốc.
+    raw = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', video_path]).decode().strip() or end_mark)
+    lag = max(0.0, end_mark - raw)
+    print('độ lệch ghi hình', round(lag, 2), 'giây', flush=True)
+    marks = [(key, max(0.0, a - lag), max(0.0, b - lag)) for key, a, b in marks]
+    # Cắt đoạn chờ không lời: giữ phần có giọng đọc của mỗi bước + 1,2 giây cuối nếu thao tác chạy lâu hơn lời đọc
+    # (để thấy kết quả hiện ra); bỏ khoảng chuyển trang giữa các bước.
+    segments: list[tuple[float, float]] = []
+    starts: dict[int, float] = {}
+    for i, (key, start, end) in enumerate(marks):
+        starts[i] = sum(b - a for a, b in segments)
+        spoken = start + audio[key][1] + 0.35
+        if end - spoken > 1.6:
+            segments += [(start, spoken), (end - 1.2, end)]
+        else:
+            segments.append((start, end))
+    vf = ''.join(f'[0:v]trim=start={a:.3f}:end={b:.3f},setpts=PTS-STARTPTS[v{j}];' for j, (a, b) in enumerate(segments))
+    vf += ''.join(f'[v{j}]' for j in range(len(segments))) + f'concat=n={len(segments)}:v=1:a=0[vout]'
     inputs = ['-i', video_path]
-    filters = []
-    for i, (key, at) in enumerate(marks, start=1):
+    filters = [vf]
+    for i, (key, _, _) in enumerate(marks, start=1):
         inputs += ['-i', audio[key][0]]
-        ms = int(at * 1000)
+        ms = int(starts[i - 1] * 1000)
         filters.append(f'[{i}:a]adelay={ms}|{ms}[a{i}]')
     mix = ''.join(f'[a{i}]' for i in range(1, len(marks) + 1)) + f'amix=inputs={len(marks)}:normalize=0[aout]'
     out = os.path.join(VIDEO_DIR, 'Tax-Referee-demo-1-phut.mp4')
-    cmd = ['ffmpeg', '-y', '-loglevel', 'error', *inputs, '-filter_complex', ';'.join(filters + [mix]), '-map', '0:v', '-map', '[aout]',
+    cmd = ['ffmpeg', '-y', '-loglevel', 'error', *inputs, '-filter_complex', ';'.join(filters + [mix]), '-map', '[vout]', '-map', '[aout]',
            '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-shortest', '-movflags', '+faststart', out]
     subprocess.run(cmd, check=True)
     dur = subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', out]).decode().strip()

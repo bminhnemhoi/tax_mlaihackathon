@@ -24,7 +24,7 @@ export const SHOPAIKEY_GEMINI_API_CONFIG = {
 /**
  * LLM dành cho DEMO (chuẩn OpenAI chat/completions), CHỈ dùng khi DEV_LLM_ENABLED=1 và đủ 3 biến DEV_LLM_*.
  * Mặc định tắt. Giá trị đặt ở máy chạy — trong repo chỉ có tên biến.
- * Riêng tư: ảnh hóa đơn đi tới máy chủ này; XML không bao giờ đi qua AI.
+ * Riêng tư: ảnh hóa đơn đi tới máy chủ này; nội dung XML không gửi cho AI (riêng tên, MST người bán có thể được tra cứu qua công cụ tìm kiếm của nhà cung cấp AI).
  */
 export function devLlmConfig(): { baseUrl: string; apiKey: string; model: string; host: string } | null {
   if (process.env.DEV_LLM_ENABLED !== '1') return null;
