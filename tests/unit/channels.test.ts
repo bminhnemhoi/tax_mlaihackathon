@@ -8,6 +8,9 @@ import { getDatabase, runIsolated } from '../../lib/server/db';
 import { switchRole } from '../../lib/server/auth';
 import { listChannelMessages, pullChannel } from '../../services/channels/channelService';
 import { topAuthenticationResults, type GmailClient, type InboundMail } from '../../services/channels/gmailChannel';
+import { listNotifications, notify } from '../../services/channels/notifier';
+import { isAllowedZaloFileUrl, parseZaloUpdates, type ZaloClient } from '../../services/channels/zaloChannel';
+import { seedStaffDirectory } from '../../services/staffDirectory';
 
 const fakeGmail = (mails: InboundMail[], seen: number[] = []): GmailClient => ({
   fetchUnseen: async () => mails, markSeen: async (uids) => { seen.push(...uids); }, close: async () => undefined,
@@ -64,6 +67,52 @@ test('Gmail: kéo lại cùng thư không tạo bản trùng; file sai đuôi b�
     assert.equal(second.duplicates, 1);
     assert.equal(second.files, 0);
     assert.equal(listChannelMessages().length, 1);
+  });
+});
+
+test('Thông báo: thiếu cấu hình ⇒ ghi SKIPPED_NOT_CONFIGURED, kênh gửi lỗi ⇒ FAILED, không bao giờ ném lỗi', async () => {
+  await runIsolated(async () => {
+    const saved = { to: process.env.GMAIL_NOTIFY_TO, chat: process.env.ZALO_NOTIFY_CHAT_ID };
+    delete process.env.GMAIL_NOTIFY_TO; delete process.env.ZALO_NOTIFY_CHAT_ID;
+    try {
+      const skipped = await notify({ kind: 'TEST', text: 'Lô thử' }, { emailReady: false, zaloReady: false, sendEmail: async () => { throw new Error('không được gọi'); }, sendZalo: async () => { throw new Error('không được gọi'); } });
+      assert.deepEqual(skipped.map(r => r.status), ['SKIPPED_NOT_CONFIGURED', 'SKIPPED_NOT_CONFIGURED']);
+      const failed = await notify({ kind: 'TEST', text: 'x', to: { zaloChatId: 'chat-1' } }, { emailReady: true, zaloReady: true, sendEmail: async () => undefined, sendZalo: async () => { throw new Error('POST https://bot-api.zaloplatforms.com/botSECRET123/sendMessage 500'); } });
+      assert.equal(failed[0].status, 'FAILED');
+      assert.ok(!failed[0].error?.includes('SECRET123'), 'lỗi lưu lại không chứa token');
+      assert.equal(listNotifications().length, 3);
+      // Lượt kéo Gmail có lô: tóm tắt cho KTT + báo người gửi, chạy được khi chưa cấu hình kênh gửi.
+      const sent: string[] = [];
+      const user = switchRole('ACCOUNTANT')!.user;
+      await pullChannel(user, 'GMAIL', { gmail: fakeGmail([mail()]), notifier: { emailReady: true, zaloReady: false, sendEmail: async (to, _s, text) => { sent.push(`${to}|${text}`); }, sendZalo: async () => undefined } });
+      assert.ok(sent.some(s => s.startsWith('minhanh.kd@example.com|Hóa đơn hd-4521.xml')), sent.join('\n'));
+    } finally {
+      if (saved.to !== undefined) process.env.GMAIL_NOTIFY_TO = saved.to;
+      if (saved.chat !== undefined) process.env.ZALO_NOTIFY_CHAT_ID = saved.chat;
+    }
+  });
+});
+
+test('Zalo: ảnh từ máy chủ ngoài danh sách cho phép bị từ chối, không tải; ảnh của nhân viên đã đăng ký vào hàng chờ', async () => {
+  await runIsolated(async () => {
+    const user = switchRole('CHIEF_ACCOUNTANT')!.user;
+    seedStaffDirectory(); getDatabase().prepare("UPDATE staff_directory SET zalo_user_id='zalo-kd-1' WHERE id='STAFF-KD'").run();
+    const downloaded: string[] = [];
+    const zalo: ZaloClient = {
+      getUpdates: async () => parseZaloUpdates({ ok: true, result: [
+        { event_name: 'message.image.received', message: { message_id: 'm1', from: { id: 'zalo-kd-1', display_name: 'Minh Anh' }, chat: { id: 'c1' }, photo: 'http://169.254.169.254/latest/meta-data' } },
+        { event_name: 'message.image.received', message: { message_id: 'm2', from: { id: 'zalo-kd-1' }, chat: { id: 'c1' }, photo: 'https://photo-stal-1.zdn.vn/hd.jpg' } },
+        { event_name: 'message.text.received', message: { message_id: 'm3', from: { id: 'zalo-kd-1' }, chat: { id: 'c1' }, text: 'chào' } },
+      ] }),
+      download: async (url) => { downloaded.push(url); return { content: Buffer.from('fake-jpeg'), mime: 'image/jpeg' }; },
+    };
+    const result = await pullChannel(user, 'ZALO', { zalo, notifier: { emailReady: false, zaloReady: false, sendEmail: async () => undefined, sendZalo: async () => undefined } });
+    assert.equal(result.counts.REJECTED, 1);
+    assert.equal(result.counts.QUEUED, 1);
+    assert.deepEqual(downloaded, ['https://photo-stal-1.zdn.vn/hd.jpg']);
+    assert.equal(isAllowedZaloFileUrl('https://zdn.vn.evil.com/a.jpg'), false);
+    assert.equal(isAllowedZaloFileUrl('https://user:pw@photo.zdn.vn/a.jpg'), false);
+    assert.equal(isAllowedZaloFileUrl('https://photo.zdn.vn:8443/a.jpg'), false);
   });
 });
 

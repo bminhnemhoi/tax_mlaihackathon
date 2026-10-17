@@ -16,6 +16,8 @@ import { evaluateWorkflow, WorkflowError } from '@/services/workflowService';
 import { attachToBatch, createBatch } from '@/services/batchService';
 import { getStaff, identifySender, seedStaffDirectory, type SenderIdentity, type StaffMember } from '@/services/staffDirectory';
 import { createImapGmailClient, gmailConfigured, type GmailClient } from './gmailChannel';
+import { createHttpZaloClient, isAllowedZaloFileUrl, zaloConfigured, type ZaloClient } from './zaloChannel';
+import { notify, type NotifyTransport } from './notifier';
 
 export type ChannelName = 'GMAIL' | 'ZALO';
 export type ChannelMessageStatus = 'PROCESSED' | 'QUEUED' | 'NEEDS_SENDER_REVIEW' | 'REJECTED' | 'ERROR';
@@ -28,13 +30,15 @@ const MANAGER_ROLES = ['CHIEF_ACCOUNTANT', 'CFO'];
 export interface InboundFile {
   externalId: string; senderAddress: string; senderName?: string; identity: SenderIdentity;
   subject?: string; receivedAt?: string; fileName: string; mime: string; content: Buffer;
+  /** Lý do từ chối trước khi tải (VD liên kết ngoài máy chủ Zalo) — không lưu file. */
+  rejectReason?: string;
 }
 export interface ProcessedOutcome { invoiceId: string; workflowStatus: string; taxAmount: number; staffId: string; senderAddress: string; fileName: string }
 export interface PullResult {
   channel: ChannelName; messages: number; files: number; duplicates: number; batchId: string | null;
   counts: Record<ChannelMessageStatus, number>; outcomes: ProcessedOutcome[];
 }
-export interface ChannelDeps { gmail?: GmailClient }
+export interface ChannelDeps { gmail?: GmailClient; zalo?: ZaloClient; notifier?: NotifyTransport }
 
 const emptyCounts = (): Record<ChannelMessageStatus, number> => ({ PROCESSED: 0, QUEUED: 0, NEEDS_SENDER_REVIEW: 0, REJECTED: 0, ERROR: 0 });
 export const isAllowedFile = (fileName: string): boolean => ALLOWED_EXTENSIONS.includes(path.extname(fileName).toLowerCase());
@@ -87,7 +91,8 @@ async function ingestFile(user: AppUser, channel: ChannelName, file: InboundFile
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'NEW', NULL, ?)`).run(id, channel, file.externalId.slice(0, 500), file.senderAddress.slice(0, 200), file.senderName?.slice(0, 200) ?? null,
     staff?.id ?? null, staff ? 1 : 0, file.subject?.slice(0, 300) ?? null, file.receivedAt ?? jsonNow(), file.fileName.slice(0, 200), file.mime.slice(0, 100), file.content.byteLength, hash, jsonNow());
   try {
-    if (file.content.byteLength > MAX_FILE_BYTES) { status = 'REJECTED'; note = 'File lớn hơn 15 MB — không nhận.'; }
+    if (file.rejectReason) { status = 'REJECTED'; note = file.rejectReason; }
+    else if (file.content.byteLength > MAX_FILE_BYTES) { status = 'REJECTED'; note = 'File lớn hơn 15 MB — không nhận.'; }
     else {
       const artifact = storeArtifact(file.fileName, file.mime, file.content, hash);
       storagePath = artifact.storagePath;
@@ -120,7 +125,32 @@ export async function pullChannel(user: AppUser, channel: ChannelName, deps: Cha
   seedStaffDirectory();
   const result: PullResult = { channel, messages: 0, files: 0, duplicates: 0, batchId: null, counts: emptyCounts(), outcomes: [] };
   const ensureBatch = () => result.batchId ??= createBatch(user, { label: `Lô ${channel === 'GMAIL' ? 'Gmail' : 'Zalo'} ${new Date().toLocaleString('vi-VN')}`, source: channel }).id;
-  if (channel !== 'GMAIL') throw new WorkflowError('Kênh Zalo chưa bật trong bản này.', 409);
+  const zaloReplies = new Map<string, number>();
+  if (channel === 'ZALO') {
+    if (!deps.zalo && !zaloConfigured()) throw new WorkflowError('Zalo chưa cấu hình (thiếu ZALO_BOT_TOKEN).', 409);
+    const client = deps.zalo ?? createHttpZaloClient();
+    const updates = (await client.getUpdates()).filter(u => u.eventName === 'message.image.received' && u.photoUrl).slice(0, PULL_LIMIT);
+    result.messages = updates.length;
+    for (const update of updates) {
+      const identity = identifySender({ zaloUserId: update.fromId });
+      const base = { externalId: update.messageId, senderAddress: update.fromId, senderName: update.fromName, identity, subject: update.caption, receivedAt: update.date };
+      if (getDatabase().prepare('SELECT 1 FROM channel_messages WHERE channel=? AND external_id=?').get(channel, update.messageId)) { result.duplicates++; continue; }
+      let file: InboundFile;
+      if (!isAllowedZaloFileUrl(update.photoUrl)) file = { ...base, fileName: `zalo-${update.messageId}.jpg`, mime: 'image/jpeg', content: Buffer.alloc(0), rejectReason: 'Liên kết ảnh không thuộc máy chủ Zalo — không tải (chống SSRF).' };
+      else {
+        try {
+          const downloaded = await client.download(update.photoUrl!);
+          const ext = downloaded.mime === 'image/png' ? '.png' : downloaded.mime === 'image/webp' ? '.webp' : '.jpg';
+          file = { ...base, fileName: `zalo-${update.messageId}${ext}`, mime: downloaded.mime, content: downloaded.content };
+        } catch (error) { file = { ...base, fileName: `zalo-${update.messageId}.jpg`, mime: 'image/jpeg', content: Buffer.alloc(0), rejectReason: (error instanceof Error ? error.message : 'Không tải được ảnh').slice(0, 200) }; }
+      }
+      await ingestFile(user, channel, file, ensureBatch, result);
+      if (identity.verified && identity.staff) zaloReplies.set(update.chatId, (zaloReplies.get(update.chatId) ?? 0) + 1);
+    }
+    appendAuditEvent({ eventType: 'CHANNEL_PULLED', entityId: `channel:${channel}`, actorId: user.id, payload: { messages: result.messages, files: result.files, duplicates: result.duplicates, counts: result.counts, batchId: result.batchId } });
+    for (const [chatId, n] of zaloReplies) await notify({ kind: 'SENDER_RECEIPT', text: `Tax Referee đã nhận ${n} ảnh hóa đơn của anh/chị. Kế toán sẽ đọc và báo kết quả.`, to: { zaloChatId: chatId } }, deps.notifier);
+    return result;
+  }
   if (!deps.gmail && !gmailConfigured()) throw new WorkflowError('Gmail chưa cấu hình (thiếu GMAIL_IMAP_USER / GMAIL_APP_PASSWORD).', 409);
   const client = deps.gmail ?? await createImapGmailClient();
   try {
@@ -141,7 +171,26 @@ export async function pullChannel(user: AppUser, channel: ChannelName, deps: Cha
     await client.markSeen(seen);
   } finally { await client.close(); }
   appendAuditEvent({ eventType: 'CHANNEL_PULLED', entityId: `channel:${channel}`, actorId: user.id, payload: { messages: result.messages, files: result.files, duplicates: result.duplicates, counts: result.counts, batchId: result.batchId } });
+  await sendPullNotifications(result, deps.notifier);
   return result;
+}
+
+const APPROVED = ['APPROVED'];
+const outcomeText = (status: string) => APPROVED.includes(status) ? 'máy đề xuất duyệt' : status === 'REJECTED' ? 'máy đề xuất không khấu trừ' : 'cần Kế toán trưởng / CFO quyết';
+const vnd = (n: number) => `${Math.round(n).toLocaleString('vi-VN')}₫`;
+
+/** Sau lượt kéo có lô: tóm tắt cho KTT và báo kết quả cho từng người gửi đã xác thực. Không ném lỗi. */
+async function sendPullNotifications(result: PullResult, transport?: NotifyTransport): Promise<void> {
+  if (!result.batchId || result.outcomes.length === 0) return;
+  const approved = result.outcomes.filter(o => APPROVED.includes(o.workflowStatus));
+  const waiting = result.outcomes.filter(o => !APPROVED.includes(o.workflowStatus) && o.workflowStatus !== 'REJECTED');
+  const vatWaiting = waiting.reduce((sum, o) => sum + o.taxAmount, 0);
+  await notify({ kind: 'BATCH_SUMMARY', batchId: result.batchId, subject: `Tax Referee — ${result.batchId}`,
+    text: `Lô ${result.batchId}: ${approved.length} hóa đơn máy đề xuất duyệt, ${waiting.length} cần anh/chị quyết, VAT chờ ${vnd(vatWaiting)} — mở Tax Referee để trả lời.` }, transport);
+  for (const o of result.outcomes) {
+    await notify({ kind: 'SENDER_OUTCOME', invoiceId: o.invoiceId, batchId: result.batchId, subject: `Kết quả hóa đơn ${o.fileName}`,
+      text: `Hóa đơn ${o.fileName}: ${outcomeText(o.workflowStatus)} (thuế GTGT ${vnd(o.taxAmount)}). Lô ${result.batchId}.`, to: { email: o.senderAddress } }, transport);
+  }
 }
 
 export interface ChannelMessageView {
