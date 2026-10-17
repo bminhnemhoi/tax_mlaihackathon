@@ -134,7 +134,8 @@ test('PDF: file tạm ghi vào thư mục riêng, cờ wx, quyền 600, luôn đ
     const [file, , opts] = call.arguments as [string, unknown, { flag?: string; mode?: number }];
     assert.notEqual(path.dirname(file), dir, 'không ghi thẳng vào thư mục tạm dùng chung');
     assert.deepEqual([opts.flag, opts.mode], ['wx', 0o600]);
-    assert.deepEqual(fs.readdirSync(dir), [], 'không để lại file hay thư mục tạm');
+    // Windows: lệnh python3 trỏ tới stub Microsoft Store thì stub tự ghi python_install_*.log vào %TEMP% — không phải file của ứng dụng.
+    assert.deepEqual(fs.readdirSync(dir).filter(f => !/^python_install_\d+_\d+\.log$/.test(f)), [], 'không để lại file hay thư mục tạm');
   } finally {
     spy.mock.restore();
     for (const [key, value] of Object.entries(saved)) value === undefined ? delete process.env[key] : (process.env[key] = value);

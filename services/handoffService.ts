@@ -1,5 +1,13 @@
 import type { EscalatedDecision, InvoiceInput, RefereeHandoff, RefereeDecision, RuleFinding } from '@/lib/schemas';
 import {ruleContract} from '@/data/policyContract';
+import {buyerTaxCodeBasis,cashPaymentBasis,closedSellerBasis,sameDayCashBasis,seriesYearBasis,signingBasis,taxAuthorityCodeBasis} from '@/lib/legalBasis';
+
+/** Quy tắc đã có căn cứ cấp điều/khoản được đối chiếu nguyên văn (lib/legalBasis), chọn theo ngày lập hóa đơn. */
+const ARTICLE_BASIS:Record<string,(invoiceDate:string)=>string>={
+  STATUTORY_LAW_48_CASH_PAYMENT:cashPaymentBasis,STATUTORY_SAME_DAY_CASH_5M:sameDayCashBasis,RULE_BUYER_TAX_CODE_MISMATCH:buyerTaxCodeBasis,
+  RULE_MCCQT_INVALID:taxAuthorityCodeBasis,RULE_SERIES_YEAR_MISMATCH:seriesYearBasis,STATUTORY_DECREE_254_CLOSED_SELLER:closedSellerBasis,
+  RULE_SIGNING_DELAY:signingBasis,
+};
 import {composeQuestion,issueItem,type FieldAsk,type QuestionItem} from './questionBuilder';
 const labels:Record<string,string>={invoiceNumber:'Số hóa đơn',invoiceDate:'Ngày lập',supplierName:'Nhà cung cấp',supplierTaxCode:'MST bên bán',itemName:'Hàng hóa / dịch vụ',totalAmount:'Tổng thanh toán',preTaxAmount:'Tiền trước thuế',taxAmount:'Tiền thuế',taxRate:'Thuế suất',buyerTaxCode:'MST bên mua',invoiceSeries:'Ký hiệu',taxAuthorityCode:'Mã CQT',signingDate:'Ngày ký',isAdjustment:'Điều chỉnh/thay thế',isImageBlurry:'Ảnh chưa rõ',isStaffReimbursed:'Hoàn ứng nhân viên',items:'Chi tiết dòng hàng',paymentMethod:'Thanh toán',sellerStatus:'Trạng thái bên bán',hasBankSlip:'Chứng từ thanh toán',hasItemManifest:'Bảng kê',sellerSuspensionDate:'Ngày đóng MST',originalInvoiceRef:'Hóa đơn gốc'};
 const value=(v:unknown,field?:string):string=>{
@@ -52,7 +60,8 @@ export function checkHandoff(decision:RefereeDecision):{valid:boolean;errors:str
 }
 export function describeRuleEvidence(finding:RuleFinding,invoiceDate?:string):RuleFinding {
   const rule=ruleContract(finding.ruleId,invoiceDate);
-  return {...finding,legalBasis:`${rule.clause} · Tax-SOP-2026${rule.source?` · ${rule.source.code} (văn bản đã đối chiếu; diễn giải quy tắc chưa xác minh)`:rule.legalVerification==='INTERNAL_POLICY'?' · kiểm soát nội bộ':' · căn cứ pháp lý chưa xác minh'}`,
+  const article=invoiceDate?ARTICLE_BASIS[finding.ruleId]?.(invoiceDate):undefined;
+  return {...finding,legalBasis:`${rule.clause} · Tax-SOP-2026${rule.source?` · ${article || rule.source.code} (văn bản đã đối chiếu; diễn giải quy tắc chưa xác minh)`:rule.legalVerification==='INTERNAL_POLICY'?' · kiểm soát nội bộ':' · căn cứ pháp lý chưa xác minh'}`,
     sopClause:rule.clause,legalVerification:rule.legalVerification,sourceUrl:rule.source?.url || undefined,
     // Giữ lời giải thích dễ hiểu cho người không chuyên; chỉ nối thêm lưu ý khi diễn giải pháp lý chưa được xác nhận.
     plainExplanation:rule.legalVerification==='INTERNAL_POLICY'||finding.plainExplanation.includes('Lưu ý: diễn giải')?finding.plainExplanation:`${finding.plainExplanation} Lưu ý: diễn giải điều khoản pháp lý của quy tắc này cần kế toán xác nhận.`};

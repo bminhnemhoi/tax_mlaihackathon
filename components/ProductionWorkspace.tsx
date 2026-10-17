@@ -468,7 +468,7 @@ export function ProductionWorkspace({
                 <Badge variant="destructive">TRÙNG HÓA ĐƠN</Badge>
               )}
               {provisionalHoldIds.has(selected.id) && (
-                <Badge variant="info">TÁCH THUẾ TẠM TÍNH (CV 2392)</Badge>
+                <Badge variant="info">TÁCH THUẾ TẠM TÍNH</Badge>
               )}
             </div>
             <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
