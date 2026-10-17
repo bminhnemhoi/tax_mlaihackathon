@@ -1,7 +1,7 @@
 # Hướng dẫn review PR "Cải tiến vòng 17/10" (dành cho người review và AI review)
 
 > Viết cho: Khánh (chủ repo, người merge) và trợ lý AI review của repo đội. Merge vào `main` = **deploy production** (hPanel tự deploy).
-> Base: `main` của `khanhle1406/Tax-Referee` (`e9e4407`, đã gộp vào nhánh bằng merge commit `0e24e75`). Lịch sử giữ nguyên (không squash, không force-push), nên hãy merge bằng **merge commit**.
+> Base: `main` của `khanhle1406/Tax-Referee` (đã gộp `e9e4407` và `9fd3e98` — PR #15, #16 — vào nhánh bằng merge commit, không rebase). Lịch sử giữ nguyên (không squash, không force-push), nên hãy merge bằng **merge commit**.
 
 ## 1. PR này làm gì (một đoạn)
 
@@ -63,13 +63,13 @@ PR còn gồm:
 npm ci
 npx tsc --noEmit          # không lỗi
 npm run lint              # không lỗi
-npm test                  # "16/16 bộ kiểm thử đạt"; bộ unit ≥ 166 kiểm tra (scripts/qa/run-all.ts)
+npm test                  # "16/16 bộ kiểm thử đạt"; bộ unit ≥ 169 kiểm tra (scripts/qa/run-all.ts)
 npm run referee:diff      # "KHÔNG ĐỔI / 180 ca"
 npm run build             # "Compiled successfully"
 ```
 Kết quả trên máy tác giả, ngày 17/10/2026, sau commit cuối của PR:
 - tsc và lint sạch;
-- 16/16 bộ test, unit 166 kiểm tra;
+- 16/16 bộ test, unit 169 kiểm tra;
 - `referee:diff` không đổi;
 - build thành công.
 
