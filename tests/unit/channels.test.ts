@@ -10,7 +10,7 @@ import { listChannelMessages, pullChannel } from '../../services/channels/channe
 import { topAuthenticationResults, type GmailClient, type InboundMail } from '../../services/channels/gmailChannel';
 import { listNotifications, notify } from '../../services/channels/notifier';
 import { isAllowedZaloFileUrl, parseZaloUpdates, type ZaloClient } from '../../services/channels/zaloChannel';
-import { seedStaffDirectory } from '../../services/staffDirectory';
+import { emailAuthenticated, seedStaffDirectory } from '../../services/staffDirectory';
 
 const fakeGmail = (mails: InboundMail[], seen: number[] = []): GmailClient => ({
   fetchUnseen: async () => mails, markSeen: async (uids) => { seen.push(...uids); }, close: async () => undefined,
@@ -114,6 +114,15 @@ test('Zalo: ảnh từ máy chủ ngoài danh sách cho phép bị từ chối, 
     assert.equal(isAllowedZaloFileUrl('https://user:pw@photo.zdn.vn/a.jpg'), false);
     assert.equal(isAllowedZaloFileUrl('https://photo.zdn.vn:8443/a.jpg'), false);
   });
+});
+
+test('Chống mạo danh: tên miền DKIM/SPF phải khớp trọn vẹn, không nhận miền giả có chứa tên miền nhân viên', () => {
+  const from = 'minhanh.kd@example.com';
+  assert.equal(emailAuthenticated(from, AUTH_OK), true);
+  assert.equal(emailAuthenticated(from, 'mx.google.com; dkim=pass header.i=@mail.example.com'), true, 'miền con hợp lệ');
+  assert.equal(emailAuthenticated(from, 'mx.google.com; dkim=pass header.d=example.com.evil.net header.s=x'), false);
+  assert.equal(emailAuthenticated(from, 'mx.google.com; spf=pass (evil) smtp.mailfrom=attacker@evilexample.com'), false);
+  assert.equal(emailAuthenticated(from, 'mx.google.com; dkim=fail header.i=@example.com; spf=softfail smtp.mailfrom=x@example.com'), false);
 });
 
 test('Gmail: chỉ tin header Authentication-Results trên cùng do mx.google.com ghi', () => {
