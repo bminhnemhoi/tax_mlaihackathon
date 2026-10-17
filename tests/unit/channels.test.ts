@@ -131,3 +131,15 @@ test('Gmail: chỉ tin header Authentication-Results trên cùng do mx.google.co
   const real = `Authentication-Results: mx.google.com;\r\n       dkim=pass header.i=@example.com\r\nAuthentication-Results: evil.example; spf=pass\r\n\r\nbody`;
   assert.match(topAuthenticationResults(real) ?? '', /^mx\.google\.com; dkim=pass/);
 });
+
+test('chống mạo danh bằng local-part (example.com@evil.net) và kênh thật không chạy trong phiên demo của người lạ', async () => {
+  assert.equal(emailAuthenticated('duclong.ktt@example.com', 'mx.google.com; spf=pass (google.com: domain of example.com@evil.net designates 1.2.3.4 as permitted sender) smtp.mailfrom=example.com@evil.net; dmarc=fail header.from=example.com'), false);
+  assert.equal(emailAuthenticated('duclong.ktt@example.com', 'mx.google.com; dkim=pass header.i=example.com@evil.net header.s=s1 header.b=abc'), false);
+  assert.equal(emailAuthenticated('duclong.ktt@example.com', 'mx.google.com; dkim=pass header.i=@example.com header.s=s1; spf=pass smtp.mailfrom=bounce@example.com'), true);
+  assert.equal(emailAuthenticated('duclong.ktt@example.com', 'mx.google.com; spf=pass smtp.mailfrom=noreply@mail.example.com'), true);
+  await runIsolated(async () => {
+    const user = switchRole('ACCOUNTANT')!.user;
+    await assert.rejects(pullChannel(user, 'GMAIL'), /chỉ dùng trong workspace nội bộ/);
+  });
+});
+

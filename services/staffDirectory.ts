@@ -4,7 +4,7 @@
  * xác thực (SPF/DKIM) không bao giờ được coi là nhân viên — hồ sơ phải chờ kế toán xác nhận người gửi.
  */
 import crypto from 'crypto';
-import { getDatabase } from '@/lib/server/db';
+import { getDatabase, isSandbox } from '@/lib/server/db';
 
 export interface StaffMember {
   id: string; fullName: string; department: string | null; title: string | null; email: string | null;
@@ -48,7 +48,8 @@ export function seedStaffDirectory(): void {
     insert.run(ids[s.key], s.fullName, s.department, s.title, s.email, s.zaloUserId, userId(s.appEmail), s.manager ? `STAFF-${s.manager.toUpperCase()}` : null, now);
   }
   const extra = process.env.TAX_REFEREE_STAFF_SEED;
-  if (!extra) return;
+  // Danh bạ thật của đội không được nạp vào phiên demo của người lạ (trừ khi chủ máy bật chế độ demo kênh thật).
+  if (!extra || (isSandbox() && process.env.TAX_REFEREE_ALLOW_REAL_CHANNELS_IN_DEMO !== '1')) return;
   try {
     const list = JSON.parse(extra) as Array<Partial<StaffMember>>;
     for (const s of Array.isArray(list) ? list.slice(0, 200) : []) {
@@ -79,12 +80,19 @@ export const emailDomain = (address: string): string => (/^[^@\s]+@([^@\s]+)$/.e
 export function emailAuthenticated(fromAddress: string, authenticationResults: string | undefined): boolean {
   const domain = emailDomain(fromAddress);
   if (!domain || !authenticationResults) return false;
-  const text = authenticationResults.toLowerCase();
-  // Tên miền phải khớp trọn vẹn (hoặc là miền con): chặn "example.com.evil.net" và "evilexample.com" giả làm example.com.
-  const d = domain.replace(/\./g, '\\.');
-  const dkim = new RegExp(`dkim=pass[^;]*header\\.(?:d|i)=(?:[^;\\s@]*@)?(?:[a-z0-9-]+\\.)*${d}(?![a-z0-9.-])`).test(text);
-  const spf = new RegExp(`spf=pass[^;]*smtp\\.mailfrom=(?:[^;\\s@]*@)?(?:[a-z0-9-]+\\.)*${d}(?![a-z0-9.-])`).test(text);
-  return dkim || spf;
+  // Tách từng mệnh đề; tên miền lấy SAU dấu '@' CUỐI CÙNG rồi so khớp chính xác hoặc là miền con — chặn
+  // "example.com.evil.net", "evilexample.com" và local-part giả "example.com@evil.net".
+  const owns = (value: string | undefined): boolean => {
+    if (!value) return false;
+    const host = value.replace(/[<>"']/g, '').split('@').pop()!.trim().replace(/\.$/, '');
+    return host === domain || host.endsWith(`.${domain}`);
+  };
+  for (const clause of authenticationResults.toLowerCase().split(';').map(c => c.trim())) {
+    const prop = (name: string) => new RegExp(`(?:^|\\s)${name.replace('.', '\\.')}=([^\\s;]+)`).exec(clause)?.[1];
+    if (/^dkim=pass\b/.test(clause) && owns(prop('header.d') ?? prop('header.i'))) return true;
+    if (/^spf=pass\b/.test(clause) && owns(prop('smtp.mailfrom'))) return true;
+  }
+  return false;
 }
 
 /** Xác định người gửi: email (kèm kết quả xác thực) hoặc Zalo user id. */
