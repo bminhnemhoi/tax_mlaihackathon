@@ -4,8 +4,6 @@ Tài liệu này liệt kê mọi lệnh từ **clone sạch → chạy được
 [deployment/HOSTINGER.md](deployment/HOSTINGER.md) · bàn giao và tự deploy: [docs/handoff/huong-dan-ban-giao.md](docs/handoff/huong-dan-ban-giao.md) ·
 backup/restore VPS và đánh giá tập độc lập: [docs/runbook-final.md](docs/runbook-final.md) (lưu trữ, có thể không còn khớp mã).
 
-Repo chính thức của đội (nguồn deploy production và bài nộp): https://github.com/khanhle1406/Tax-Referee. Lệnh clone dưới đây dùng bản sao công khai của Minh (`bminhnemhoi/tax_mlaihackathon`).
-
 ## 1. Yêu cầu
 - Node.js 22 (giống CI và production) hoặc 24, kèm npm.
 - Windows, macOS hoặc Linux. Các lệnh test chạy được trên cả Windows (không cần WSL).
@@ -15,8 +13,8 @@ Repo chính thức của đội (nguồn deploy production và bài nộp): http
 ## 2. Clone sạch → chạy
 
 ```sh
-git clone https://github.com/bminhnemhoi/tax_mlaihackathon.git
-cd tax_mlaihackathon
+git clone https://github.com/khanhle1406/Tax-Referee.git
+cd Tax-Referee
 npm ci
 cp .env.example .env.local          # điền key AI nếu muốn đọc ảnh; để trống vẫn chạy Verify
 python3 -m pip install PyMuPDF      # tùy chọn, cho PDF

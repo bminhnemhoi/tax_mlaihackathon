@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Cảm ơn bạn đã báo lỗi. **Lỗ hổng bảo mật xin đừng báo ở đây** — xem [SECURITY.md](https://github.com/bminhnemhoi/tax_mlaihackathon/blob/main/SECURITY.md).
+        Cảm ơn bạn đã báo lỗi. **Lỗ hổng bảo mật xin đừng báo ở đây** — xem [SECURITY.md](https://github.com/khanhle1406/Tax-Referee/blob/main/SECURITY.md).
         Không dán dữ liệu thật của doanh nghiệp, khóa API hay mật khẩu.
   - type: dropdown
     id: area

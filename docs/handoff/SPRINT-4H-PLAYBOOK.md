@@ -23,7 +23,6 @@ Yêu cầu nâng cao Đề A (Sprint 2) còn có thể bị hỏi: tự điều 
 | `origin/main` | `94d7452` (PR #9–#12 đã merge), đang chạy trên live. `live:check`: HMAC bật, Verify 9/9, `/trust` 12/12, CI trên `main` xanh | — |
 | PR #11 vá căn cứ pháp lý · PR #12 công cụ vòng thi | Đã merge và đã lên live; trên live không còn chuỗi `${…}`, văn bản kèm quyết định chỉ gồm văn bản đã đối chiếu | — |
 | PR #13 `fix/judge-sim-hardening` (lỗi mất điểm tìm được khi mô phỏng kiểm thử chung kết) | CI và phản biện đang chạy; `referee:diff` 0/180; unit 117 | Người dùng quyết định merge trước giờ G hay không |
-| Repo cá nhân | PR #11 `legal-sync` đã merge (`c15e22c`) | — |
 | CI | 3,5–4,5 phút (6 lần chạy gần nhất); chạy Ubuntu, Windows rồi build | — |
 | Deploy | Live khởi động lại khoảng 97 giây sau merge | — |
 | `referee:diff` | 180 ca, khoảng 2,4 giây | — |
