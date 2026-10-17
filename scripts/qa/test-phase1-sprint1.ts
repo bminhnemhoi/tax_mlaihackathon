@@ -83,7 +83,7 @@ const resWrongBuyer = evaluateInvoiceLocally(invWrongBuyer, baseConfig);
 assert(
   resWrongBuyer.status === 'ESCALATED' &&
   resWrongBuyer.riskGroup === 'OUT_OF_POLICY' &&
-  resWrongBuyer.flaggedReason?.includes('không trùng khớp với MST doanh nghiệp'),
+  Boolean(resWrongBuyer.findings?.some(f => f.ruleId === 'RULE_BUYER_TAX_CODE_MISMATCH')),
   'Phát hiện hóa đơn sai MST người mua (không thuộc doanh nghiệp) và chặn OUT_OF_POLICY',
   resWrongBuyer.flaggedReason
 );
@@ -201,7 +201,7 @@ const resHighRisk = evaluateInvoiceLocally(invFromHighRisk, baseConfig);
 assert(
   resHighRisk.status === 'ESCALATED' &&
   resHighRisk.riskGroup === 'OUT_OF_POLICY' &&
-  resHighRisk.flaggedReason?.includes('danh bạ cảnh báo rủi ro cao về hóa đơn'),
+  Boolean(resHighRisk.findings?.some(f => f.ruleId === 'RULE_HIGH_RISK_SUPPLIER')),
   'Hệ thống tự động phát hiện hóa đơn từ nhà cung cấp cảnh báo rủi ro cao trong danh bạ',
   resHighRisk.flaggedReason
 );
@@ -259,7 +259,7 @@ assert(
 const citTt78 = getLegalCitation('TT-78-2021-D4-K1');
 assert(
   citTt78 !== undefined &&
-  citTt78.exactQuote.includes('Ký hiệu hóa đơn điện tử là nhóm gồm 6 ký tự'),
+  citTt78.exactQuote.includes('Ký hiệu hóa đơn điện tử là nhóm 6 ký tự'),
   'Trích dẫn Thông tư 78/2021/TT-BTC Điều 4 về ký hiệu 6 ký tự chính xác'
 );
 
