@@ -1,0 +1,1959 @@
+{
+ "verify:A-01": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 100000
+ },
+ "verify:A-02": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 100000
+ },
+ "verify:A-03": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 400000
+ },
+ "verify:A-04": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "verify:A-05": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "verify:C-01": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "verify:C-02": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SCOPE_NOT_COVERED"
+  ],
+  "approvedTax": null
+ },
+ "verify:C-03": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_IMAGE_BLURRY"
+  ],
+  "approvedTax": null
+ },
+ "verify:C-04": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_BUYER_TAX_CODE_MISMATCH"
+  ],
+  "approvedTax": null
+ },
+ "verify:R-1": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 1440000
+ },
+ "verify:R-2": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 400000
+ },
+ "verify:R-3": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "verify:R-4": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 300000
+ },
+ "verify:R-5": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "verify:R-6": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SELLER_SUSPENDED",
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "verify:R-7": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_DECREE_254_CLOSED_SELLER"
+  ],
+  "approvedTax": null
+ },
+ "verify:R-8": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "verify:R-9": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_IMAGE_BLURRY"
+  ],
+  "approvedTax": null
+ },
+ "verify:R-10": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-R-01": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-02": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-03": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-04": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-05": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-06": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-07": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 1363636.3636363652
+ },
+ "dev:DEV-R-08": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 1818181.7272727303
+ },
+ "dev:DEV-R-09": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 454545.3636363642
+ },
+ "dev:DEV-R-10": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 454545.45454545505
+ },
+ "dev:DEV-R-11": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 454545.5454545459
+ },
+ "dev:DEV-R-12": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 18181818.090909094
+ },
+ "dev:DEV-R-13": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": -1000
+ },
+ "dev:DEV-R-14": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": -18181818.090909094
+ },
+ "dev:DEV-R-15": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-16": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-17": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-18": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-19": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 0
+ },
+ "dev:DEV-R-20": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 100000
+ },
+ "dev:DEV-R-21": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 160000.00000000023
+ },
+ "dev:DEV-R-22": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-23": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-R-24": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-U-01": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-02": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-03": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-04": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_DATA_QUALITY"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-05": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_IMAGE_BLURRY"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-06": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-07": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-08": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-09": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-10": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SELLER_CLOSED_BEFORE"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-11": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SELLER_CLOSED_BEFORE"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-U-12": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-O-01": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-O-02": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-O-03": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-O-04": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 300000.00000000047
+ },
+ "dev:DEV-O-05": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "dev:DEV-O-06": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_BUYER_TAX_CODE_MISMATCH"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-O-07": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-O-08": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-O-09": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-O-10": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_DECREE_254_CLOSED_SELLER"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-O-11": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_LAW_48_CASH_PAYMENT",
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-O-12": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY",
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-01": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-02": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-03": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-04": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-05": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-06": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-07": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-08": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 9090909.090909094
+ },
+ "dev:DEV-A-09": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-10": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-11": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "dev:DEV-A-12": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "red:EA-01-exact-200m": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "red:EA-02-200m-plus-1": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "red:EA-03-below-limit-199999999-routine": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 18181818
+ },
+ "red:EA-04-negative-adjustment-250m": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "red:EA-05-big-equipment-1375m": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "red:EA-06-authority-plus-unknown-seller": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY",
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "red:EA-07-authority-plus-cash": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY",
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "red:EA-08-authority-but-blurry-image": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "EXCEED_AUTHORITY",
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "RULE_IMAGE_BLURRY"
+  ],
+  "approvedTax": null
+ },
+ "red:EA-09-total-mismatch-straddles-limit": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "EXCEED_AUTHORITY",
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "RULE_DATA_QUALITY"
+  ],
+  "approvedTax": null
+ },
+ "red:EA-10-authority-plus-vat8-telecom": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY",
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-01-total-ne-pre-plus-tax": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_DATA_QUALITY"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-02-tax-ne-pre-times-rate": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_DATA_QUALITY"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-03-line-items-vs-header": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_LINE_ITEM_MISMATCH"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-04-blurry-image-otherwise-clean": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_IMAGE_BLURRY"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-05-payment-unknown-at-5M-boundary": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-06-bank-transfer-slip-unknown": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-07-seller-status-unknown-20M": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-08-closed-seller-date-unknown": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-09-adjustment-without-original-ref": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-10-conference-package-no-manifest": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-11-odd-tax-rate-7pct": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "red:UN-12-uncertain-total-crossing-200M": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "EXCEED_AUTHORITY",
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "RULE_DATA_QUALITY"
+  ],
+  "approvedTax": null
+ },
+ "red:BR-01-blurry-450-or-480": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_DATA_QUALITY",
+   "RULE_IMAGE_BLURRY"
+  ],
+  "approvedTax": null
+ },
+ "red:BR-02-client-dinner-alcohol": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "INTERNAL_POLICY_GUEST_ENTERTAINMENT"
+  ],
+  "approvedTax": null
+ },
+ "red:BR-03-exactly-5m-bank-routine": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 370370
+ },
+ "red:BR-04-two-problems-telecom8-and-cash": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_LAW_48_CASH_PAYMENT",
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "red:BR-05-buyer-mst-wrong-and-over-limit": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY",
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "RULE_BUYER_TAX_CODE_MISMATCH"
+  ],
+  "approvedTax": null
+ },
+ "red:BR-06-unchanged-invoice-seller-suspended": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SELLER_SUSPENDED"
+  ],
+  "approvedTax": null
+ },
+ "red:BR-07-it-laptops-440m-authority-only": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "red:BR-08-staff-paid-cash-reimbursed": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "red:BR-09-staff-reimbursed-bank-slip-routine": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 1400000
+ },
+ "red:BR-10-blurry-high-value-amount-first": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "EXCEED_AUTHORITY",
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "RULE_IMAGE_BLURRY"
+  ],
+  "approvedTax": null
+ },
+ "red:RT-01-tiny-minimal": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 5000
+ },
+ "red:RT-02-cash-4999999": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 454545
+ },
+ "red:RT-03-exact-5m-bank-slip-8pct": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 370370
+ },
+ "red:RT-04-19999999-no-seller-status": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 1481481
+ },
+ "red:RT-05-exact-20m-active-seller": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 1818182
+ },
+ "red:RT-06-199999999-all-evidence": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 18181818
+ },
+ "red:RT-07-zero-rate-intl-freight": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 0
+ },
+ "red:RT-08-kct-software-minimal": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 0
+ },
+ "red:RT-09-five-pct-water-minimal": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 112500
+ },
+ "red:RT-10-eight-pct-paper-minimal": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 256000
+ },
+ "red:RT-11-items-reconcile-line-rounding": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 571706
+ },
+ "red:RT-12-consulting-with-manifest": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 1500000
+ },
+ "red:RT-13-small-positive-adjustment-with-ref": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 40000
+ },
+ "red:RT-14-telecom-at-ten-pct": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 150000
+ },
+ "red:OP-01-cash-exactly-5m": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "red:OP-02-cash-264m-needs-cfo": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY",
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "red:OP-03-same-day-split-cash": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "red:OP-04-same-day-mixed-transfer-and-cash": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 150000
+ },
+ "red:OP-05-internet-at-8pct": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "red:OP-06-mobile-telecom-8pct-no-keyword": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "red:OP-07-wrong-buyer-tax-code-lookalike": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_BUYER_TAX_CODE_MISMATCH"
+  ],
+  "approvedTax": null
+ },
+ "red:OP-08-karaoke-and-alcohol": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "INTERNAL_POLICY_GUEST_ENTERTAINMENT"
+  ],
+  "approvedTax": null
+ },
+ "red:OP-09-gift-to-partners-33m": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SCOPE_NOT_COVERED"
+  ],
+  "approvedTax": null
+ },
+ "red:OP-10-gold-bars-306m": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY",
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "RULE_SCOPE_NOT_COVERED"
+  ],
+  "approvedTax": null
+ },
+ "red:OP-11-vat8-dated-2027": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SCOPE_VAT8_PERIOD"
+  ],
+  "approvedTax": null
+ },
+ "red:OP-12-invoice-after-seller-closure": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_DECREE_254_CLOSED_SELLER"
+  ],
+  "approvedTax": null
+ },
+ "red:TR-01": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 148000
+ },
+ "red:TR-02": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "INTERNAL_POLICY_GUEST_ENTERTAINMENT"
+  ],
+  "approvedTax": null
+ },
+ "red:TR-03": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "INTERNAL_POLICY_GUEST_ENTERTAINMENT",
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "red:TR-04": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "INTERNAL_POLICY_GUEST_ENTERTAINMENT"
+  ],
+  "approvedTax": null
+ },
+ "red:TR-05": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 30000
+ },
+ "red:TR-06": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "red:TR-07": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 0
+ },
+ "red:TR-08": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SCOPE_NOT_COVERED"
+  ],
+  "approvedTax": null
+ },
+ "red:TR-09": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SCOPE_NOT_COVERED"
+  ],
+  "approvedTax": null
+ },
+ "red:TR-10": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 480000
+ },
+ "red:TR-11": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SCOPE_VAT8_PERIOD"
+  ],
+  "approvedTax": null
+ },
+ "red:TR-12": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "red:TR-13": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "AUTHORITY_K_FACTOR_RED"
+  ],
+  "approvedTax": null
+ },
+ "red:TR-14": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_DATA_QUALITY": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_DATA_QUALITY"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_IMAGE_BLURRY": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_IMAGE_BLURRY"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_LINE_ITEM_MISMATCH": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_LINE_ITEM_MISMATCH"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_BUYER_TAX_CODE_MISMATCH": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_BUYER_TAX_CODE_MISMATCH"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_MCCQT_INVALID": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_MCCQT_INVALID"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_SERIES_YEAR_MISMATCH": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SERIES_YEAR_MISMATCH"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_SIGNING_DELAY": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SIGNING_DELAY"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_SELLER_SUSPENDED": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SELLER_SUSPENDED"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_SELLER_CLOSURE_DATE_UNKNOWN": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "probe:STATUTORY_DECREE_254_CLOSED_SELLER": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_DECREE_254_CLOSED_SELLER"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_SELLER_CLOSED_BEFORE": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SELLER_CLOSED_BEFORE"
+  ],
+  "approvedTax": null
+ },
+ "probe:STATUTORY_LAW_48_CASH_PAYMENT": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_LAW_48_CASH_PAYMENT"
+  ],
+  "approvedTax": null
+ },
+ "probe:STATUTORY_RES_204_VAT_8_EXCLUDED": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "probe:INTERNAL_POLICY_GUEST_ENTERTAINMENT": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "INTERNAL_POLICY_GUEST_ENTERTAINMENT"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_SCOPE_NOT_COVERED": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SCOPE_NOT_COVERED"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_SCOPE_VAT8_PERIOD": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SCOPE_VAT8_PERIOD"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_MISSING_MANIFEST": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "probe:AUTHORITY_EXCEED_KTT_LIMIT": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "probe:AUTHORITY_K_FACTOR_RED": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "AUTHORITY_K_FACTOR_RED"
+  ],
+  "approvedTax": null
+ },
+ "probe:RULE_ADJUSTMENT_NO_ORIGINAL": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "study:U1": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "study:U2": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SCOPE_NOT_COVERED"
+  ],
+  "approvedTax": null
+ },
+ "study:U3": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "STATUTORY_RES_204_VAT_8_EXCLUDED"
+  ],
+  "approvedTax": null
+ },
+ "study:U4": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "study:U5": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT"
+  ],
+  "approvedTax": null
+ },
+ "demo:MAU-0009001": {
+  "status": "ROUTINE",
+  "riskGroup": null,
+  "riskGroups": null,
+  "requiresCFO": null,
+  "rules": [],
+  "approvedTax": 200000
+ },
+ "demo:MAU-0009002": {
+  "status": "ESCALATED",
+  "riskGroup": "UNCERTAIN_INFO",
+  "riskGroups": [
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "demo:MAU-0009003": {
+  "status": "ESCALATED",
+  "riskGroup": "OUT_OF_POLICY",
+  "riskGroups": [
+   "OUT_OF_POLICY",
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": false,
+  "rules": [
+   "INTERNAL_POLICY_GUEST_ENTERTAINMENT",
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ },
+ "demo:MAU-0009004": {
+  "status": "ESCALATED",
+  "riskGroup": "EXCEED_AUTHORITY",
+  "riskGroups": [
+   "EXCEED_AUTHORITY",
+   "UNCERTAIN_INFO"
+  ],
+  "requiresCFO": true,
+  "rules": [
+   "AUTHORITY_EXCEED_KTT_LIMIT",
+   "RULE_SOURCE_REVIEW"
+  ],
+  "approvedTax": null
+ }
+}

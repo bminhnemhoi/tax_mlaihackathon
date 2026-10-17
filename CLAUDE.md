@@ -4,6 +4,7 @@ Trọng tài thuế GTGT đầu vào cho hóa đơn điện tử Việt Nam (MLA
 **Quy tắc tất định quyết định; AI chỉ đọc chứng từ.** Live: https://limegreen-salamander-517622.hostingersite.com · Repo: khanhle1406/Tax-Referee.
 
 > **Demo Day 17/10:** nếu người dùng là Khánh hoặc hỏi "cần làm gì", đọc và tóm tắt `docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md` trước tiên.
+> **Vòng cải tiến 4 giờ:** khi người dùng gửi yêu cầu của Ban tổ chức, dùng skill `sprint-4h` — playbook `docs/handoff/SPRINT-4H-PLAYBOOK.md`, sổ tay `docs/handoff/SPRINT-4H-COOKBOOK.md`.
 
 ## Luật cứng (không ngoại lệ)
 - **Bí mật:** không đọc, in hay commit `env_*`, `.env*` (trừ `.env.example`); chỉ được nhắc TÊN biến. Hook `.claude/hooks/guard.mjs` chặn các lệnh vi phạm.
