@@ -38,15 +38,15 @@ Vòng cải tiến 17/10 theo góp ý của giám khảo: xử lý theo lô có 
 
 ### Bảo mật
 - **Trả lời nhóm không xác nhận hộ số liệu:** không gộp câu xác nhận giá trị (`CONFIRM_FIELDS`, `NEED_VALUE`, `SET_FIELDS` kèm xác nhận trường) và ý ảnh mờ, số liệu lệch (`RULE_IMAGE_BLURRY`, `RULE_DATA_QUALITY`); bản gửi kèm phiên bản từng hóa đơn người duyệt đã thấy, hồ sơ vừa đổi thì bị chặn (409).
-- **Chống mạo danh email:** tên miền SPF/DKIM phải khớp trọn vẹn (không nhận `example.com.evil.net`, `evilexample.com`); tách từng mệnh đề `Authentication-Results`, lấy tên miền sau `@` cuối cùng (chặn `example.com@evil.net`); bỏ comment và chuỗi trong ngoặc kép trước khi đọc.
-- **Bất kiêm nhiệm ở kênh:** chỉ Kế toán viên (người nhập) lấy thư; KTT/CFO xác nhận người gửi lạ, sau đó file được xử lý dưới tên Kế toán viên đã lấy thư.
-- **Giới hạn nhận file:** tối đa 5 đính kèm mỗi thư, 50 file mỗi lượt, 10 file mỗi lượt từ người gửi chưa xác thực; phần vượt bị từ chối, chỉ ghi siêu dữ liệu. File trùng trong cùng lượt tính một lần; hóa đơn đã nằm ở lô khác được đánh dấu trùng, không tạo lô rỗng.
+- **Chống mạo danh email:** tên miền SPF/DKIM phải trùng tên miền người gửi hoặc là miền con của nó (không nhận `example.com.evil.net`, `evilexample.com`); tách từng mệnh đề `Authentication-Results`, lấy tên miền sau `@` cuối cùng (chặn `example.com@evil.net`); bỏ comment và chuỗi trong ngoặc kép trước khi đọc.
+- **Bất kiêm nhiệm ở kênh:** chỉ Kế toán viên (người nhập) lấy thư; KTT/CFO xác nhận người gửi lạ, sau đó file được xử lý dưới tên Kế toán viên đã lấy thư; người đã xác nhận người gửi không được tự trả lời, tự duyệt hay tự chốt chính hóa đơn đó.
+- **Giới hạn nhận file:** tối đa 5 đính kèm mỗi thư, 50 file mỗi lượt, 10 file mỗi lượt từ người gửi chưa xác thực, và tổng hàng chờ xác nhận người gửi tối đa 100 file; phần vượt chỉ được đếm vào lượt lấy (không tạo dòng, không lưu nội dung). File trùng trong cùng lượt tính một lần; hóa đơn đã nằm ở lô khác được đánh dấu trùng, không tạo lô rỗng.
 - **Truy vết:** mỗi file nhận qua kênh có sự kiện `CHANNEL_FILE_INGESTED` (mã nhân viên gửi, đã xác thực hay chưa; không ghi địa chỉ).
 - **Cách ly phiên demo:** kênh thật và danh bạ thật (`TAX_REFEREE_STAFF_SEED`) không chạy trong phiên demo của người lạ; bộ gửi tin mô phỏng không bao giờ dùng người nhận thật (`GMAIL_NOTIFY_TO`, `ZALO_NOTIFY_CHAT_ID`).
 - **Dữ liệu người gửi:** email/Zalo id trong danh bạ chỉ trả cho KTT/CFO; ở danh sách file nhận và tin đã gửi, Kế toán viên chỉ thấy địa chỉ đã che (email chỉ còn tên miền).
-- **Sổ sách:** tải XML/CSV sổ cái (`GET /api/ledger/export`) và đẩy chứng từ (`POST /api/ledger/sync`) chỉ KTT/CFO (quyền `ledger.export`); xem trước danh sách (`GET /api/ledger/sync`) vẫn mở cho người đã đăng nhập.
-- **XML:** hai thẻ `<HTTToan>` bị từ chối là XML mơ hồ.
-- **`/api/health`:** cảnh báo khi bật trên production các cờ chỉ dành cho máy local: `real_channels_in_demo`, `demo_preset_batches`, `dev_llm_enabled`.
+- **Sổ sách:** tải XML/CSV sổ cái (`GET /api/ledger/export`) và đẩy chứng từ (`POST /api/ledger/sync`) chỉ KTT/CFO (quyền `ledger.export`); xem trước danh sách (`GET /api/ledger/sync`) vẫn mở cho người đã đăng nhập. Ghi sổ gắn với nội dung lúc chốt (`posted_content_hash`): hồ sơ bị sửa sau khi chốt rời sổ cho tới khi được chốt bổ sung.
+- **XML:** hai thẻ `<HTTToan>` bị từ chối là XML mơ hồ; hình thức thanh toán chỉ đọc ngoài dòng hàng (thẻ giả trong `<HHDVu>` không được chọn).
+- **`/api/health`:** cảnh báo khi bật trên production các cờ chỉ dành cho máy local: `real_channels_in_demo`, `demo_preset_batches`, `dev_llm_enabled`; cùng cờ đăng nhập theo vai không mật khẩu `internal_role_login` (`TAX_REFEREE_ALLOW_INTERNAL_ROLE_LOGIN`).
 - Zalo: chỉ tải ảnh từ máy chủ Zalo (https, không cổng lạ, không theo chuyển hướng) để chống SSRF.
 
 ### Tài liệu
