@@ -102,7 +102,7 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
       const subject = flagged.length ? `Dòng hàng ${flagged.map(line => `“${line.itemName}”`).join(', ')}` : item;
       return {
         reason: `${subject} có thể thuộc nhóm không được giảm thuế (viễn thông/kim loại/tài chính/hàng chịu TTĐB… theo ${vat8Basis(inv.invoiceDate)}) nhưng đang áp 8%: thuế ${vnd(invoiced)} trên ${vnd(base)}, nếu đúng ${standardRate}% phải là ${vnd(correct)}.`,
-        ask: 'Mặt hàng này có đúng thuộc nhóm không được giảm thuế không?',
+        ask: 'Xử lý phần thuế đang áp 8% này ra sao?',
         options: [option('A', `Đúng nhóm loại trừ — yêu cầu NCC xuất lại ${standardRate}%`, 'Giữ hồ sơ, chưa khấu trừ cho đến khi có hóa đơn đúng thuế suất.', 'REQUEST_SUPPLIER_REISSUE'),
           option('B', `Không khấu trừ ${vnd(invoiced)} phần thuế sai thuế suất`, 'Ghi nhận chi phí nội bộ, loại phần thuế sai.', 'REJECT_TAX_DEDUCTION')]
       };
