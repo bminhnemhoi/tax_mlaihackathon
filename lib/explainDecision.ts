@@ -35,8 +35,16 @@ const FIELD_LABELS: Record<string, string> = {
 /** Quy tắc về nội dung khoản chi (đồ uống có cồn, ngoài phạm vi SOP, sai 8%). */
 const SCOPE_RULES = new Set(['INTERNAL_POLICY_GUEST_ENTERTAINMENT', 'RULE_SCOPE_NOT_COVERED', 'STATUTORY_RES_204_VAT_8_EXCLUDED', 'RULE_SCOPE_VAT8_PERIOD']);
 
-export function explainDecision(inv: InvoiceInput, decision: Pick<RefereeDecision, 'status' | 'findings'> & { approvedTaxAmount?: number }, config: Partial<SystemPolicyConfig> = {}): DecisionExplanation {
-  const findings = decision.findings ?? [];
+type PrecedentRef = { precedentId: string; approvedBy: string; rationale: string };
+
+export function explainDecision(inv: InvoiceInput, decision: Pick<RefereeDecision, 'status' | 'findings'> & { approvedTaxAmount?: number; precedentApplied?: PrecedentRef }, config: Partial<SystemPolicyConfig> = {}): DecisionExplanation {
+  const approved = decision.status === 'ROUTINE';
+  // Ca tự duyệt nhờ tiền lệ CFO: engine vẫn trả các phát hiện quy chế nội bộ đã được tiền lệ giải tỏa (policyEngine, nhánh ROUTINE).
+  // Chúng không còn là "chỗ chưa ổn": tách riêng, không tô đỏ, ghi chú tiền lệ.
+  const precedent = approved ? decision.precedentApplied : undefined;
+  const all = decision.findings ?? [];
+  const cleared = precedent ? all.filter(f => f.kind === 'INTERNAL_POLICY') : [];
+  const findings = all.filter(f => !cleared.includes(f));
   const has = (pred: (ruleId: string) => boolean) => findings.some(f => pred(f.ruleId));
   const threshold = paymentThreshold(inv, config);
   const kttLimit = config.kttApprovalLimit ?? 200_000_000;
@@ -53,11 +61,14 @@ export function explainDecision(inv: InvoiceInput, decision: Pick<RefereeDecisio
     detail: taxOk ? `Thuế ${vnd(inv.taxAmount)} khớp thuế suất ${inv.items && new Set(inv.items.map(l => l.taxRate)).size > 1 ? 'từng nhóm dòng hàng' : `${inv.taxRate}%`}`
       : `Thuế in ${vnd(inv.taxAmount)}, tính lại được ${vnd(expectedHeaderTax(inv))}` });
 
-  if (inv.taxRate === 8) {
+  // Cùng điều kiện với engine (usesVat8): đầu hóa đơn 8% hoặc có dòng hàng 8% (hóa đơn nhiều thuế suất).
+  if (inv.taxRate === 8 || (inv.items ?? []).some(line => line.taxRate === 8)) {
     const period = vatReductionAt(inv.invoiceDate);
     const excluded = has(id => id === 'STATUTORY_RES_204_VAT_8_EXCLUDED' || id === 'RULE_SCOPE_VAT8_PERIOD');
+    // Engine chỉ so tên hàng với danh mục từ khóa: phiếu nói đúng phép kiểm đó, không khẳng định mặt hàng "không thuộc nhóm loại trừ".
     checks.push({ key: 'vat8', ok: Boolean(period) && !excluded, label: 'Được áp thuế suất 8%',
-      detail: !period ? `Ngày lập ${inv.invoiceDate} nằm ngoài mọi kỳ giảm thuế` : excluded ? `Mặt hàng có thể thuộc nhóm không được giảm (${period.basis})` : `Trong kỳ giảm thuế theo ${period.basis}, mặt hàng không thuộc nhóm loại trừ` });
+      detail: !period ? `Ngày lập ${inv.invoiceDate} nằm ngoài mọi kỳ giảm thuế` : excluded ? `Mặt hàng có thể thuộc nhóm không được giảm (${period.basis})`
+        : `Trong kỳ giảm thuế theo ${period.basis}; tên hàng không khớp danh mục từ khóa loại trừ đang cấu hình (kiểm tự động theo tên hàng)` });
   }
 
   const cashRule = has(id => id === 'STATUTORY_LAW_48_CASH_PAYMENT' || id === 'STATUTORY_SAME_DAY_CASH_5M');
@@ -81,9 +92,14 @@ export function explainDecision(inv: InvoiceInput, decision: Pick<RefereeDecisio
     detail: sellerRule ? 'Bên bán tạm ngừng, đã đóng MST hoặc có cảnh báo' : inv.sellerStatus === 'ACTIVE' ? 'MST bên bán đang hoạt động'
       : total < materiality ? `Dưới ${vnd(materiality)}: quy chế không bắt buộc tra trạng thái` : 'Chưa xác minh trạng thái MST bên bán' });
 
-  const scope = findings.filter(f => SCOPE_RULES.has(f.ruleId) && f.ruleId !== 'STATUTORY_RES_204_VAT_8_EXCLUDED' && f.ruleId !== 'RULE_SCOPE_VAT8_PERIOD');
+  const isScope = (f: { ruleId: string }) => SCOPE_RULES.has(f.ruleId) && f.ruleId !== 'STATUTORY_RES_204_VAT_8_EXCLUDED' && f.ruleId !== 'RULE_SCOPE_VAT8_PERIOD';
+  const scope = findings.filter(isScope);
+  const clearedLabels = cleared.map(f => ruleContract(f.ruleId).label).join('; ');
+  const precedentNote = precedent ? `áp tiền lệ #${precedent.precedentId} đã được CFO duyệt` : '';
   checks.push({ key: 'scope', ok: scope.length === 0, label: 'Nội dung chi trong phạm vi quy chế',
-    detail: scope.length ? scope.map(f => ruleContract(f.ruleId).label).join('; ') : 'Không có đồ uống có cồn, quà biếu, chi cá nhân hay khoản ngoài quy chế' });
+    detail: scope.length ? scope.map(f => ruleContract(f.ruleId).label).join('; ')
+      : cleared.some(isScope) ? `${cleared.filter(isScope).map(f => ruleContract(f.ruleId).label).join('; ')} — ${precedentNote}`
+      : 'Không có đồ uống có cồn, quà biếu, chi cá nhân hay khoản ngoài quy chế' });
 
   const duplicate = has(id => id.includes('DUPLICATE'));
   checks.push({ key: 'duplicate', ok: !duplicate, label: 'Không trùng hóa đơn đã nhận', detail: duplicate ? 'Trùng số và MST với hóa đơn đã có' : 'Chưa từng nhận hóa đơn này' });
@@ -95,15 +111,17 @@ export function explainDecision(inv: InvoiceInput, decision: Pick<RefereeDecisio
       fieldLabels: fields.map(field => FIELD_LABELS[field]), reason: f.flaggedReason };
   });
 
-  const approved = decision.status === 'ROUTINE';
   const vatAtStake = approved ? 0 : Math.max(0, inv.taxAmount);
   const passed = checks.filter(c => c.ok === true).length;
+  const viaPrecedent = approved && cleared.length > 0;
   return {
     verdict: approved ? 'APPROVED' : 'STOPPED',
     headline: approved
-      ? `Máy đề xuất duyệt: đạt ${passed} điều kiện, khấu trừ ${vnd(decision.approvedTaxAmount ?? inv.taxAmount)}`
+      ? `Máy đề xuất duyệt: đạt ${passed} điều kiện, khấu trừ ${vnd(decision.approvedTaxAmount ?? inv.taxAmount)}${viaPrecedent ? ' — áp tiền lệ CFO' : ''}`
       : `Dừng ở ${highlights.length} điểm — VAT chờ quyết định ${vnd(vatAtStake)}`,
-    plain: approved
+    plain: viaPrecedent
+      ? `Khoản chi này bình thường phải hỏi (${clearedLabels}), nhưng đã có tiền lệ #${precedent?.precedentId} được CFO duyệt cho đúng bên bán và mục đích này; các điều kiện khác đều đạt nên máy đề xuất duyệt. Kế toán trưởng chốt lô thì mới ghi sổ.`
+      : approved
       ? 'Giống bài kiểm tra không sai câu nào: không điều kiện nào trượt nên máy đề xuất duyệt. Kế toán trưởng chốt lô thì mới ghi sổ.'
       : `Có ${highlights.length === 1 ? 'một chỗ' : `${highlights.length} chỗ`} chưa ổn (tô đỏ bên dưới) nên máy không tự quyết — hỏi đúng người có quyền.`,
     checks,

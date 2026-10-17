@@ -21,10 +21,29 @@ const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HI�
   // Thuê nhà hàng (dịch vụ ăn uống/hội nghị) không phải kinh doanh bất động sản.
   'THUÊ NHÀ HÀNG'];
 /** Ô tô tải thông thường không chịu TTĐB; pick-up cabin kép và ô tô tải VAN (từ hai hàng ghế) chịu TTĐB nên vẫn bị loại khỏi 8%. */
-const TRUCK_NOT_EXCLUDED=['XE Ô TÔ TẢI','Ô TÔ TẢI','XE O TO TAI','O TO TAI'];
-const TTDB_TRUCK=['PICKUP','PICK UP','CABIN KÉP','CA BIN KÉP','DOUBLE CAB','TẢI VAN','Ô TÔ VAN','XE VAN','BÁN TẢI'];
-/** Xe chịu TTĐB gọi theo tên thông dụng, không có chữ "ô tô" (VD "xe bán tải cabin kép"): bị loại khỏi 8% ở mọi kỳ. "XE VAN" chỉ tắt miễn trừ vì không dấu trùng "xe vận". */
-const TTDB_TRUCK_EXCLUDED=['BÁN TẢI','PICKUP','PICK UP','CABIN KÉP','CA BIN KÉP','DOUBLE CAB','TẢI VAN','Ô TÔ VAN'];
+// "Ô TÔ BÁN TẢI" chỉ được coi là ô tô tải khi không còn dấu hiệu xe chịu TTĐB (tức đã ghi cabin đơn).
+const TRUCK_NOT_EXCLUDED=['XE Ô TÔ TẢI','Ô TÔ TẢI','XE O TO TAI','O TO TAI','XE Ô TÔ BÁN TẢI','Ô TÔ BÁN TẢI'];
+/** Xe chịu TTĐB gọi theo tên thông dụng, không có chữ "ô tô" (VD "xe bán tải cabin kép"): bị loại khỏi 8% ở mọi kỳ. */
+const TTDB_DOUBLE_CAB=['CABIN KÉP','CA BIN KÉP','DOUBLE CAB'];
+const TTDB_VAN=['TẢI VAN','Ô TÔ VAN'];
+/** Bán tải/pick-up cabin đơn là ô tô tải, không buộc loại (cabin kép vẫn thắng nếu cùng xuất hiện). */
+const SINGLE_CAB=['CABIN ĐƠN','CA BIN ĐƠN','SINGLE CAB'];
+/** "PICK UP" chỉ là tên xe khi đi sau XE/Ô TÔ (cách tối đa hai từ, VD "xe Ford Ranger pick-up"); "phí pick-up hàng" là dịch vụ lấy hàng. */
+const PICKUP_VEHICLE=/(?<![\p{L}\p{N}])(?:XE|Ô TÔ|O TO)(?: [\p{L}\p{N}]+){0,2} (?:PICK UP|PICKUP)(?![\p{L}\p{N}])(?! (?:HÀNG|HANG)(?![\p{L}\p{N}]))/u;
+/** Dịch vụ/phụ tùng cho xe bán tải, pick-up (sửa chữa, bảo dưỡng, thuê, phụ tùng, lốp, rửa xe) không phải bản thân chiếc xe chịu TTĐB: bỏ cả cụm, kể cả loại cabin đi kèm. */
+const TRUCK_SERVICE=/(?<![\p{L}\p{N}])(?:SỬA CHỮA|SUA CHUA|BẢO DƯỠNG|BAO DUONG|THUÊ|THUE|PHỤ TÙNG|PHU TUNG|LỐP|LOP|RỬA|RUA)(?: (?:XE|Ô TÔ|O TO|TẢI|TAI))* (?:BÁN TẢI|BAN TAI|PICK UP|PICKUP)(?: (?:CABIN|CA BIN) (?:KÉP|KEP|ĐƠN|DON)| DOUBLE CAB| SINGLE CAB)?(?![\p{L}\p{N}])/gu;
+/**
+ * Nhận diện xe chịu TTĐB trên tên hàng ĐÃ bỏ cụm dịch vụ (TRUCK_SERVICE, VAT8_NOT_EXCLUDED): "sửa chữa xe bán tải" không phải bán xe.
+ * truckSignal tắt miễn trừ "ô tô tải"; "XE VAN" chỉ tắt miễn trừ (không buộc loại) vì không dấu trùng "xe vận".
+ */
+function ttdbVehicle(textUpper:string):{excluded:boolean;truckSignal:boolean} {
+  // Bỏ dấu câu trước khi nhận diện: "(VAN)", "ca-bin kép", "pick-up" vẫn được nhận ra.
+  const words=VAT8_NOT_EXCLUDED.reduce((acc,phrase)=>acc.split(phrase).join(' '),textUpper.replace(/[^\p{L}\p{N}]+/gu,' ').replace(TRUCK_SERVICE,' '));
+  const any=(list:string[])=>list.some(k=>matchesKeyword(words,k));
+  const pickup=matchesKeyword(words,'BÁN TẢI') || PICKUP_VEHICLE.test(words);
+  const excluded=any(TTDB_DOUBLE_CAB) || any(TTDB_VAN) || (pickup && !any(SINGLE_CAB));
+  return {excluded,truckSignal:excluded || matchesKeyword(words,'XE VAN')};
+}
 /** Văn phòng phẩm gõ không dấu ("bia ho so") — dạng bỏ dấu của "BIA" không được coi là đồ uống có cồn. */
 // Chỉ cụm không mơ hồ: "bia so 1", "bia lo 24 chai", "bia cung cap…" vẫn là bia.
 const BENIGN_UNACCENTED=['BIA HO SO','BIA NHUA','BIA KEP','BIA TRINH KY','BIA ACCO','BIA CATALOGUE','BIA SO MI'];
@@ -34,11 +53,10 @@ const stripBenign=(textUpper:string)=>BENIGN_UNACCENTED.reduce((acc,phrase)=>con
  * nhiên liệu dầu, than, hóa chất, CNTT được giảm 8%; viễn thông, kim loại, hàng chịu TTĐB (trừ xăng) vẫn bị loại.
  */
 function isVat8Excluded(textUpper:string,categories:string[],invoiceDate:string):boolean {
-  // Bỏ dấu câu trước khi nhận diện xe chịu TTĐB: "(VAN)", "ca-bin kép", "pick-up" vẫn được nhận ra.
-  const words=textUpper.replace(/[^\p{L}\p{N}]+/gu,' ');
-  const benign=TTDB_TRUCK.some(k=>matchesKeyword(words,k))?VAT8_NOT_EXCLUDED:[...VAT8_NOT_EXCLUDED,...TRUCK_NOT_EXCLUDED];
+  const vehicle=ttdbVehicle(textUpper);
+  if(vehicle.excluded)return true;
+  const benign=vehicle.truckSignal?VAT8_NOT_EXCLUDED:[...VAT8_NOT_EXCLUDED,...TRUCK_NOT_EXCLUDED];
   const text=benign.reduce((acc,phrase)=>acc.split(phrase).join(' '),stripBenign(textUpper));
-  if(TTDB_TRUCK_EXCLUDED.some(k=>matchesKeyword(words,k)))return true;
   return vat8ExcludedPhrases(invoiceDate,categories).some(phrase=>matchesKeyword(text,phrase));
 }
 /** Chi tiếp khách/đồ uống có cồn/giải trí (SOP: cần làm rõ mục đích). So khớp nguyên từ để "BAVIA" hay "BÌA" không bị nhầm với "BIA". */

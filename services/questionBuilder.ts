@@ -99,12 +99,15 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
       const base = flagged.length ? flagged.reduce((sum, line) => sum + line.amount, 0) : inv.preTaxAmount;
       const invoiced = flagged.length ? flagged.reduce((sum, line) => sum + line.taxAmount, 0) : inv.taxAmount;
       const correct = Math.round(base * standardRate / 100);
-      const subject = flagged.length ? `Dòng hàng ${flagged.map(line => `“${line.itemName}”`).join(', ')}` : item;
+      // Tên dòng hàng cắt ngắn, tối đa 3 dòng: ý hỏi luôn ≤ 700 ký tự dù hóa đơn có nhiều dòng tên dài.
+      const listed = flagged.slice(0, 3).map(line => `“${clip(line.itemName, 40)}”`).join(', ') + (flagged.length > 3 ? ` và ${flagged.length - 3} dòng khác` : '');
+      const subject = flagged.length ? `Dòng hàng ${listed}` : item;
       return {
         reason: `${subject} có thể thuộc nhóm không được giảm thuế (viễn thông/kim loại/tài chính/hàng chịu TTĐB… theo ${vat8Basis(inv.invoiceDate)}) nhưng đang áp 8%: thuế ${vnd(invoiced)} trên ${vnd(base)}, nếu đúng ${standardRate}% phải là ${vnd(correct)}.`,
         ask: 'Xử lý phần thuế đang áp 8% này ra sao?',
+        // Hệ quả REJECT_TAX_DEDUCTION từ chối cả hồ sơ (issueEffects → REJECT) nên chữ đáp án B nêu thuế của CẢ hóa đơn, không chỉ phần dòng sai.
         options: [option('A', `Đúng nhóm loại trừ — yêu cầu NCC xuất lại ${standardRate}%`, 'Giữ hồ sơ, chưa khấu trừ cho đến khi có hóa đơn đúng thuế suất.', 'REQUEST_SUPPLIER_REISSUE'),
-          option('B', `Không khấu trừ ${vnd(invoiced)} phần thuế sai thuế suất`, 'Ghi nhận chi phí nội bộ, loại phần thuế sai.', 'REJECT_TAX_DEDUCTION')]
+          option('B', `Không khấu trừ toàn bộ ${tax} VAT của hóa đơn — yêu cầu NCC điều chỉnh`, 'Từ chối khấu trừ thuế của cả hóa đơn; ghi nhận chi phí nội bộ, lưu lý do và yêu cầu bên bán điều chỉnh.', 'REJECT_TAX_DEDUCTION')]
       };
     }
     case 'RULE_SCOPE_VAT8_PERIOD':
