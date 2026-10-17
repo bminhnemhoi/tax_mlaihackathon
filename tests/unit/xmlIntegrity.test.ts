@@ -149,3 +149,10 @@ test('XML: hai thẻ <HTTToan> (hình thức thanh toán) bị từ chối — k
   assert.doesNotThrow(() => parseXml(xml));
   assert.throws(() => parseXml(xml.replace('<HTTToan>', '<HTTToan>Chuyển khoản</HTTToan><HTTToan>')), /không đọc tất định được/);
 });
+
+test('XML: thẻ <HTTToan> giả đặt trong dòng hàng (trước TTChung thật) không được chọn — hóa đơn tiền mặt vẫn là tiền mặt', () => {
+  const xml = fs.readFileSync(path.join(process.cwd(), 'data', 'demo-batch', '16-tien-mat-lon.xml'), 'utf-8');
+  const read = (source: string) => (parseXml(source).rawInvoice as { paymentMethod?: string }).paymentMethod;
+  assert.equal(read(xml), 'CASH');
+  assert.equal(read(xml.replace('<HHDVu>', '<HHDVu><HTTToan>Chuyển khoản</HTTToan>')), 'CASH');
+});

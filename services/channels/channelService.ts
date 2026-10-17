@@ -29,16 +29,19 @@ const PULL_LIMIT = 20;
 export const MAX_ATTACHMENTS_PER_MAIL = 5;
 export const MAX_FILES_PER_PULL = 50;
 export const MAX_UNVERIFIED_FILES_PER_PULL = 10;
+/** Trần chung của hàng chờ xác nhận người gửi (mọi lượt cộng lại): người lạ không làm cạn quota chứng từ qua nhiều lượt. */
+export const MAX_PENDING_UNVERIFIED = 100;
 /** Người lấy thư là người NHẬP hồ sơ; Kế toán trưởng/CFO giữ quyền duyệt (bất kiêm nhiệm). */
 const PULL_ROLES = ['ACCOUNTANT'];
 const MANAGER_ROLES = ['CHIEF_ACCOUNTANT', 'CFO'];
 const QUEUED_NOTE = 'Đã lưu ảnh/PDF gốc — bản này chưa tự đọc ảnh nhận qua kênh; tải ảnh ở màn Lô hóa đơn hoặc Tiếp nhận để đọc.';
 
 /** Phần vượt trần của một lượt lấy: chỉ ghi siêu dữ liệu, không lưu nội dung file. */
-function limitReason(accepted: { files: number; unverified: number }, verified: boolean, indexInMail?: number): string | undefined {
+function limitReason(accepted: { files: number; unverified: number; pendingUnverified: number }, verified: boolean, indexInMail?: number): string | undefined {
   if (indexInMail !== undefined && indexInMail > MAX_ATTACHMENTS_PER_MAIL) return `Thư có hơn ${MAX_ATTACHMENTS_PER_MAIL} file đính kèm — chỉ nhận ${MAX_ATTACHMENTS_PER_MAIL} file đầu.`;
   if (accepted.files >= MAX_FILES_PER_PULL) return `Quá ${MAX_FILES_PER_PULL} file trong một lượt lấy — không nhận, gửi lại sau.`;
   if (!verified && accepted.unverified >= MAX_UNVERIFIED_FILES_PER_PULL) return `Quá ${MAX_UNVERIFIED_FILES_PER_PULL} file từ người gửi chưa xác thực trong một lượt — không nhận.`;
+  if (!verified && accepted.pendingUnverified + accepted.unverified >= MAX_PENDING_UNVERIFIED) return `Hàng chờ xác nhận người gửi đã đủ ${MAX_PENDING_UNVERIFIED} file — xử lý bớt trước khi nhận thêm.`;
   accepted.files += 1;
   if (!verified) accepted.unverified += 1;
   return undefined;
@@ -172,7 +175,9 @@ export async function pullChannel(user: AppUser, channel: ChannelName, injected:
   const deps: ChannelDeps = simulated ? { gmail: demoGmailClient(), zalo: demoZaloClient(), notifier: demoNotifier() } : injected;
   const result: PullResult = { channel, messages: 0, files: 0, duplicates: 0, batchId: null, counts: emptyCounts(), outcomes: [], simulated };
   const ensureBatch = () => result.batchId ??= createBatch(user, { label: `Lô ${channel === 'GMAIL' ? 'Gmail' : 'Zalo'}${simulated ? ' (mô phỏng)' : ''} ${vnStamp()}`, source: channel }).id;
-  const accepted = { files: 0, unverified: 0 };
+  const accepted = { files: 0, unverified: 0, pendingUnverified: (getDatabase().prepare("SELECT COUNT(*) n FROM channel_messages WHERE status='NEEDS_SENDER_REVIEW'").get() as { n: number }).n };
+  // File vượt trần: chỉ đếm (không tạo dòng, không lưu nội dung, không ghi sự kiện từng file) — lượt lấy ghi tổng số bị bỏ.
+  let skippedOverLimit = 0;
   const zaloReplies = new Map<string, number>();
   if (channel === 'ZALO') {
     if (!deps.zalo && !zaloConfigured()) throw new WorkflowError('Zalo chưa cấu hình (thiếu ZALO_BOT_TOKEN).', 409);
@@ -186,7 +191,7 @@ export async function pullChannel(user: AppUser, channel: ChannelName, injected:
       let file: InboundFile;
       const overLimit = isAllowedZaloFileUrl(update.photoUrl) ? limitReason(accepted, Boolean(identity.verified && identity.staff)) : undefined;
       if (!isAllowedZaloFileUrl(update.photoUrl)) file = { ...base, fileName: `zalo-${update.messageId}.jpg`, mime: 'image/jpeg', content: Buffer.alloc(0), rejectReason: 'Liên kết ảnh không thuộc máy chủ Zalo — không tải (chống SSRF).' };
-      else if (overLimit) file = { ...base, fileName: `zalo-${update.messageId}.jpg`, mime: 'image/jpeg', content: Buffer.alloc(0), rejectReason: overLimit };
+      else if (overLimit) { skippedOverLimit++; result.counts.REJECTED++; result.files++; continue; }
       else {
         try {
           const downloaded = await client.download(update.photoUrl!);
@@ -197,7 +202,7 @@ export async function pullChannel(user: AppUser, channel: ChannelName, injected:
       await ingestFile(user, channel, file, ensureBatch, result);
       if (identity.verified && identity.staff) zaloReplies.set(update.chatId, (zaloReplies.get(update.chatId) ?? 0) + 1);
     }
-    appendAuditEvent({ eventType: 'CHANNEL_PULLED', entityId: `channel:${channel}`, actorId: user.id, payload: { messages: result.messages, files: result.files, duplicates: result.duplicates, counts: result.counts, batchId: result.batchId, simulated } });
+    appendAuditEvent({ eventType: 'CHANNEL_PULLED', entityId: `channel:${channel}`, actorId: user.id, payload: { messages: result.messages, files: result.files, duplicates: result.duplicates, counts: result.counts, batchId: result.batchId, simulated, skippedOverLimit } });
     for (const [chatId, n] of zaloReplies) await notify({ kind: 'SENDER_RECEIPT', text: `Tax Referee đã nhận ${n} ảnh hóa đơn của anh/chị. Kế toán sẽ đọc và báo kết quả.`, to: { zaloChatId: chatId } }, deps.notifier);
     return result;
   }
@@ -213,18 +218,17 @@ export async function pullChannel(user: AppUser, channel: ChannelName, injected:
       for (const [index, attachment] of mail.attachments.entries()) {
         if (!isAllowedFile(attachment.fileName)) continue;
         inMail += 1;
-        const overLimit = limitReason(accepted, Boolean(identity.verified && identity.staff), inMail);
+        if (limitReason(accepted, Boolean(identity.verified && identity.staff), inMail)) { skippedOverLimit++; result.counts.REJECTED++; result.files++; continue; }
         await ingestFile(user, channel, {
           externalId: `${mail.messageId}#${index}`, senderAddress: mail.from, senderName: mail.fromName, identity,
-          subject: mail.subject, receivedAt: mail.receivedAt, fileName: attachment.fileName, mime: attachment.mime,
-          content: overLimit ? Buffer.alloc(0) : attachment.content, rejectReason: overLimit,
+          subject: mail.subject, receivedAt: mail.receivedAt, fileName: attachment.fileName, mime: attachment.mime, content: attachment.content,
         }, ensureBatch, result);
       }
       seen.push(mail.uid);
     }
     await client.markSeen(seen);
   } finally { await client.close(); }
-  appendAuditEvent({ eventType: 'CHANNEL_PULLED', entityId: `channel:${channel}`, actorId: user.id, payload: { messages: result.messages, files: result.files, duplicates: result.duplicates, counts: result.counts, batchId: result.batchId, simulated } });
+  appendAuditEvent({ eventType: 'CHANNEL_PULLED', entityId: `channel:${channel}`, actorId: user.id, payload: { messages: result.messages, files: result.files, duplicates: result.duplicates, counts: result.counts, batchId: result.batchId, simulated, skippedOverLimit } });
   await sendPullNotifications(result, deps.notifier);
   return result;
 }

@@ -192,3 +192,22 @@ test('duyệt nhóm: câu xác nhận giá trị riêng từng tờ (ảnh mờ)
     assert.notEqual(readRecord('RUOU-0000074').status, 'APPROVED');
   });
 });
+
+test('ghi sổ gắn với nội dung lúc chốt: hồ sơ đã ghi sổ mà bị sửa sau đó thì rời sổ, chốt bổ sung mới vào lại', async () => {
+  await runIsolated(async () => {
+    const acc = switchRole('ACCOUNTANT')!.user;
+    const batch = createBatch(acc, { label: 'Lô sửa sau khi chốt' });
+    await evaluateWorkflow(water('0000081'), acc, { forceLocalOnly: true });
+    attachToBatch(acc, batch.id, { invoiceId: 'NUOC-0000081' });
+    const ktt = switchRole('CHIEF_ACCOUNTANT')!.user;
+    signOffBatch(batch.id, ktt, 'Chốt lô nước uống tháng 10');
+    assert.deepEqual(ready(), ['NUOC-0000081']);
+    await evaluateWorkflow({ ...water('0000081'), preTaxAmount: 600_000, taxAmount: 48_000, totalAmount: 648_000 }, acc, { forceLocalOnly: true, expectedRevision: readRecord('NUOC-0000081').revision });
+    assert.equal(readRecord('NUOC-0000081').status, 'APPROVED');
+    assert.deepEqual(ready(), [], 'nội dung khác lúc chốt: chưa được ghi sổ');
+    assert.equal(getBatch(batch.id, ktt).summary.awaitingPost, 1);
+    const again = signOffBatch(batch.id, ktt, 'Chốt bổ sung sau khi kế toán sửa số tiền');
+    assert.deepEqual([again.postedInvoices, again.supplement], [1, true]);
+    assert.deepEqual(ready(), ['NUOC-0000081']);
+  });
+});

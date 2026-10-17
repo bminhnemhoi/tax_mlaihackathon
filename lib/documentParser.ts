@@ -350,7 +350,8 @@ export function parseXml(rawXml: string) {
     tag(xml, 'ThueSuat');
   const taxRate = parseTaxRateString(taxRateRaw);
 
-  const paymentMethodRaw = (tag(xml, 'HTTToan') || tag(xml, 'HTTT') || tag(xml, 'PaymentMethod') || '')
+  // Chỉ đọc ngoài dòng hàng, như phép kiểm trùng tên: thẻ giả đặt trong <HHDVu> phía trước TTChung không được chọn.
+  const paymentMethodRaw = (tag(xmlHeader, 'HTTToan') || tag(xmlHeader, 'HTTT') || tag(xmlHeader, 'PaymentMethod') || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toUpperCase();
   const saysCash = /\bTM\b|TIEN MAT|\bCASH\b/.test(paymentMethodRaw);
   const saysBank = /\bCK\b|CHUYEN KHOAN|TRANSFER|NGAN HANG/.test(paymentMethodRaw);

@@ -11,13 +11,14 @@ import { getActivePolicy, getDatabase } from '@/lib/server/db';
 import { explainDecision, type DecisionExplanation } from '@/lib/explainDecision';
 import { ruleContract } from '@/data/policyContract';
 import { InvoiceInputSchema, RefereeDecisionSchema, type RefereeDecision } from '@/lib/schemas';
-import { answerHandoff, readRecord, WorkflowError } from '@/services/workflowService';
+import { answerHandoff, readRecord, senderConfirmedBy, WorkflowError } from '@/services/workflowService';
 import { getStaff } from '@/services/staffDirectory';
 
 /** Điều kiện SQL (bí danh hóa đơn `i`): hóa đơn được phép vào sổ — không thuộc lô nào, hoặc đã được người có thẩm quyền ghi sổ
  *  khi chốt lô (batch_items.posted_at). Hóa đơn còn chờ/tạm giữ lúc chốt, nếu được duyệt sau, phải chốt bổ sung mới vào sổ.
  *  Sổ sách và xuất chứng từ (app/api/ledger/**) chỉ lấy hóa đơn APPROVED thỏa điều kiện này. */
-export const LEDGER_READY_SQL = 'NOT EXISTS (SELECT 1 FROM batch_items bi WHERE bi.invoice_id = i.id AND bi.posted_at IS NULL)';
+export const LEDGER_READY_SQL = 'NOT EXISTS (SELECT 1 FROM batch_items bi WHERE bi.invoice_id = i.id AND (bi.posted_at IS NULL OR bi.posted_content_hash IS NOT i.content_hash))';
+// Ghi sổ gắn với NỘI DUNG lúc chốt (posted_content_hash): hồ sơ bị sửa sau khi chốt rời sổ cho tới khi được chốt bổ sung.
 
 export type BatchSource = 'UPLOAD' | 'GMAIL' | 'ZALO' | 'MANUAL';
 export type BatchBucket = 'MACHINE_APPROVED' | 'HUMAN_APPROVED' | 'NEEDS_HUMAN' | 'ON_HOLD' | 'REJECTED' | 'ERROR' | 'PROCESSING';
@@ -43,6 +44,8 @@ export interface BatchItemView {
   explanation?: DecisionExplanation; questionKey?: string;
   /** Thời điểm hóa đơn được ghi sổ khi chốt lô (null = chưa ghi sổ). */
   postedAt?: string | null; revision?: number; evaluationId?: string | null; approvedTax?: number;
+  /** Mã băm nội dung hiện tại và lúc ghi sổ: khác nhau nghĩa là hồ sơ đã bị sửa sau khi chốt. */
+  contentHash?: string | null; postedContentHash?: string | null;
 }
 export interface BatchGroupMember { invoiceId: string; invoiceNumber?: string; supplierName?: string; totalAmount?: number; revision: number; evaluationId: string | null }
 export interface BatchGroup { key: string; label: string; invoiceIds: string[]; members: BatchGroupMember[]; requiresCFO: boolean; sampleQuestion: string; questionItems: Array<{ n: number; text: string; answers: [string, string] }> }
@@ -148,7 +151,7 @@ export function questionKey(decision: RefereeDecision): string | undefined {
 /** Nhãn nhóm đọc được: tên quy tắc của từng ý, kèm nội dung câu với ý xác minh dữ liệu nguồn. */
 function groupLabel(items: QuestionItem[]): string {
   return items.map(item => item.ruleIds.map(id => ruleContract(id).label).join(' + ') +
-    (item.ruleIds.includes('RULE_SOURCE_REVIEW') ? ` (${item.text.replace(/“[^”]*”/g, '').replace(/\s+/g, ' ').trim().slice(0, 80)})` : '')).join(' · ');
+    (item.ruleIds.includes('RULE_SOURCE_REVIEW') ? ` (${item.text.replace(/“[^”]*”/g, '').replace(/\d[\d.,]*\s?₫/g, '…').replace(/\s+/g, ' ').trim().slice(0, 80)})` : '')).join(' · ');
 }
 
 export function getBatch(batchId: string, user: AppUser): {
@@ -158,7 +161,7 @@ export function getBatch(batchId: string, user: AppUser): {
   const db = getDatabase();
   const batch = requireBatch(batchId);
   const config = getActivePolicy().config;
-  const rows = db.prepare(`SELECT bi.*, i.status, i.payload_json, i.approved_deductible_tax, i.created_by_user_id invoice_creator, i.revision invoice_revision, e.id invoice_evaluation_id, e.decision_json
+  const rows = db.prepare(`SELECT bi.*, i.status, i.payload_json, i.approved_deductible_tax, i.created_by_user_id invoice_creator, i.revision invoice_revision, i.content_hash invoice_content_hash, e.id invoice_evaluation_id, e.decision_json
       FROM batch_items bi LEFT JOIN invoices i ON i.id=bi.invoice_id
       LEFT JOIN evaluations e ON e.id=(SELECT id FROM evaluations WHERE invoice_id=bi.invoice_id ORDER BY rowid DESC LIMIT 1)
       WHERE bi.batch_id=? ORDER BY bi.position`).all(batchId) as Array<Record<string, unknown>>;
@@ -170,9 +173,10 @@ export function getBatch(batchId: string, user: AppUser): {
     const bucket = bucketOf(r.status as string | undefined, error, invoiceId);
     summary[bucket] += 1;
     const view: BatchItemView = { position: Number(r.position), invoiceId, fileName: (r.file_name as string) ?? null, error, bucket, bucketLabel: BUCKET_LABELS[bucket], createdByUserId: (r.invoice_creator as string) ?? null,
-      postedAt: (r.posted_at as string) ?? null, revision: Number(r.invoice_revision) || 0, evaluationId: (r.invoice_evaluation_id as string) ?? null, approvedTax: Number(r.approved_deductible_tax) || 0 };
-    if (view.postedAt) summary.posted += 1;
-    else if (APPROVED_BUCKETS.has(bucket)) { summary.awaitingPost += 1; summary.vatAwaitingPost += view.approvedTax ?? 0; }
+      postedAt: (r.posted_at as string) ?? null, revision: Number(r.invoice_revision) || 0, evaluationId: (r.invoice_evaluation_id as string) ?? null, approvedTax: Number(r.approved_deductible_tax) || 0,
+      contentHash: (r.invoice_content_hash as string) ?? null, postedContentHash: (r.posted_content_hash as string) ?? null };
+    if (isPosted(view)) summary.posted += 1;
+    if (!isPosted(view) && APPROVED_BUCKETS.has(bucket)) { summary.awaitingPost += 1; summary.vatAwaitingPost += view.approvedTax ?? 0; }
     const staff = getStaff(r.submitter_staff_id as string | null);
     view.submitter = staff ? { id: staff.id, name: staff.fullName, department: staff.department } : null;
     if (!invoiceId || !r.payload_json) return view;
@@ -216,8 +220,10 @@ export function getBatch(batchId: string, user: AppUser): {
   return { batch, items, summary, groups: [...groups.values()].filter(g => g.invoiceIds.length > 1), canSignOff: blockers.length === 0, signOffBlockers: blockers };
 }
 
-/** Hóa đơn sẽ được ghi sổ ở lần chốt này: đã duyệt và chưa ghi sổ. */
-const toPost = (items: BatchItemView[]) => items.filter(i => APPROVED_BUCKETS.has(i.bucket) && !i.postedAt);
+/** Đã ghi sổ ĐÚNG nội dung hiện tại (sửa sau khi chốt thì coi như chưa ghi sổ). */
+const isPosted = (i: BatchItemView) => Boolean(i.postedAt) && i.postedContentHash === i.contentHash;
+/** Hóa đơn sẽ được ghi sổ ở lần chốt này: đã duyệt và chưa ghi sổ (hoặc đã sửa sau lần ghi sổ trước). */
+const toPost = (items: BatchItemView[]) => items.filter(i => APPROVED_BUCKETS.has(i.bucket) && !isPosted(i));
 
 function signOffBlockers(batch: BatchRow, items: BatchItemView[], user: AppUser): string[] {
   const out: string[] = [];
@@ -230,6 +236,7 @@ function signOffBlockers(batch: BatchRow, items: BatchItemView[], user: AppUser)
   if (!supplement && items.some(i => i.bucket === 'PROCESSING')) out.push('Còn hóa đơn đang xử lý.');
   if (!supplement && !pending.length) out.push('Chưa có hóa đơn nào đủ điều kiện để chốt.');
   if (pending.some(i => i.createdByUserId === user.id)) out.push('Lô có hóa đơn do chính anh/chị nhập — người khác phải chốt (bất kiêm nhiệm).');
+  if (pending.some(i => senderConfirmedBy(i.invoiceId) === user.id)) out.push('Lô có hóa đơn do chính anh/chị xác nhận người gửi — người khác phải chốt (bất kiêm nhiệm).');
   if (user.role !== 'CFO' && pending.some(i => Math.abs(i.totalAmount ?? 0) >= kttLimit)) out.push('Lô có hóa đơn từ hạn mức CFO — cần CFO chốt.');
   return out;
 }
@@ -254,10 +261,12 @@ export function signOffBatch(batchId: string, user: AppUser, note: string): { ba
       const changed = db.prepare("UPDATE batches SET status='SIGNED_OFF', signed_off_by_user_id=?, signed_off_at=?, signoff_note=? WHERE id=? AND status='OPEN'").run(user.id, at, text.slice(0, 500), batchId);
       if (changed.changes !== 1) throw new WorkflowError('Lô vừa được người khác chốt. Tải lại.', 409);
     }
-    const mark = db.prepare('UPDATE batch_items SET posted_at=?, posted_by_user_id=? WHERE batch_id=? AND invoice_id=? AND posted_at IS NULL');
-    for (const item of posted) if (mark.run(at, user.id, batchId, item.invoiceId).changes !== 1) throw new WorkflowError('Lô vừa được người khác chốt. Tải lại.', 409);
+    // Ghi đúng nội dung người ký đã xem: nếu hồ sơ vừa bị sửa giữa lúc tải trang và lúc chốt thì mã băm khác, không ghi.
+    const mark = db.prepare(`UPDATE batch_items SET posted_at=?, posted_by_user_id=?, posted_content_hash=? WHERE batch_id=? AND invoice_id=?
+      AND (posted_at IS NULL OR posted_content_hash IS NOT ?) AND ? = (SELECT content_hash FROM invoices WHERE id=?) AND (SELECT status FROM invoices WHERE id=?) = 'APPROVED'`);
+    for (const item of posted) if (mark.run(at, user.id, item.contentHash, batchId, item.invoiceId, item.contentHash, item.contentHash, item.invoiceId, item.invoiceId).changes !== 1) throw new WorkflowError('Hồ sơ trong lô vừa thay đổi. Tải lại rồi chốt.', 409);
     appendAuditEvent({ eventType: supplement ? 'BATCH_SUPPLEMENT_SIGNED_OFF' : 'BATCH_SIGNED_OFF', entityId: `batch:${batchId}`, actorId: user.id, payload: { actorRole: user.role, actorName: user.displayName, reason: text, invoiceIds: posted.map(i => i.invoiceId), vat, stillWaiting } });
-    for (const item of posted) appendAuditEvent({ eventType: 'INVOICE_POSTED_BY_BATCH', entityId: String(item.invoiceId), actorId: user.id, payload: { batchId, actorRole: user.role, reason: text, supplement } });
+    for (const item of posted) appendAuditEvent({ eventType: 'INVOICE_POSTED_BY_BATCH', entityId: String(item.invoiceId), actorId: user.id, payload: { batchId, actorRole: user.role, reason: text, supplement, contentHash: item.contentHash, repost: Boolean(item.postedAt) } });
   })();
   return { batchId, postedInvoices: posted.length, vat, stillWaiting, supplement };
 }

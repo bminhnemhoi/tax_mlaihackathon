@@ -28,8 +28,9 @@ const TTDB_DOUBLE_CAB=['CABIN KÉP','CA BIN KÉP','DOUBLE CAB'];
 const TTDB_VAN=['TẢI VAN','Ô TÔ VAN'];
 /** Bán tải/pick-up cabin đơn là ô tô tải, không buộc loại (cabin kép vẫn thắng nếu cùng xuất hiện). */
 const SINGLE_CAB=['CABIN ĐƠN','CA BIN ĐƠN','SINGLE CAB'];
-/** "PICK UP" chỉ là tên xe khi đi sau XE/Ô TÔ (cách tối đa hai từ, VD "xe Ford Ranger pick-up"); "phí pick-up hàng" là dịch vụ lấy hàng. */
-const PICKUP_VEHICLE=/(?<![\p{L}\p{N}])(?:XE|Ô TÔ|O TO)(?: [\p{L}\p{N}]+){0,2} (?:PICK UP|PICKUP)(?![\p{L}\p{N}])(?! (?:HÀNG|HANG)(?![\p{L}\p{N}]))/u;
+/** "PICK UP" là tên xe (VD "Ford Ranger Pickup", "xe pick-up") trừ ngữ cảnh dịch vụ lấy hàng/đón khách: "phí pick-up hàng", "dịch vụ pick up", "pick up khách". */
+const PICKUP_SERVICE=/(?<![\p{L}\p{N}])(?:(?:PHÍ|PHI|DỊCH VỤ|DICH VU|CƯỚC|CUOC)(?: [\p{L}\p{N}]+)? (?:PICK UP|PICKUP)|(?:PICK UP|PICKUP) (?:HÀNG|HANG|KHÁCH|KHACH))(?![\p{L}\p{N}])/gu;
+const PICKUP_WORD=/(?<![\p{L}\p{N}])(?:PICK UP|PICKUP)(?![\p{L}\p{N}])/u;
 /** Dịch vụ/phụ tùng cho xe bán tải, pick-up (sửa chữa, bảo dưỡng, thuê, phụ tùng, lốp, rửa xe) không phải bản thân chiếc xe chịu TTĐB: bỏ cả cụm, kể cả loại cabin đi kèm. */
 const TRUCK_SERVICE=/(?<![\p{L}\p{N}])(?:SỬA CHỮA|SUA CHUA|BẢO DƯỠNG|BAO DUONG|THUÊ|THUE|PHỤ TÙNG|PHU TUNG|LỐP|LOP|RỬA|RUA)(?: (?:XE|Ô TÔ|O TO|TẢI|TAI))* (?:BÁN TẢI|BAN TAI|PICK UP|PICKUP)(?: (?:CABIN|CA BIN) (?:KÉP|KEP|ĐƠN|DON)| DOUBLE CAB| SINGLE CAB)?(?![\p{L}\p{N}])/gu;
 /**
@@ -40,7 +41,7 @@ function ttdbVehicle(textUpper:string):{excluded:boolean;truckSignal:boolean} {
   // Bỏ dấu câu trước khi nhận diện: "(VAN)", "ca-bin kép", "pick-up" vẫn được nhận ra.
   const words=VAT8_NOT_EXCLUDED.reduce((acc,phrase)=>acc.split(phrase).join(' '),textUpper.replace(/[^\p{L}\p{N}]+/gu,' ').replace(TRUCK_SERVICE,' '));
   const any=(list:string[])=>list.some(k=>matchesKeyword(words,k));
-  const pickup=matchesKeyword(words,'BÁN TẢI') || PICKUP_VEHICLE.test(words);
+  const pickup=matchesKeyword(words,'BÁN TẢI') || PICKUP_WORD.test(words.replace(PICKUP_SERVICE,' '));
   const excluded=any(TTDB_DOUBLE_CAB) || any(TTDB_VAN) || (pickup && !any(SINGLE_CAB));
   return {excluded,truckSignal:excluded || matchesKeyword(words,'XE VAN')};
 }

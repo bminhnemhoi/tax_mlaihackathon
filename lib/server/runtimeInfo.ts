@@ -27,6 +27,7 @@ export function configWarnings(auditKeyed: boolean, commit: string): string[] {
     ...(process.env.TAX_REFEREE_ALLOW_REAL_CHANNELS_IN_DEMO === '1' ? ['real_channels_in_demo'] : []),
     ...(process.env.TAX_REFEREE_DEMO_PRESET_BATCHES === '1' ? ['demo_preset_batches'] : []),
     ...(process.env.DEV_LLM_ENABLED === '1' ? ['dev_llm_enabled'] : []),
+    ...(process.env.TAX_REFEREE_ALLOW_INTERNAL_ROLE_LOGIN === '1' ? ['internal_role_login'] : []),
   ];
   return [...(auditKeyed ? [] : ['audit_key_missing']), ...(commit === 'unknown' ? ['commit_unknown'] : []), ...(process.env.QGEN_AI === '1' ? ['qgen_ai_enabled'] : []), ...localOnly];
 }

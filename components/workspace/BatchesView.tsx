@@ -147,7 +147,8 @@ function BatchDetailView({ detail, user, onChanged }: { detail: BatchDetail; use
       {batch.signoffNote && <p className="text-xs text-muted-foreground">Ghi chú khi chốt: {batch.signoffNote}</p>}
     </div>
 
-    {approver && batch.status === 'OPEN' && groups.map(g => <GroupAnswerCard key={g.key} batchId={batch.id} group={g} user={user} onDone={onChanged} />)}
+    {/* Lô đã chốt vẫn trả lời được hóa đơn còn chờ; duyệt xong thì chốt bổ sung mới vào sổ. */}
+    {approver && groups.map(g => <GroupAnswerCard key={g.key} batchId={batch.id} group={g} user={user} onDone={onChanged} />)}
 
     {grouped.map(g => <div key={g.bucket} className="rounded-xl border bg-white">
       <h3 className="flex items-center gap-2 border-b px-4 py-2 text-sm font-semibold"><Badge variant={BUCKET_TONE[g.bucket]}>{g.rows[0].bucketLabel}</Badge><span className="text-muted-foreground">{g.rows.length}</span></h3>

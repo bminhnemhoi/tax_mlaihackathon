@@ -6,7 +6,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { getDatabase, runIsolated } from '../../lib/server/db';
 import { switchRole } from '../../lib/server/auth';
-import { assignSender, listChannelMessages, MAX_ATTACHMENTS_PER_MAIL, MAX_UNVERIFIED_FILES_PER_PULL, pullChannel } from '../../services/channels/channelService';
+import { assignSender, listChannelMessages, MAX_ATTACHMENTS_PER_MAIL, MAX_PENDING_UNVERIFIED, MAX_UNVERIFIED_FILES_PER_PULL, pullChannel } from '../../services/channels/channelService';
+import { signOffBatch } from '../../services/batchService';
+import { answerHandoff, readRecord } from '../../services/workflowService';
 import { topAuthenticationResults, type GmailClient, type InboundMail } from '../../services/channels/gmailChannel';
 import { listNotifications, notify } from '../../services/channels/notifier';
 import { isAllowedZaloFileUrl, parseZaloUpdates, type ZaloClient } from '../../services/channels/zaloChannel';
@@ -192,6 +194,16 @@ test('xác nhận người gửi: file được xử lý dưới tên Kế toán
     const row = getDatabase().prepare('SELECT created_by_user_id FROM invoices WHERE id=?').get(done.invoiceId) as { created_by_user_id: string };
     assert.equal(row.created_by_user_id, acc.id, 'người nhập là Kế toán viên đã lấy thư');
     assert.equal((getDatabase().prepare('SELECT created_by_user_id c FROM batches WHERE id=?').get(done.batchId) as { c: string }).c, acc.id);
+    // Người xác nhận người gửi là người đưa hóa đơn vào quy trình: không tự chốt hóa đơn đó; người khác (KTT) chốt được.
+    const rec = readRecord(done.invoiceId!);
+    if (rec.status === 'APPROVED') {
+      assert.throws(() => signOffBatch(done.batchId!, cfo, 'CFO tự chốt hóa đơn mình xác nhận người gửi'), /xác nhận người gửi/);
+      assert.equal(signOffBatch(done.batchId!, switchRole('CHIEF_ACCOUNTANT')!.user, 'KTT chốt, khác người xác nhận').postedInvoices, 1);
+    } else {
+      const spec = JSON.parse(rec.decision_json!).handoff.questionSpec as { items: unknown[] };
+      const answers = Object.fromEntries(spec.items.map((_, i) => [String(i + 1), 'A']));
+      await assert.rejects(answerHandoff(done.invoiceId!, cfo, { answers, reason: 'CFO tự trả lời hóa đơn mình xác nhận người gửi', revision: rec.revision, evaluationId: rec.evaluation_id }), /xác nhận người gửi/);
+    }
   });
 });
 
@@ -206,4 +218,17 @@ test('mô phỏng: bộ gửi tin của phiên demo không bao giờ ghi ngườ
       assert.ok(listNotifications().every(n => n.recipient !== 'that-cua-doi@congty.vn'), JSON.stringify(listNotifications().map(n => n.recipient)));
     });
   } finally { if (saved === undefined) delete process.env.GMAIL_NOTIFY_TO; else process.env.GMAIL_NOTIFY_TO = saved; }
+});
+
+test('kênh: hàng chờ xác nhận người gửi có trần chung giữa các lượt; phần vượt trần không tạo dòng, không lưu nội dung', async () => {
+  await runIsolated(async () => {
+    const user = switchRole('ACCOUNTANT')!.user;
+    const insert = getDatabase().prepare("INSERT INTO channel_messages (id, channel, external_id, sender_address, received_at, status, created_at) VALUES (?, 'GMAIL', ?, 'la@x.example', '2026-10-15T00:00:00Z', 'NEEDS_SENDER_REVIEW', '2026-10-15T00:00:00Z')");
+    for (let i = 0; i < MAX_PENDING_UNVERIFIED - 2; i++) insert.run(`cho-${i}`, `<cho-${i}@x.example>`);
+    const before = (getDatabase().prepare('SELECT COUNT(*) n FROM channel_messages').get() as { n: number }).n;
+    const r = await pullChannel(user, 'GMAIL', { gmail: fakeGmail([{ uid: 9, messageId: '<la-9@evil.example.net>', from: 'la@evil.example.net', authenticationResults: 'mx.google.com; spf=pass smtp.mailfrom=la@evil.example.net',
+      attachments: Array.from({ length: 5 }, (_, k) => ({ fileName: `la-9-${k}.xml`, mime: 'application/xml', content: Buffer.from(`<x>9-${k}</x>`) })) }]) });
+    assert.deepEqual([r.counts.NEEDS_SENDER_REVIEW, r.counts.REJECTED], [2, 3]);
+    assert.equal((getDatabase().prepare('SELECT COUNT(*) n FROM channel_messages').get() as { n: number }).n, before + 2, 'phần vượt trần không tạo dòng');
+  });
 });

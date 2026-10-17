@@ -39,7 +39,7 @@ test('xe chịu TTĐB: dịch vụ cho xe bán tải, phí pick-up hàng, xe bá
     for (const name of ['Bảo dưỡng xe bán tải cabin kép Toyota Hilux', 'Thuê xe pick-up 3 ngày', 'Lốp xe bán tải 265/65R17', 'Phụ tùng xe pick up Ford Ranger',
       'Rửa xe bán tải', 'Sửa chữa xe ô tô tải pick-up cabin kép', 'Xe pick-up single cab Isuzu'])
       assert.ok(!rules(run(`VX-S-${name}`, name)).includes('STATUTORY_RES_204_VAT_8_EXCLUDED'), `${name}: dịch vụ/xe tải không chịu TTĐB`);
-    for (const name of ['Xe bán tải cabin kép Ford Ranger', 'Xe bán tải Ford Ranger', 'Xe pick-up Toyota Hilux', 'Xe Ford Ranger pick-up', 'Ô tô pickup Mitsubishi Triton'])
+    for (const name of ['Xe bán tải cabin kép Ford Ranger', 'Xe bán tải Ford Ranger', 'Xe pick-up Toyota Hilux', 'Xe Ford Ranger pick-up', 'Ô tô pickup Mitsubishi Triton', 'Ford Ranger Pickup 2.0 AT', 'Pickup Mitsubishi Triton 4x4'])
       assert.ok(rules(run(`VX-X-${name}`, name)).includes('STATUTORY_RES_204_VAT_8_EXCLUDED'), `${name}: xe chịu TTĐB vẫn bị loại khỏi 8%`);
   });
 });
