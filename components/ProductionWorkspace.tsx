@@ -323,7 +323,7 @@ export function ProductionWorkspace({
   };
 
   const handleResetWorkspace = async () => {
-    if (!window.confirm('Xóa hết hóa đơn ('+(items.length>=200?'từ 200 trở lên':items.length)+') trong workspace demo này? Toàn bộ hóa đơn và chứng từ đính kèm sẽ bị xóa, nhật ký kiểm toán được giữ lại.')) {
+    if (!window.confirm('Xóa hết hóa đơn ('+(items.length>=200?'từ 200 trở lên':items.length)+') trong workspace này? Toàn bộ hóa đơn và chứng từ đính kèm sẽ bị xóa, nhật ký kiểm toán được giữ lại.')) {
       return;
     }
     setIsResetting(true);
@@ -787,7 +787,7 @@ export function ProductionWorkspace({
             </>}
             {!loading&&!error&&!invoiceId&&['inbox','approval'].includes(view)&&<div className="space-y-3">
               <InboxFilterToolbar filters={filters} onChange={setFilters} totalCount={visibleList.length} filteredCount={filteredList.length}/>
-              {isDemo&&items.length>0&&<div className="flex justify-end"><Button type="button" variant="outline" size="sm" disabled={isResetting} onClick={()=>void handleResetWorkspace()} className="gap-2 text-rose-700"><Trash2 className="h-4 w-4"/>{isResetting?'Đang xóa…':'Xóa hết hóa đơn'}</Button></div>}
+              {(isDemo||process.env.NEXT_PUBLIC_ALLOW_WORKSPACE_RESET==='1')&&items.length>0&&<div className="flex justify-end"><Button type="button" variant="outline" size="sm" disabled={isResetting} onClick={()=>void handleResetWorkspace()} className="gap-2 text-rose-700"><Trash2 className="h-4 w-4"/>{isResetting?'Đang xóa…':'Xóa hết hóa đơn'}</Button></div>}
               {renderList(filteredList)}
               <p className="text-xs text-muted-foreground">{items.length} hồ sơ được tải, tối đa 200 hồ sơ gần nhất.</p>
             </div>}
