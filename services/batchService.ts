@@ -31,7 +31,7 @@ export interface BatchItemView {
   submitter?: { id: string; name: string; department: string | null } | null;
   explanation?: DecisionExplanation; questionKey?: string;
 }
-export interface BatchGroup { key: string; label: string; invoiceIds: string[]; requiresCFO: boolean; sampleQuestion: string }
+export interface BatchGroup { key: string; label: string; invoiceIds: string[]; requiresCFO: boolean; sampleQuestion: string; questionItems: Array<{ n: number; text: string; answers: [string, string] }> }
 
 const mapBatch = (r: Record<string, unknown>): BatchRow => ({
   id: String(r.id), label: String(r.label), source: r.source as BatchSource, status: r.status as BatchRow['status'],
@@ -140,7 +140,7 @@ export function getBatch(batchId: string, user: AppUser): {
         const key = questionKey(d);
         if (key) {
           view.questionKey = key;
-          const group = groups.get(key) ?? { key, label: key.split(' | ').map(part => part.split('+').map(id => ruleContract(id).label).join(' + ')).join(' · '), invoiceIds: [], requiresCFO: false, sampleQuestion: d.handoff?.question ?? '' };
+          const group = groups.get(key) ?? { key, label: key.split(' | ').map(part => part.split('+').map(id => ruleContract(id).label).join(' + ')).join(' · '), invoiceIds: [], requiresCFO: false, sampleQuestion: d.handoff?.question ?? '', questionItems: (d.handoff?.questionSpec?.items ?? []).map(item => ({ n: item.n, text: item.text, answers: item.answers })) };
           group.invoiceIds.push(invoiceId);
           group.requiresCFO = group.requiresCFO || d.requiresCFO;
           groups.set(key, group);
