@@ -80,8 +80,10 @@ export function emailAuthenticated(fromAddress: string, authenticationResults: s
   const domain = emailDomain(fromAddress);
   if (!domain || !authenticationResults) return false;
   const text = authenticationResults.toLowerCase();
-  const dkim = new RegExp(`dkim=pass[^;]*header\\.(?:d|i)=@?(?:[a-z0-9-]+\\.)*${domain.replace(/\./g, '\\.')}`).test(text);
-  const spf = new RegExp(`spf=pass[^;]*smtp\\.mailfrom=[^;\\s]*@?(?:[a-z0-9-]+\\.)*${domain.replace(/\./g, '\\.')}`).test(text);
+  // Tên miền phải khớp trọn vẹn (hoặc là miền con): chặn "example.com.evil.net" và "evilexample.com" giả làm example.com.
+  const d = domain.replace(/\./g, '\\.');
+  const dkim = new RegExp(`dkim=pass[^;]*header\\.(?:d|i)=(?:[^;\\s@]*@)?(?:[a-z0-9-]+\\.)*${d}(?![a-z0-9.-])`).test(text);
+  const spf = new RegExp(`spf=pass[^;]*smtp\\.mailfrom=(?:[^;\\s@]*@)?(?:[a-z0-9-]+\\.)*${d}(?![a-z0-9.-])`).test(text);
   return dkim || spf;
 }
 
