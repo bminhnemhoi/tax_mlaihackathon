@@ -65,8 +65,8 @@ export function ruleContract(id:string,invoiceDate?:string):PolicyRuleContract {
   const vatSource=!invoiceDate || vatPeriod?.nq204 || invoiceDate>'2026-12-31'?officialSources.vat:vatPeriod?{code:vatPeriod.decree,url:'',effectiveFrom:vatPeriod.from}:undefined;
   const source=id.includes('CASH')?(invoiceDate && invoiceDate<'2025-07-01'?officialSources.legacyPayment:officialSources.payment):id.includes('VAT_8')||id==='RULE_SCOPE_VAT8_PERIOD'?vatSource:
     id==='RULE_SERIES_YEAR_MISMATCH'?invoiceDate && invoiceDate<'2026-07-01'?(invoiceDate>='2025-06-01'?officialSources.seriesTt32:officialSources.seriesTt78):officialSources.seriesTt91:
-    /BUYER_TAX|MCCQT|SIGNING/.test(id)?invoiceDate && invoiceDate<'2026-07-01'?officialSources.legacyInvoice:officialSources.invoice:
-    /CLOSED_SELLER|ADJUSTMENT/.test(id)?invoiceDate && invoiceDate<'2026-07-01'?(invoiceDate>='2025-06-01'?officialSources.earlierInvoice:officialSources.legacyInvoice):officialSources.invoice:undefined;
+    /BUYER_TAX|MCCQT/.test(id)?invoiceDate && invoiceDate<'2026-07-01'?officialSources.legacyInvoice:officialSources.invoice:
+    /CLOSED_SELLER|ADJUSTMENT|SIGNING/.test(id)?invoiceDate && invoiceDate<'2026-07-01'?(invoiceDate>='2025-06-01'?officialSources.earlierInvoice:officialSources.legacyInvoice):officialSources.invoice:undefined;
   // Nhóm lấy từ bảng phân loại duy nhất (lib/riskTaxonomy) — SOP, engine và workflow không thể lệch nhau.
   const group=groupOf(id);
   return {id,label:check?.[1]||id,clause:check?.[2]||'Dữ liệu đầu vào',condition:check?.[3]||'Xác minh dữ kiện trước khi tiếp tục.',requiredFields:fields[id]||[],

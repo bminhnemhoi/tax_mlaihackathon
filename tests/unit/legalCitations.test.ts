@@ -4,8 +4,10 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { GOVERNMENT_REGULATORY_REGISTRY, listLegalCitations } from '../../data/regulatoryRegistry';
-import { buyerTaxCodeBasis, cashPaymentBasis, closedSellerBasis, sameDayCashBasis, seriesYearBasis, taxAuthorityCodeBasis } from '../../lib/legalBasis';
+import { GOVERNMENT_REGULATORY_REGISTRY, isUnverifiedDocument, listLegalCitations } from '../../data/regulatoryRegistry';
+import { RULE_PROBE_BASE, RULE_PROBES } from '../../data/verification/ruleProbes';
+import { demoCompanyTaxCode } from '../../data/verification/challengeCases';
+import { buyerTaxCodeBasis, cashPaymentBasis, closedSellerBasis, inSentence, sameDayCashBasis, seriesYearBasis, signingBasis, taxAuthorityCodeBasis } from '../../lib/legalBasis';
 import { getActivePolicy, runIsolated } from '../../lib/server/db';
 import { describeRuleEvidence } from '../../services/handoffService';
 import { evaluateInvoiceLocally } from '../../services/policyEngine';
@@ -63,10 +65,21 @@ test('căn cứ cấp điều/khoản đổi đúng tại các mốc ngày lập
   assert.match(closedSellerBasis('2026-06-30'), /Nghị định 70\/2025/);
   assert.match(buyerTaxCodeBasis('2026-06-30'), /khoản 5 Điều 10 Nghị định 123\/2020/);
   assert.match(buyerTaxCodeBasis('2026-07-01'), /Nghị định 254\/2026/);
+  // NĐ 70/2025 thay khoản 5 và khoản 9 Điều 10 NĐ 123/2020 từ 01/6/2025.
+  assert.doesNotMatch(buyerTaxCodeBasis('2025-05-31'), /70\/2025/);
+  assert.match(buyerTaxCodeBasis('2025-06-01'), /khoản 5 Điều 10 Nghị định 123\/2020\/NĐ-CP, sửa đổi bởi Nghị định 70\/2025/);
+  assert.equal(signingBasis('2025-05-31'), 'Khoản 9 Điều 10 Nghị định 123/2020/NĐ-CP');
+  assert.match(signingBasis('2025-06-01'), /sửa đổi bởi Nghị định 70\/2025/);
+  assert.match(signingBasis('2026-06-30'), /sửa đổi bởi Nghị định 70\/2025/);
+  assert.equal(signingBasis('2026-07-01'), 'Nghị định 254/2026/NĐ-CP');
+  // Ghép vào câu: chỉ "Khoản"/"Điểm" viết thường; "Điều", "Nghị định" kèm số giữ viết hoa.
+  assert.equal(inSentence('Khoản 5 Điều 15 Thông tư 219/2013/TT-BTC'), 'khoản 5 Điều 15 Thông tư 219/2013/TT-BTC');
+  assert.equal(inSentence('Điều 4 và Phụ lục I Thông tư 91/2026/TT-BTC'), 'Điều 4 và Phụ lục I Thông tư 91/2026/TT-BTC');
+  assert.equal(inSentence('Nghị định 254/2026/NĐ-CP'), 'Nghị định 254/2026/NĐ-CP');
 });
 
 test('liên kết nguồn của phát hiện trỏ đúng văn bản được ghi trong căn cứ, ở mọi khung ngày lập', () => {
-  const rules = ['STATUTORY_LAW_48_CASH_PAYMENT', 'STATUTORY_SAME_DAY_CASH_5M', 'RULE_BUYER_TAX_CODE_MISMATCH', 'RULE_MCCQT_INVALID', 'RULE_SERIES_YEAR_MISMATCH', 'STATUTORY_DECREE_254_CLOSED_SELLER'];
+  const rules = ['STATUTORY_LAW_48_CASH_PAYMENT', 'STATUTORY_SAME_DAY_CASH_5M', 'RULE_BUYER_TAX_CODE_MISMATCH', 'RULE_MCCQT_INVALID', 'RULE_SERIES_YEAR_MISMATCH', 'STATUTORY_DECREE_254_CLOSED_SELLER', 'RULE_SIGNING_DELAY'];
   for (const date of ['2025-05-31', '2025-06-01', '2025-06-30', '2025-07-01', '2026-06-30', '2026-07-01'])
     for (const ruleId of rules) {
       const f = describeRuleEvidence({ ruleId, kind: 'STATUTORY', severity: 'HIGH', riskGroup: 'OUT_OF_POLICY', flaggedReason: '-', plainExplanation: '-', legalBasis: '' }, date);
@@ -100,5 +113,41 @@ test('phát hiện của engine hiển thị căn cứ theo ngày lập: cụm t
     const cash = (total: number) => ({ ...base, id: `C${total}`, preTaxAmount: Math.round(total / 1.1), taxAmount: total - Math.round(total / 1.1), totalAmount: total });
     assert.equal(basisOf(cash(4_999_999), [], 'STATUTORY_LAW_48_CASH_PAYMENT'), '');
     assert.match(basisOf(cash(5_000_000), [], 'STATUTORY_LAW_48_CASH_PAYMENT'), /Điều 26 Nghị định 181\/2025/);
+    // Trước 01/7/2025 ngưỡng là 20 triệu (khoản 2 Điều 15 TT 219/2013).
+    const cashOld = (total: number) => ({ ...cash(total), invoiceDate: '2025-06-30' });
+    assert.equal(basisOf(cashOld(19_999_999), [], 'STATUTORY_LAW_48_CASH_PAYMENT'), '');
+    assert.match(basisOf(cashOld(20_000_000), [], 'STATUTORY_LAW_48_CASH_PAYMENT'), /Khoản 2 Điều 15 Thông tư 219\/2013/);
+  });
+});
+
+test('chữ hiển thị của mọi đầu dò quy tắc ở mọi khung ngày lập: không lộ biểu thức mẫu chưa thay giá trị hay undefined, "Nghị định"/"Điều" giữa câu viết hoa', async () => {
+  await runIsolated(async () => {
+    const policy = getActivePolicy();
+    const config = { ...policy.config, companyTaxCode: demoCompanyTaxCode };
+    const plus40 = (d: string) => new Date(Date.parse(`${d}T00:00:00Z`) + 40 * 86_400_000).toISOString().slice(0, 10);
+    for (const date of ['2025-05-31', '2025-06-01', '2025-07-01', '2026-06-30', '2026-07-01', '2026-08-15'])
+      for (const [ruleId, patch] of Object.entries(RULE_PROBES)) {
+        const inv: InvoiceInput = { ...RULE_PROBE_BASE, ...patch, invoiceDate: date, ...(ruleId === 'RULE_SIGNING_DELAY' ? { signingDate: plus40(date) } : {}) };
+        const decision = evaluateInvoiceLocally(inv, config, policy.version);
+        const text = JSON.stringify(decision);
+        assert.ok(!text.includes('${') && !/undefined/.test(text), `${ruleId} @ ${date}: lộ biểu thức hoặc undefined`);
+        assert.doesNotMatch(text, /Theo (nghị định|điều|thông tư|luật) /, `${ruleId} @ ${date}: tên văn bản viết thường giữa câu`);
+        if (ruleId === 'RULE_SIGNING_DELAY' || ruleId === 'RULE_ADJUSTMENT_NO_ORIGINAL')
+          assert.ok(decision.findings?.some(f => f.ruleId === ruleId), `${ruleId} @ ${date}: đầu dò không kích hoạt`);
+      }
+  });
+});
+
+test('văn bản kèm quyết định chỉ gồm văn bản đã đối chiếu nguyên văn (không còn CV 2392, luật thuế TNDN/TNCN)', async () => {
+  await runIsolated(async () => {
+    const policy = getActivePolicy();
+    const config = { ...policy.config, companyTaxCode: demoCompanyTaxCode };
+    const unverified = GOVERNMENT_REGULATORY_REGISTRY.filter(isUnverifiedDocument).map(d => d.code);
+    assert.ok(unverified.includes('2392/TCT-QLRR') && unverified.includes('67/2025/QH15'));
+    for (const [date, expected] of [['2025-03-10', '123/2020/NĐ-CP'], ['2026-08-15', '254/2026/NĐ-CP']] as const) {
+      const regs = evaluateInvoiceLocally({ ...RULE_PROBE_BASE, invoiceDate: date }, config, policy.version).applicableRegulations ?? [];
+      assert.ok(regs.includes(expected), `${date}: thiếu ${expected}`);
+      for (const code of unverified) assert.ok(!regs.includes(code), `${date}: còn ${code}`);
+    }
   });
 });

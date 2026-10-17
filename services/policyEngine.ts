@@ -1,6 +1,6 @@
 import { ActionOption, InvoiceInput, InvoiceLineItem, LineItemAnalysis, MacroState, RefereeDecision, RuleFinding, RuleKind, SystemPolicyConfig } from '@/lib/schemas';
 import { MACRO_DEFAULTS } from '@/lib/constants';
-import { getApplicableRegulations } from '@/data/regulatoryRegistry';
+import { getApplicableRegulations, isUnverifiedDocument } from '@/data/regulatoryRegistry';
 import { checkDuplicateInvoice } from '@/services/duplicateDetector';
 import { findPrecedentForInvoice } from '@/services/precedentService';
 import { getSupplier } from '@/services/supplierService';
@@ -11,7 +11,7 @@ import {buildHandoff,describeRuleEvidence} from './handoffService';
 import {concreteIssue} from './questionBuilder';
 import {groupOf,orderFindings,riskGroupsOf} from '@/lib/riskTaxonomy';
 import {fieldLabels} from '@/lib/workflowPresentation';
-import {buyerTaxCodeBasis,cashPaymentBasis,closedSellerBasis,inSentence,invoiceFrameworkAt,sameDayCashBasis,seriesYearBasis,taxAuthorityCodeBasis,vat8Basis,vat8ExcludedPhrases,vatReductionAt} from '@/lib/legalBasis';
+import {buyerTaxCodeBasis,cashPaymentBasis,closedSellerBasis,inSentence,invoiceFrameworkAt,sameDayCashBasis,seriesYearBasis,signingBasis,taxAuthorityCodeBasis,vat8Basis,vat8ExcludedPhrases,vatReductionAt} from '@/lib/legalBasis';
 
 /** Cụm từ chứa từ khóa loại trừ nhưng là hàng hóa thông thường (VD "mũ bảo hiểm" không phải dịch vụ bảo hiểm). */
 const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HIỂM','GĂNG TAY BẢO HIỂM',
@@ -514,9 +514,13 @@ function evaluateInvoiceLocallyInternal(
         severity: 'MEDIUM',
         riskGroup: 'UNCERTAIN_INFO',
         flaggedReason: `Chữ ký số bên bán được ký vào ngày ${inv.signingDate}, lệch ${Math.abs(diffDays)} ngày so với ngày lập hóa đơn (${inv.invoiceDate}).`,
-        plainExplanation: `Theo quy định về thời điểm ký số và thời điểm lập hóa đơn (${inv.invoiceDate < '2026-07-01' ? 'khoản 9 Điều 10 Nghị định 123/2020/NĐ-CP' : invoiceFrameworkAt(inv.invoiceDate).decree}), hai thời điểm này đang lệch nhau ${Math.abs(diffDays)} ngày. Cần lưu ý thời điểm khai thuế theo ngày lập hoặc ngày ký theo hướng dẫn của CQT địa phương.`,
-        legalBasis: inv.invoiceDate < '2026-07-01' ? 'Khoản 9 Điều 10 Nghị định 123/2020/NĐ-CP' : `${invoiceFrameworkAt(inv.invoiceDate).decree} (thời điểm lập và ký số hóa đơn)`,
-        sopClause: inv.invoiceDate < '2026-07-01' ? 'Khoản 9 Điều 10 Nghị định 123/2020/NĐ-CP' : `${invoiceFrameworkAt(inv.invoiceDate).decree} (thời điểm lập và ký số hóa đơn)`,
+        plainExplanation: `Theo ${inSentence(signingBasis(inv.invoiceDate))}, ${inv.invoiceDate < '2025-06-01'
+          ? 'khi thời điểm ký số khác thời điểm lập hóa đơn thì thời điểm khai thuế là thời điểm lập hóa đơn.'
+          : inv.invoiceDate < '2026-07-01'
+            ? 'người bán ký số và gửi cơ quan thuế cấp mã chậm nhất là ngày làm việc tiếp theo kể từ thời điểm lập hóa đơn; người mua khai thuế theo thời điểm nhận hóa đơn đúng, đủ về hình thức và nội dung.'
+            : 'cần đối chiếu thời điểm ký số với thời điểm lập hóa đơn để xác định kỳ kê khai.'} Hóa đơn này có ngày ký số lệch ${Math.abs(diffDays)} ngày so với ngày lập.`,
+        legalBasis: signingBasis(inv.invoiceDate),
+        sopClause: signingBasis(inv.invoiceDate),
         actionableQuestion: `Hóa đơn ${inv.invoiceNumber} có ngày ký số lệch ${Math.abs(diffDays)} ngày so với ngày lập. KTT xử lý thế nào?`,
         options: [
           {
@@ -645,7 +649,7 @@ function evaluateInvoiceLocallyInternal(
           severity: 'CRITICAL',
           riskGroup: 'OUT_OF_POLICY',
           flaggedReason: `Cụm ${sameDayCheck.invoiceCount} hóa đơn cùng ngày (${inv.invoiceDate}) từ NCC [${inv.supplierName}] có tổng giá trị ${sameDayCheck.dailyTotal.toLocaleString('vi-VN')}₫ (≥ ${nonCashThreshold / 1_000_000} triệu đồng) thanh toán TIỀN MẶT`,
-          plainExplanation: `Theo ${inSentence(sameDayCashBasis(inv.invoiceDate))}, mua hàng hóa, dịch vụ của cùng một người bán có giá trị dưới ${nonCashThreshold / 1_000_000} triệu đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ ${nonCashThreshold / 1_000_000} triệu đồng trở lên thì chỉ được khấu trừ thuế khi có chứng từ thanh toán không dùng tiền mặt.`,
+          plainExplanation: `Theo ${inSentence(sameDayCashBasis(inv.invoiceDate))}, mua hàng hóa, dịch vụ của ${inv.invoiceDate < '2025-07-01' ? 'một nhà cung cấp' : 'cùng một người bán'} có giá trị dưới ${nonCashThreshold / 1_000_000} triệu đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ ${nonCashThreshold / 1_000_000} triệu đồng trở lên thì chỉ được khấu trừ thuế khi có chứng từ thanh toán ${inv.invoiceDate < '2025-07-01' ? 'qua ngân hàng' : 'không dùng tiền mặt'}.`,
           legalBasis: sameDayCashBasis(inv.invoiceDate),
           sopClause: sameDayCashBasis(inv.invoiceDate),
           actionableQuestion: `Phát hiện cụm hóa đơn cùng ngày từ ${inv.supplierName} đạt ${sameDayCheck.dailyTotal.toLocaleString('vi-VN')}₫ thanh toán tiền mặt. KTT xử lý thế nào?`,
@@ -959,7 +963,7 @@ function evaluateInvoiceLocallyInternal(
       severity: 'MEDIUM',
       riskGroup: 'UNCERTAIN_INFO',
       flaggedReason: 'Hóa đơn điều chỉnh nhưng không tìm thấy số hóa đơn gốc trong CSDL nội bộ',
-      plainExplanation: 'Hóa đơn ghi là điều chỉnh giảm tiền nhưng hệ thống không tìm thấy hóa đơn gốc tương ứng theo ${invoiceFrameworkAt(inv.invoiceDate).decree}.',
+      plainExplanation: `Hóa đơn ghi là điều chỉnh giảm tiền nhưng hệ thống không tìm thấy hóa đơn gốc tương ứng theo ${invoiceFrameworkAt(inv.invoiceDate).decree}.`,
       legalBasis: `Điều 1.4 Quy chế Tax-SOP-2026 & ${invoiceFrameworkAt(inv.invoiceDate).decree}`,
       sopClause: `Điều 1.4 Quy chế Tax-SOP-2026 & ${invoiceFrameworkAt(inv.invoiceDate).decree}`,
       actionableQuestion: 'Hóa đơn điều chỉnh ' + inv.invoiceNumber + ' không tìm thấy số hóa đơn gốc. KTT xử lý thế nào?',
@@ -1130,7 +1134,8 @@ export function evaluateInvoiceLocally(
   contextInvoices?: InvoiceInput[]
 ): RefereeDecision {
   const regInfo = getApplicableRegulations(inv.invoiceDate);
-  const applicableDecreeCodes = regInfo.applicableRegulations.map((d) => d.code);
+  // Chỉ liệt kê văn bản đã đối chiếu nguyên văn; văn bản nguồn thứ cấp (VD CV 2392, luật thuế TNDN/TNCN) không phải căn cứ của quyết định.
+  const applicableDecreeCodes = regInfo.applicableRegulations.filter((d) => !isUnverifiedDocument(d)).map((d) => d.code);
   // Chuẩn hóa Unicode (NFC): chữ Việt gõ dạng tổ hợp (NFD) vẫn khớp từ khóa quy tắc.
   const normalized = structuredClone(inv);
   normalized.itemName = normalized.itemName.normalize('NFC');

@@ -24,6 +24,8 @@ export interface RegulatoryDocument {
 }
 
 const UNVERIFIED = 'Nguồn thứ cấp — chưa đối chiếu nguyên văn; engine không dùng văn bản này để kết luận.';
+/** Văn bản chưa đối chiếu nguyên văn: không liệt kê như căn cứ pháp lý của quyết định. */
+export const isUnverifiedDocument = (doc: { summary: string }): boolean => doc.summary.includes(UNVERIFIED);
 
 export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
   // --- KHUNG PHÁP LUẬT 2025 - 2026 HIỆN HÀNH ---
@@ -53,22 +55,23 @@ export const GOVERNMENT_REGULATORY_REGISTRY: RegulatoryDocument[] = [
       'Điều 26: phải có chứng từ thanh toán không dùng tiền mặt đối với hàng hóa, dịch vụ mua vào (bao gồm cả hàng hóa nhập khẩu) từ 05 triệu đồng trở lên đã bao gồm thuế GTGT',
       'Khoản 3 Điều 26: mua của một người nộp thuế có giá trị dưới 05 triệu đồng nhưng mua nhiều lần trong cùng một ngày có tổng giá trị từ 05 triệu đồng trở lên thì chỉ được khấu trừ đối với trường hợp có chứng từ thanh toán không dùng tiền mặt',
       'Khoản 1 Điều 26: không tính chứng từ bên mua nộp tiền mặt vào tài khoản của bên bán',
-      'Điểm g khoản 2 Điều 26 (sửa đổi bởi Nghị định 144/2026/NĐ-CP, hiệu lực 20/6/2026): hàng mua trả chậm, trả góp từ 05 triệu đồng chưa có chứng từ thanh toán do chưa đến thời điểm thanh toán theo hợp đồng vẫn được khấu trừ'
+      'Điểm g khoản 2 Điều 26: hàng mua trả chậm, trả góp từ 05 triệu đồng chưa có chứng từ thanh toán do chưa đến thời điểm thanh toán theo hợp đồng vẫn được khấu trừ; Nghị định 144/2026/NĐ-CP (hiệu lực 20/6/2026) bổ sung: sau khi điều chỉnh mà có chứng từ thanh toán không dùng tiền mặt thì được kê khai, khấu trừ vào kỳ tính thuế có chứng từ'
     ],
-    summary: 'Ngưỡng 5 triệu đồng (đã gồm thuế GTGT) và quy tắc mua nhiều lần trong ngày cho điều kiện khấu trừ thuế GTGT đầu vào từ 01/7/2025. Sửa đổi bởi Nghị định 359/2025/NĐ-CP và Nghị định 144/2026/NĐ-CP (không sửa đoạn mở đầu và khoản 3 Điều 26).'
+    summary: 'Ngưỡng 5 triệu đồng (đã gồm thuế GTGT) và quy tắc mua nhiều lần trong ngày cho điều kiện khấu trừ thuế GTGT đầu vào từ 01/7/2025. Sửa đổi bởi Nghị định 144/2026/NĐ-CP (không sửa đoạn mở đầu và khoản 3 Điều 26); Nghị định 359/2025/NĐ-CP: chưa đối chiếu nguyên văn.'
   },
   {
     id: 'ND-144-2026',
     code: '144/2026/NĐ-CP',
-    title: 'Nghị định sửa đổi, bổ sung Nghị định 181/2025/NĐ-CP (điểm g khoản 2 Điều 26)',
+    title: 'Nghị định sửa đổi, bổ sung một số điều của Nghị định 181/2025/NĐ-CP',
     issuer: 'CHÍNH PHỦ',
     effectiveFrom: '2026-06-20',
     status: 'ACTIVE',
     officialUrl: 'https://vanban.chinhphu.vn/?docid=218020&pageid=27160',
     keyRules: [
-      'Điều 4: sửa đổi, bổ sung điểm g khoản 2 Điều 26 Nghị định 181/2025/NĐ-CP — hàng mua trả chậm, trả góp từ 05 triệu đồng chưa có chứng từ thanh toán do chưa đến thời điểm thanh toán theo hợp đồng vẫn được khấu trừ'
+      'Điều 4: sửa đổi, bổ sung điểm g khoản 2 Điều 26 Nghị định 181/2025/NĐ-CP — bổ sung trường hợp sau khi điều chỉnh mà có chứng từ thanh toán không dùng tiền mặt thì được kê khai, khấu trừ vào kỳ tính thuế có chứng từ',
+      'Các điều khác: sửa Điều 4, điểm b khoản 1 Điều 9, khoản 2 Điều 23 và thay Phụ lục I, II của Nghị định 181/2025/NĐ-CP'
     ],
-    summary: 'Sửa đổi điều kiện chứng từ thanh toán đối với hàng mua trả chậm, trả góp; không sửa khoản 3 Điều 26 Nghị định 181/2025/NĐ-CP.'
+    summary: 'Sửa đổi một số điều của Nghị định 181/2025/NĐ-CP, trong đó có điểm g khoản 2 Điều 26 (hàng mua trả chậm, trả góp); không sửa đoạn mở đầu và khoản 3 Điều 26.'
   },
   {
     id: 'NQ-204-2025',
