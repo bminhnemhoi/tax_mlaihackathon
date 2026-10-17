@@ -20,6 +20,9 @@ export const PRINCIPALS: PrincipalInfo[] = [
 
 export interface Capability { action: string; label: string; allowed: Principal[]; conditions: string[]; enforcedBy: string }
 export const CAPABILITIES: Capability[] = [
+  { action: 'batch.create', label: 'Tạo lô hóa đơn, gắn hóa đơn vào lô', allowed: ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Lô đã chốt thì không thêm hóa đơn', 'Gửi lại cùng file (cùng mã băm) không tạo bản trùng'], enforcedBy: 'createBatch, attachToBatch · services/batchService.ts' },
+  { action: 'batch.signoff', label: 'Chốt lô trước khi ghi sổ', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Không phải người tạo lô', 'Lô có hóa đơn từ hạn mức CFO: chỉ CFO', 'Ghi lý do ≥ 8 ký tự', 'Hóa đơn còn chờ người quyết không bị ghi sổ'], enforcedBy: 'signOffBatch · services/batchService.ts' },
+  { action: 'batch.answerGroup', label: 'Trả lời chung cho nhóm hóa đơn cùng câu hỏi', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Chỉ các hóa đơn cùng câu hỏi trong cùng lô', 'Từng hóa đơn vẫn qua kiểm soát của câu hỏi chuyển tiếp (CFO, bất kiêm nhiệm)'], enforcedBy: 'answerGroup · services/batchService.ts' },
   { action: 'invoice.submit', label: 'Nhập / sửa hồ sơ', allowed: ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Sửa sau khi đã chuyển tiếp: trường đã đổi phải được người có thẩm quyền xác nhận', 'Ca từng cần CFO: người khác CFO sửa không làm hạ thẩm quyền'], enforcedBy: 'evaluateWorkflow · services/workflowService.ts' },
   { action: 'invoice.confirmFields', label: 'Xác minh dữ liệu chưa chắc (kể cả AI đọc)', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Không phải người nhập hồ sơ'], enforcedBy: 'evaluateWorkflow · services/workflowService.ts' },
   { action: 'handoff.answer', label: 'Trả lời câu hỏi chuyển tiếp ("1A, 2B")', allowed: ['CHIEF_ACCOUNTANT', 'CFO'], conditions: ['Ca cần CFO: chỉ CFO', 'Không phải người nhập hồ sơ'], enforcedBy: 'answerHandoff · services/workflowService.ts' },

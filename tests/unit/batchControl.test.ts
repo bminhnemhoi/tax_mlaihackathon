@@ -13,7 +13,7 @@ import { answerGroup, attachToBatch, createBatch, getBatch, signOffBatch } from 
 import { evaluateInvoiceLocally } from '../../services/policyEngine';
 import { answerHandoff, evaluateWorkflow, readRecord } from '../../services/workflowService';
 
-const base = { invoiceDate: '2026-10-05', supplierTaxCode: '0316789013', supplierName: 'Công ty TNHH Văn Phòng Xanh', isImageBlurry: false, isAdjustment: false };
+const base = { invoiceDate: '2026-10-05', supplierTaxCode: '0316789013', supplierName: 'Công ty TNHH Văn Phòng Xanh', isImageBlurry: false, isAdjustment: false, sellerStatus: 'UNKNOWN' as const };
 const water = (n: string): InvoiceInput => ({ ...base, id: `NUOC-${n}`, invoiceNumber: n, itemName: 'Nước uống đóng bình 20L', preTaxAmount: 500_000, taxRate: 8, taxAmount: 40_000, totalAmount: 540_000 });
 // Mỗi hóa đơn rượu một nhà hàng khác nhau: cùng người bán cùng ngày sẽ cộng dồn thành cụm và bị hỏi thêm chứng từ (câu hỏi khác).
 const wine = (n: string): InvoiceInput => ({ ...base, id: `RUOU-${n}`, invoiceNumber: n, supplierTaxCode: `03198${n.slice(-5)}`, supplierName: `Nhà hàng Sen Vàng ${n.slice(-2)}`, itemName: 'Tiếp khách đối tác - rượu vang', preTaxAmount: 3_000_000, taxRate: 10, taxAmount: 300_000, totalAmount: 3_300_000, paymentMethod: 'BANK_TRANSFER' });

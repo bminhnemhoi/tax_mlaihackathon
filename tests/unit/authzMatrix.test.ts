@@ -10,6 +10,7 @@ import { switchRole, type AppUser } from '../../lib/server/auth';
 import { CAPABILITIES, HUMAN_ROLES, can, type Principal } from '../../lib/capabilities';
 import { allowedActions, answerHandoff, applyWorkflowAction, evaluateWorkflow, readRecord, reviewPostAudit } from '../../services/workflowService';
 import { setAutomationPaused } from '../../services/automationControl';
+import { answerGroup, attachToBatch, createBatch, signOffBatch } from '../../services/batchService';
 import { createPolicyDraft, publishPolicy, rollbackPolicy } from '../../services/policyService';
 
 const base = { invoiceDate: '2026-10-05', supplierTaxCode: '0312345678', supplierName: 'Công ty TNHH Minh An', taxRate: 10 };
@@ -29,6 +30,15 @@ function setup(): Users {
 
 /** Mỗi quyền: dựng tình huống bằng người khác (để không vướng bất kiêm nhiệm), rồi để `actor` thử. Trả true nếu được phép. */
 const SCENARIOS: Record<string, (u: Users, actor: AppUser) => Promise<boolean>> = {
+  'batch.create': async (_u, actor) => attempt(() => createBatch(actor, { label: 'Lô thử quyền' })),
+  // Lô do kế toán viên tạo, có một ca thường quy đã tự duyệt: người khác người tạo, đủ vai trò mới chốt được.
+  'batch.signoff': async (u, actor) => { const lot = createBatch(u.ACCOUNTANT, { label: 'Lô chốt thử' }); const inv = routine(); await evaluateWorkflow(inv, u.ACCOUNTANT, { forceLocalOnly: true });
+    attachToBatch(u.ACCOUNTANT, lot.id, { invoiceId: inv.id }); return attempt(() => signOffBatch(lot.id, actor, 'Chốt lô sau khi xem tổng hợp')); },
+  // Hai hóa đơn tiếp khách có rượu ở hai nhà hàng khác nhau: cùng một câu hỏi, trả lời chung được.
+  'batch.answerGroup': async (u, actor) => { const lot = createBatch(u.ACCOUNTANT, { label: 'Lô nhóm thử' }); const ids: string[] = [];
+    for (const k of [1, 2]) { seq += 1; const n = String(9_500_000 + seq); const inv = { ...base, id: `AZG-${n}`, invoiceNumber: n, supplierTaxCode: `031955${String(seq).padStart(4, '0')}`, itemName: 'Tiếp khách đối tác - rượu vang', preTaxAmount: 3_000_000, taxAmount: 300_000, totalAmount: 3_300_000, paymentMethod: 'BANK_TRANSFER' as const };
+      void k; await evaluateWorkflow(inv, u.ACCOUNTANT, { forceLocalOnly: true }); attachToBatch(u.ACCOUNTANT, lot.id, { invoiceId: inv.id }); ids.push(inv.id); }
+    return attempt(async () => { const r = await answerGroup(lot.id, actor, { invoiceIds: ids, answers: { '1': 'A', '2': 'A' }, reason: 'Tiếp khách theo quy chế, có bảng kê' }); if (!r.every(x => x.ok)) throw new Error('bị chặn'); }); },
   'invoice.submit': async (_u, actor) => attempt(() => evaluateWorkflow(routine(), actor, { forceLocalOnly: true })),
   'invoice.confirmFields': async (u, actor) => { const inv = routine(); await evaluateWorkflow(inv, u.ACCOUNTANT, { forceLocalOnly: true });
     return attempt(() => evaluateWorkflow(inv, actor, { forceLocalOnly: true, expectedRevision: readRecord(inv.id).revision, confirmations: [{ field: 'totalAmount', evidence: 'Đối chiếu hóa đơn gốc' }] })); },
