@@ -161,7 +161,7 @@ function tag(xml: string, name: string): string | undefined {
 const SINGLE_VALUED_HEADER_TAGS = [
   'TgTCThue', 'TgTThue', 'TgTTThue', 'TgTTTBSo', 'TongTienHang', 'TongTienThue', 'TongThanhToan', 'TongTien', 'SubTotal', 'SubtotalAmount',
   'TotalSaleAmount', 'TotalAmountWithoutVAT', 'GrandTotal', 'TotalPayment', 'TotalVAT', 'TotalVATAmount', 'TotalAmountWithVAT', 'InvoiceTotal',
-  'TotalAmount', 'TaxAmount', 'VATAmount', 'SHDon', 'NLap', 'KHHDon', 'KHMSHDon', 'MCCQT', 'HTTT', 'PaymentMethod',
+  'TotalAmount', 'TaxAmount', 'VATAmount', 'SHDon', 'NLap', 'KHHDon', 'KHMSHDon', 'MCCQT', 'HTTT', 'HTTToan', 'PaymentMethod',
 ];
 const PARTY_BLOCK_TAGS = ['NBan', 'NMua', 'SellerInfo', 'BuyerInfo', 'Seller', 'Buyer'];
 const AMBIGUOUS_XML = (detail: string) => new Error(`Tệp XML có ${detail} — không đọc tất định được. Hãy tải bản XML gốc hoặc nhập tay.`);

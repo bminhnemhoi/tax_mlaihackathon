@@ -1,8 +1,9 @@
 /**
  * Lô dựng sẵn cho buổi trình bày trên máy local: phiên demo mới mở ra đã có lô để nói ngay, không phải chờ tải 25 file.
  * Chỉ chạy khi chủ máy đặt TAX_REFEREE_DEMO_PRESET_BATCHES=1 (mặc định tắt, bản live không đổi).
- *  - Lô 1 "cuối tháng 10": 25 file mẫu (data/demo-batch) do Kế toán viên tải lên, đi đúng đường của màn hình Lô hóa đơn
- *    (đọc XML tất định → xếp MST → ngày → số → máy kiểm từng tờ → gắn lô); để MỞ cho Kế toán trưởng trả lời nhóm và chốt.
+ *  - Lô 1 "cuối tháng 10": 25 file mẫu (data/demo-batch) do Kế toán viên tải lên, theo thứ tự và luật của màn hình Lô hóa đơn
+ *    (đọc XML tất định → bỏ file trùng → xếp MST → ngày → số → máy kiểm từng tờ → gắn lô; không tra cứu bên bán qua mạng);
+ *    để MỞ cho Kế toán trưởng trả lời nhóm và chốt.
  *  - Lô 2 "tuần 2 tháng 10": 5 hóa đơn thường quy, Kế toán trưởng đã chốt — để Tổng quan và Lịch sử có số liệu ngay.
  */
 import crypto from 'node:crypto';
@@ -61,13 +62,16 @@ export async function seedDemoBatches(): Promise<{ batches: string[] }> {
     await evaluateWorkflow(invoice, accountant, { forceLocalOnly: true });
     attachToBatch(accountant, week2.id, { invoiceId: invoice.id, fileName: `${invoice.invoiceNumber}.xml` });
   }
-  signOffBatch(week2.id, chief, 'Chốt lô tuần 2 sau khi xem phiếu giải trình từng hóa đơn');
+  signOffBatch(week2.id, chief, 'Chốt lô tuần 2 sau khi xem phiếu giải trình từng hóa đơn (dữ liệu dựng sẵn cho demo)');
 
   const month = createBatch(accountant, { label: 'Lô cuối tháng 10 · 25 file (Kế toán viên tải lên)', source: 'UPLOAD' });
   const parsed = DEMO_BATCH_FILES.map((file, index) => ({ index, file, sha: crypto.createHash('sha256').update(file.xml).digest('hex'), ...readSample(file.fileName, file.xml) }));
   const key = (p: typeof parsed[number]) => [String(p.invoice?.supplierTaxCode ?? '~'), String(p.invoice?.invoiceDate ?? '~'), String(p.invoice?.invoiceNumber ?? '~')].join('|');
   parsed.sort((a, b) => key(a).localeCompare(key(b)) || a.index - b.index);
+  const seen = new Set<string>();
   for (const p of parsed) {
+    if (seen.has(p.sha)) continue; // cùng nội dung với file đã nhận: không đưa qua máy kiểm lần hai
+    seen.add(p.sha);
     if (!p.invoice) { attachToBatch(accountant, month.id, { fileName: p.file.fileName, fileSha256: p.sha, error: p.error ?? 'Không đọc được' }); continue; }
     try {
       const result = await evaluateWorkflow(p.invoice, accountant, { forceLocalOnly: true }) as { decision?: { invoiceId?: string } };

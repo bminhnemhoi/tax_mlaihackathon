@@ -22,5 +22,11 @@ export function aiRuntimeInfo() {
 /** Cấu hình "fail-open" phải hiện ra: thiếu khóa audit thì không có HMAC/chữ ký điểm neo và mẫu hậu kiểm đoán trước được. */
 export function configWarnings(auditKeyed: boolean, commit: string): string[] {
   if (process.env.NODE_ENV !== 'production') return [];
-  return [...(auditKeyed ? [] : ['audit_key_missing']), ...(commit === 'unknown' ? ['commit_unknown'] : []), ...(process.env.QGEN_AI === '1' ? ['qgen_ai_enabled'] : [])];
+  // Cờ chỉ dành cho máy local của đội: bật trên production là cấu hình nhầm (kênh thật trong phiên người lạ, dữ liệu dựng sẵn, LLM demo).
+  const localOnly = [
+    ...(process.env.TAX_REFEREE_ALLOW_REAL_CHANNELS_IN_DEMO === '1' ? ['real_channels_in_demo'] : []),
+    ...(process.env.TAX_REFEREE_DEMO_PRESET_BATCHES === '1' ? ['demo_preset_batches'] : []),
+    ...(process.env.DEV_LLM_ENABLED === '1' ? ['dev_llm_enabled'] : []),
+  ];
+  return [...(auditKeyed ? [] : ['audit_key_missing']), ...(commit === 'unknown' ? ['commit_unknown'] : []), ...(process.env.QGEN_AI === '1' ? ['qgen_ai_enabled'] : []), ...localOnly];
 }

@@ -142,3 +142,10 @@ test('PDF: file tạm ghi vào thư mục riêng, cờ wx, quyền 600, luôn đ
     try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* Windows: tiến trình python3 bị timeout có thể còn giữ thư mục */ }
   }
 });
+
+test('XML: hai thẻ <HTTToan> (hình thức thanh toán) bị từ chối — không để thẻ giả "Chuyển khoản" đứng trước thẻ "Tiền mặt" thật', () => {
+  const xml = fs.readFileSync(path.join(process.cwd(), 'data', 'demo-batch', '01-van-phong-pham.xml'), 'utf-8');
+  assert.ok(xml.includes('<HTTToan>'));
+  assert.doesNotThrow(() => parseXml(xml));
+  assert.throws(() => parseXml(xml.replace('<HTTToan>', '<HTTToan>Chuyển khoản</HTTToan><HTTToan>')), /không đọc tất định được/);
+});
