@@ -161,7 +161,7 @@ function tag(xml: string, name: string): string | undefined {
 const SINGLE_VALUED_HEADER_TAGS = [
   'TgTCThue', 'TgTThue', 'TgTTThue', 'TgTTTBSo', 'TongTienHang', 'TongTienThue', 'TongThanhToan', 'TongTien', 'SubTotal', 'SubtotalAmount',
   'TotalSaleAmount', 'TotalAmountWithoutVAT', 'GrandTotal', 'TotalPayment', 'TotalVAT', 'TotalVATAmount', 'TotalAmountWithVAT', 'InvoiceTotal',
-  'TotalAmount', 'TaxAmount', 'VATAmount', 'SHDon', 'NLap', 'KHHDon', 'KHMSHDon', 'MCCQT', 'HTTT', 'PaymentMethod',
+  'TotalAmount', 'TaxAmount', 'VATAmount', 'SHDon', 'NLap', 'KHHDon', 'KHMSHDon', 'MCCQT', 'HTTT', 'HTTToan', 'PaymentMethod',
 ];
 const PARTY_BLOCK_TAGS = ['NBan', 'NMua', 'SellerInfo', 'BuyerInfo', 'Seller', 'Buyer'];
 const AMBIGUOUS_XML = (detail: string) => new Error(`Tệp XML có ${detail} — không đọc tất định được. Hãy tải bản XML gốc hoặc nhập tay.`);
@@ -350,13 +350,13 @@ export function parseXml(rawXml: string) {
     tag(xml, 'ThueSuat');
   const taxRate = parseTaxRateString(taxRateRaw);
 
-  const paymentMethodRaw = (tag(xml, 'HTTT') || tag(xml, 'PaymentMethod') || '')
+  // Chỉ đọc ngoài dòng hàng, như phép kiểm trùng tên: thẻ giả đặt trong <HHDVu> phía trước TTChung không được chọn.
+  const paymentMethodRaw = (tag(xmlHeader, 'HTTToan') || tag(xmlHeader, 'HTTT') || tag(xmlHeader, 'PaymentMethod') || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toUpperCase();
-  const paymentMethod = paymentMethodRaw.includes('TM') && !paymentMethodRaw.includes('CK')
-    ? 'CASH'
-    : paymentMethodRaw.includes('CK') || paymentMethodRaw.includes('CHUYEN KHOAN')
-    ? 'BANK_TRANSFER'
-    : undefined;
+  const saysCash = /\bTM\b|TIEN MAT|\bCASH\b/.test(paymentMethodRaw);
+  const saysBank = /\bCK\b|CHUYEN KHOAN|TRANSFER|NGAN HANG/.test(paymentMethodRaw);
+  // "TM/CK" (một trong hai) là chưa rõ: không đoán; hệ thống chỉ hỏi khi số tiền tới ngưỡng thanh toán.
+  const paymentMethod = saysCash && !saysBank ? 'CASH' : saysBank && !saysCash ? 'BANK_TRANSFER' : undefined;
 
   // 6. Trích xuất chi tiết dòng hàng <Item> hoặc <HHDVu> (IMP-08)
   const items: Array<{

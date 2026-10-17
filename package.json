@@ -8,10 +8,10 @@
   "homepage": "https://limegreen-salamander-517622.hostingersite.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bminhnemhoi/tax_mlaihackathon.git"
+    "url": "git+https://github.com/khanhle1406/Tax-Referee.git"
   },
   "bugs": {
-    "url": "https://github.com/bminhnemhoi/tax_mlaihackathon/issues"
+    "url": "https://github.com/khanhle1406/Tax-Referee/issues"
   },
   "keywords": [
     "vat",
@@ -41,6 +41,10 @@
     "test:comprehensive": "tsx scripts/qa/test-comprehensive-suites.ts",
     "test:manifest": "tsx scripts/qa/test-regression-manifest.ts",
     "demo:reset": "tsx scripts/ops/reset-demo-data.ts",
+    "referee:snapshot": "tsx scripts/qa/referee-snapshot.ts --write",
+    "referee:diff": "tsx scripts/qa/referee-snapshot.ts",
+    "channels:check": "tsx scripts/ops/channels-check.ts",
+    "live:check": "python scripts/ops/check-live.py",
     "test": "tsx scripts/qa/run-all.ts",
     "test:unit": "node --import tsx --test tests/unit/*.test.ts",
     "test:fixtures": "tsx scripts/qa/qa-fixtures.ts",
@@ -66,7 +70,8 @@
     "test:review-regressions": "tsx scripts/qa/run-all.ts review-regressions",
     "test:qa": "tsx scripts/qa/run-all.ts qa-regressions",
     "test:challenge-a": "tsx scripts/qa/run-all.ts challenge-a",
-    "test:workspace-ui": "tsx scripts/qa/test-workspace-ui.ts"
+    "test:workspace-ui": "tsx scripts/qa/test-workspace-ui.ts",
+    "demo:local": "bash scripts/demo/start-local-demo.sh"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -80,8 +85,11 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fast-xml-parser": "^5.11.2",
+    "imapflow": "^2.1.2",
     "lucide-react": "^0.475.0",
+    "mailparser": "^3.9.32",
     "next": "15.5.27",
+    "nodemailer": "^10.0.13",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -95,7 +103,9 @@
     "@eslint/eslintrc": "^3.3.7",
     "@types/better-sqlite3": "^9.6.0",
     "@types/canvas-confetti": "^1.9.0",
+    "@types/mailparser": "^3.9.0",
     "@types/node": "^22.13.9",
+    "@types/nodemailer": "^8.0.2",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",

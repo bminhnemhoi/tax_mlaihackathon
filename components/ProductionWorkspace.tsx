@@ -18,7 +18,7 @@ import { InvoiceList } from '@/components/workspace/InvoiceList';
 import { WorkspaceShell } from '@/components/workspace/WorkspaceShell';
 import { ScreenState, WorkspaceSkeleton } from '@/components/workspace/ScreenState';
 import { workspaceRoutes, viewForPath, invoiceIdForPath, readInboxFilters, writeInboxFilters, readInvoiceTab, invoiceReturnPath, readListPage, replaceWorkspaceQuery, type WorkspaceView } from '@/lib/workspaceNavigation';
-import { AlertTriangle, CheckCircle2, Clock, FileText, XCircle, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, FileText, XCircle, ShieldAlert, Trash2 } from 'lucide-react';
 const InteractiveInputForm=dynamic(()=>import('@/components/InteractiveInputForm').then(module=>module.InteractiveInputForm),{loading:()=> <WorkspaceSkeleton/>});
 import { PolicyViewerModal } from '@/components/PolicyViewerModal';
 import { LedgerSyncModal } from '@/components/LedgerSyncModal';
@@ -38,6 +38,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 
 import { toast } from 'sonner';
+import { DashboardView } from '@/components/workspace/DashboardView';
+import { BatchesView } from '@/components/workspace/BatchesView';
+import { ChannelsView } from '@/components/workspace/ChannelsView';
+import { HistoryView } from '@/components/workspace/HistoryView';
 
 type AppUser = { id: string; email: string; displayName: string; role: 'ACCOUNTANT' | 'CHIEF_ACCOUNTANT' | 'CFO' };
 type View = WorkspaceView;
@@ -323,7 +327,7 @@ export function ProductionWorkspace({
   };
 
   const handleResetWorkspace = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn RESET toàn bộ hóa đơn về trạng thái ban đầu không? Toàn bộ hóa đơn đã gửi lên sẽ được xóa sạch.')) {
+    if (!window.confirm('Xóa hết hóa đơn ('+(items.length>=200?'từ 200 trở lên':items.length)+') trong workspace này? Toàn bộ hóa đơn và chứng từ đính kèm sẽ bị xóa, nhật ký kiểm toán được giữ lại.')) {
       return;
     }
     setIsResetting(true);
@@ -715,6 +719,10 @@ export function ProductionWorkspace({
             </div>}
             {/* Reports use server values and an explicit draft period. */}
             {!loading&&!error&&view==='reports'&&<ReportsView macro={macro} items={items} policyVersion={policyVersion}/>}
+            {!loading&&!error&&view==='dashboard'&&<DashboardView user={user}/>}
+            {!loading&&!error&&view==='batches'&&<BatchesView user={user}/>}
+            {!loading&&!error&&view==='channels'&&<ChannelsView user={user}/>}
+            {!loading&&!error&&view==='history'&&<HistoryView user={user}/>}
 
             {/* TCT Reconciliation View */}
             {!loading && !error && view === 'reconciliation' && (
@@ -787,6 +795,7 @@ export function ProductionWorkspace({
             </>}
             {!loading&&!error&&!invoiceId&&['inbox','approval'].includes(view)&&<div className="space-y-3">
               <InboxFilterToolbar filters={filters} onChange={setFilters} totalCount={visibleList.length} filteredCount={filteredList.length}/>
+              {(isDemo||process.env.NEXT_PUBLIC_ALLOW_WORKSPACE_RESET==='1')&&items.length>0&&<div className="flex justify-end"><Button type="button" variant="outline" size="sm" disabled={isResetting} onClick={()=>void handleResetWorkspace()} className="gap-2 text-rose-700"><Trash2 className="h-4 w-4"/>{isResetting?'Đang xóa…':'Xóa hết hóa đơn'}</Button></div>}
               {renderList(filteredList)}
               <p className="text-xs text-muted-foreground">{items.length} hồ sơ được tải, tối đa 200 hồ sơ gần nhất.</p>
             </div>}

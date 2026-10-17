@@ -9,8 +9,8 @@ Khi tham gia, bạn đồng ý tuân theo [Quy tắc ứng xử](CODE_OF_CONDUCT
 **Yêu cầu:** Node.js 22 (giống CI và production; có sẵn `.nvmrc`) hoặc 24, kèm npm. Python 3 với PyMuPDF là tùy chọn (đọc lớp chữ PDF).
 
 ```bash
-git clone https://github.com/bminhnemhoi/tax_mlaihackathon.git
-cd tax_mlaihackathon
+git clone https://github.com/khanhle1406/Tax-Referee.git
+cd Tax-Referee
 npm ci
 cp .env.example .env.local   # khóa AI chỉ cần cho đọc ảnh/PDF scan
 npm run dev                  # http://localhost:3000
@@ -48,10 +48,10 @@ TAX_REFEREE_DATA_DIR=$(mktemp -d) NODE_ENV=test node --import tsx --test tests/u
 2. **Commit nhỏ, một ý một commit**, message tiếng Việt theo dạng Conventional Commits:
    - `feat(referee): ...`, `fix(auth): ...`, `docs: ...`, `test: ...`, `refactor: ...`, `chore: ...`
    - Commit có trợ lý AI tham gia thì thêm trailer `Co-Authored-By:` tương ứng.
-3. **Mở PR vào `main`** theo mẫu có sẵn: mục đích, thay đổi, cách kiểm chứng, rủi ro. Reviewer mặc định theo [`.github/CODEOWNERS`](.github/CODEOWNERS); thay đổi muốn đưa vào bản live thì mở PR ở [repo gốc của đội](https://github.com/khanhle1406/Tax-Referee) (reviewer `@khanhle1406`).
+3. **Mở PR vào `main`** theo mẫu có sẵn: mục đích, thay đổi, cách kiểm chứng, rủi ro. Reviewer: `@khanhle1406` (mặc định theo [`.github/CODEOWNERS`](.github/CODEOWNERS)).
 4. **CI phải xanh** trước khi merge.
 5. **Merge bằng *Create a merge commit*.** Không squash, không rebase, không force-push, không `--no-verify` — lịch sử git là bằng chứng quá trình làm.
-6. **Deploy:** chỉ `main` của repo gốc của đội mới deploy production (hPanel tự deploy sau khoảng 1,5 phút; chờ 2–5 phút rồi kiểm `/api/health` có commit mới, `/verify` 9/9, `/trust` 12/12). Repo này không deploy.
+6. **Merge vào `main` = deploy production** (hPanel tự deploy sau khoảng 1,5 phút; chờ 2–5 phút rồi kiểm). Sau merge, kiểm `/api/health` (commit mới), `/verify` (9/9), `/trust` (12/12).
 
 ## 4. Nguyên tắc cốt lõi
 

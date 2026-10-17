@@ -1,0 +1,19 @@
+# Dịch vụ systemd cấp người dùng: giữ bộ chạy luôn sống và máy không tự ngủ khi demo.
+# Cài: chép thành ~/.config/systemd/user/goblin-demo-stack.service, sửa <ĐƯỜNG DẪN>, rồi
+#   systemctl --user daemon-reload && systemctl --user enable --now goblin-demo-stack
+[Unit]
+Description=Goblin -> Tax Referee demo stack (tax + adapter + receiver)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/systemd-inhibit --what=sleep:idle --who=goblin-demo --why="demo hóa đơn Zalo -> Tax Referee" /bin/bash <ĐƯỜNG DẪN>/integrations/goblin-relay/relay-local-stack.sh
+Restart=always
+RestartSec=8
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target
