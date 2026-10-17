@@ -72,8 +72,9 @@ export function explainDecision(inv: InvoiceInput, decision: Pick<RefereeDecisio
     detail: overLimit || total >= kttLimit ? `${vnd(total)} từ hạn mức ${vnd(kttLimit)} trở lên (hoặc mua tách nhỏ) — cần CFO` : `${vnd(total)} dưới hạn mức ${vnd(kttLimit)} của Kế toán trưởng` });
 
   const buyerMismatch = has(id => id === 'RULE_BUYER_TAX_CODE_MISMATCH');
-  checks.push({ key: 'buyer', ok: buyerMismatch ? false : inv.buyerTaxCode ? true : null, label: 'Đúng MST người mua',
-    detail: buyerMismatch ? `MST người mua ${inv.buyerTaxCode} khác MST doanh nghiệp` : inv.buyerTaxCode ? `MST người mua ${inv.buyerTaxCode} đúng doanh nghiệp` : 'Hóa đơn không ghi MST người mua' });
+  const companyTaxCode = config.companyTaxCode;
+  checks.push({ key: 'buyer', ok: buyerMismatch ? false : inv.buyerTaxCode && companyTaxCode ? true : null, label: 'Đúng MST người mua',
+    detail: buyerMismatch ? `MST người mua ${inv.buyerTaxCode} khác MST doanh nghiệp` : !inv.buyerTaxCode ? 'Hóa đơn không ghi MST người mua' : companyTaxCode ? `MST người mua ${inv.buyerTaxCode} đúng doanh nghiệp` : 'Chưa cấu hình MST doanh nghiệp để đối chiếu' });
 
   const sellerRule = has(id => id.includes('SELLER'));
   checks.push({ key: 'seller', ok: sellerRule ? false : inv.sellerStatus === 'ACTIVE' ? true : total < materiality ? null : false, label: 'Bên bán còn hoạt động',
@@ -103,7 +104,7 @@ export function explainDecision(inv: InvoiceInput, decision: Pick<RefereeDecisio
       ? `Máy đề xuất duyệt: đạt ${passed} điều kiện, khấu trừ ${vnd(decision.approvedTaxAmount ?? inv.taxAmount)}`
       : `Dừng ở ${highlights.length} điểm — VAT chờ quyết định ${vnd(vatAtStake)}`,
     plain: approved
-      ? 'Giống bài kiểm tra đúng hết: mọi điều kiện đều đạt nên máy đề xuất duyệt. Kế toán trưởng chốt lô thì mới ghi sổ.'
+      ? 'Giống bài kiểm tra không sai câu nào: không điều kiện nào trượt nên máy đề xuất duyệt. Kế toán trưởng chốt lô thì mới ghi sổ.'
       : `Có ${highlights.length === 1 ? 'một chỗ' : `${highlights.length} chỗ`} chưa ổn (tô đỏ bên dưới) nên máy không tự quyết — hỏi đúng người có quyền.`,
     checks,
     highlights,

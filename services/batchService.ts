@@ -26,6 +26,7 @@ const now = () => new Date().toISOString();
 
 export interface BatchRow { id: string; label: string; source: BatchSource; status: 'OPEN' | 'SIGNED_OFF'; createdByUserId: string | null; createdAt: string; signedOffByUserId: string | null; signedOffAt: string | null; signoffNote: string | null }
 export interface BatchItemView {
+  createdByUserId?: string | null;
   position: number; invoiceId: string | null; fileName: string | null; error: string | null; bucket: BatchBucket; bucketLabel: string;
   invoiceNumber?: string; supplierName?: string; totalAmount?: number; taxAmount?: number; status?: string; requiresCFO?: boolean;
   submitter?: { id: string; name: string; department: string | null } | null;
@@ -60,15 +61,19 @@ export function attachToBatch(user: AppUser, batchId: string, input: { invoiceId
   const batch = requireBatch(batchId);
   if (batch.status !== 'OPEN') throw new WorkflowError('Lô đã chốt, không thêm hóa đơn được.', 409);
   if (input.invoiceId && !db.prepare('SELECT 1 FROM invoices WHERE id=?').get(input.invoiceId)) throw new WorkflowError('Không tìm thấy hóa đơn để gắn vào lô.', 404);
+  if (batch.createdByUserId && batch.createdByUserId !== user.id) throw new WorkflowError('Chỉ người tạo lô được thêm hóa đơn vào lô.', 403);
   if (input.fileSha256) {
     const existing = db.prepare('SELECT position FROM batch_items WHERE batch_id=? AND file_sha256=?').get(batchId, input.fileSha256) as { position: number } | undefined;
     if (existing) return { position: existing.position, duplicate: true };
+  }
+  if (input.invoiceId) {
+    const inBatch = db.prepare('SELECT batch_id, position FROM batch_items WHERE invoice_id=?').get(input.invoiceId) as { batch_id: string; position: number } | undefined;
+    if (inBatch) { if (inBatch.batch_id === batchId) return { position: inBatch.position, duplicate: true }; throw new WorkflowError('Hóa đơn đã nằm trong một lô khác — một hóa đơn chỉ được ghi sổ một lần.', 409); }
   }
   return db.transaction(() => {
     const position = ((db.prepare('SELECT COALESCE(MAX(position),0) p FROM batch_items WHERE batch_id=?').get(batchId) as { p: number }).p) + 1;
     db.prepare('INSERT INTO batch_items (batch_id,position,invoice_id,file_name,file_sha256,source_ref,submitter_staff_id,error,created_at) VALUES (?,?,?,?,?,?,?,?,?)')
       .run(batchId, position, input.invoiceId ?? null, input.fileName?.slice(0, 200) ?? null, input.fileSha256 ?? null, input.sourceRef?.slice(0, 200) ?? null, input.submitterStaffId ?? null, input.error?.slice(0, 300) ?? null, now());
-    void user;
     return { position, duplicate: false };
   })();
 }
@@ -104,7 +109,9 @@ function questionKey(decision: RefereeDecision): string | undefined {
   // Ý "xác minh dữ liệu nguồn" hỏi những dữ kiện khác nhau (ủy nhiệm chi, bảng kê, trạng thái MST…): phải cùng nội dung câu hỏi
   // mới được gộp. Bỏ số tiền, số hóa đơn và phần trong ngoặc kép để các tờ cùng loại câu hỏi vẫn gộp được.
   const shape = (text: string) => text.replace(/“[^”]*”/g, '').replace(/[\d.,]+\s?₫?/g, '#').replace(/\s+/g, ' ').trim();
-  return items.map(item => item.ruleIds.includes('RULE_SOURCE_REVIEW') ? `${item.ruleIds.join('+')}:${shape(item.text)}` : item.ruleIds.join('+')).join(' | ');
+  // Kèm loại hệ quả của từng đáp án: câu "hình thức thanh toán" trên ngưỡng (B = không khấu trừ) khác dưới ngưỡng (B = vẫn hợp lệ).
+  const effects = (item: { effects?: Array<{ kind: string }> }) => (item.effects ?? []).map(e => e.kind).join('/');
+  return items.map(item => item.ruleIds.includes('RULE_SOURCE_REVIEW') ? `${item.ruleIds.join('+')}:${shape(item.text)}#${effects(item)}` : item.ruleIds.join('+')).join(' | ');
 }
 
 export function getBatch(batchId: string, user: AppUser): {
@@ -114,7 +121,7 @@ export function getBatch(batchId: string, user: AppUser): {
   const db = getDatabase();
   const batch = requireBatch(batchId);
   const config = getActivePolicy().config;
-  const rows = db.prepare(`SELECT bi.*, i.status, i.payload_json, i.approved_deductible_tax, e.decision_json
+  const rows = db.prepare(`SELECT bi.*, i.status, i.payload_json, i.approved_deductible_tax, i.created_by_user_id invoice_creator, e.decision_json
       FROM batch_items bi LEFT JOIN invoices i ON i.id=bi.invoice_id
       LEFT JOIN evaluations e ON e.id=(SELECT id FROM evaluations WHERE invoice_id=bi.invoice_id ORDER BY rowid DESC LIMIT 1)
       WHERE bi.batch_id=? ORDER BY bi.position`).all(batchId) as Array<Record<string, unknown>>;
@@ -125,7 +132,7 @@ export function getBatch(batchId: string, user: AppUser): {
     const error = (r.error as string) ?? null;
     const bucket = bucketOf(r.status as string | undefined, error, invoiceId);
     summary[bucket] += 1;
-    const view: BatchItemView = { position: Number(r.position), invoiceId, fileName: (r.file_name as string) ?? null, error, bucket, bucketLabel: BUCKET_LABELS[bucket] };
+    const view: BatchItemView = { position: Number(r.position), invoiceId, fileName: (r.file_name as string) ?? null, error, bucket, bucketLabel: BUCKET_LABELS[bucket], createdByUserId: (r.invoice_creator as string) ?? null };
     const staff = getStaff(r.submitter_staff_id as string | null);
     view.submitter = staff ? { id: staff.id, name: staff.fullName, department: staff.department } : null;
     if (!invoiceId || !r.payload_json) return view;
@@ -139,11 +146,15 @@ export function getBatch(batchId: string, user: AppUser): {
       const d = decision.data;
       view.requiresCFO = d.status === 'ESCALATED' ? d.requiresCFO : false;
       view.explanation = explainDecision(invoice.data, d, config);
+      // Phiếu nói theo kết quả CUỐI: ca máy dừng nhưng người đã quyết thì không còn "VAT chờ quyết định".
+      const approvedTax = Number(r.approved_deductible_tax) || 0;
+      if (bucket === 'HUMAN_APPROVED') Object.assign(view.explanation, { headline: `Máy dừng ở ${view.explanation.highlights.length} điểm; người có thẩm quyền đã duyệt — khấu trừ ${new Intl.NumberFormat('vi-VN').format(approvedTax)}₫`, plain: 'Máy không tự quyết ca này; người có thẩm quyền đã trả lời và duyệt. Dưới đây là chỗ máy đã dừng.', vatAtStake: 0 });
+      if (bucket === 'REJECTED' || bucket === 'ON_HOLD') Object.assign(view.explanation, { headline: bucket === 'REJECTED' ? 'Đã từ chối — không khấu trừ VAT' : 'Đang tạm giữ — chưa khấu trừ VAT', plain: bucket === 'REJECTED' ? 'Người có thẩm quyền đã quyết định không khấu trừ.' : 'Hồ sơ đang chờ bổ sung chứng từ hoặc bị giữ thuế.', vatAtStake: 0 });
       if (bucket === 'NEEDS_HUMAN' && d.status === 'ESCALATED') {
         const key = questionKey(d);
         if (key) {
           view.questionKey = key;
-          const group = groups.get(key) ?? { key, label: key.split(' | ').map(part => part.split(':')[0].split('+').map(id => ruleContract(id).label).join(' + ') + (part.includes(':') ? ` (${part.slice(part.indexOf(':') + 1).slice(0, 60)})` : '')).join(' · '), invoiceIds: [], requiresCFO: false, sampleQuestion: d.handoff?.question ?? '', questionItems: (d.handoff?.questionSpec?.items ?? []).map(item => ({ n: item.n, text: item.text, answers: item.answers })) };
+          const group = groups.get(key) ?? { key, label: key.split(' | ').map(part => part.split(':')[0].split('+').map(id => ruleContract(id).label).join(' + ') + (part.includes(':') ? ` (${part.slice(part.indexOf(':') + 1).split('#')[0].slice(0, 60)})` : '')).join(' · '), invoiceIds: [], requiresCFO: false, sampleQuestion: d.handoff?.question ?? '', questionItems: (d.handoff?.questionSpec?.items ?? []).map(item => ({ n: item.n, text: item.text, answers: item.answers })) };
           group.invoiceIds.push(invoiceId);
           group.requiresCFO = group.requiresCFO || d.requiresCFO;
           groups.set(key, group);
@@ -164,6 +175,8 @@ function signOffBlockers(batch: BatchRow, items: BatchItemView[], user: AppUser)
   if (batch.createdByUserId && batch.createdByUserId === user.id) out.push('Người tạo lô không được tự chốt lô (bất kiêm nhiệm).');
   if (items.some(i => i.bucket === 'PROCESSING')) out.push('Còn hóa đơn đang xử lý.');
   if (!items.some(i => i.bucket === 'MACHINE_APPROVED' || i.bucket === 'HUMAN_APPROVED')) out.push('Chưa có hóa đơn nào đủ điều kiện để chốt.');
+  if (items.some(i => (i.bucket === 'MACHINE_APPROVED' || i.bucket === 'HUMAN_APPROVED') && i.createdByUserId === user.id))
+    out.push('Lô có hóa đơn do chính anh/chị nhập — người khác phải chốt (bất kiêm nhiệm).');
   if (user.role !== 'CFO' && items.some(i => (i.bucket === 'MACHINE_APPROVED' || i.bucket === 'HUMAN_APPROVED') && Math.abs(i.totalAmount ?? 0) >= kttLimit))
     out.push('Lô có hóa đơn từ hạn mức CFO — cần CFO chốt.');
   return out;

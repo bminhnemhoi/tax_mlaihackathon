@@ -102,3 +102,24 @@ test('chốt lô: người tạo không tự chốt; lô có ca từ hạn mức
     void getActivePolicy;
   });
 });
+
+test('một hóa đơn chỉ nằm trong một lô; chỉ người tạo lô được gắn; KTT không chốt lô có hóa đơn do chính mình nhập', async () => {
+  await runIsolated(async () => {
+    const acc = switchRole('ACCOUNTANT')!.user;
+    const ktt = switchRole('CHIEF_ACCOUNTANT')!.user;
+    const cfo = switchRole('CFO')!.user;
+    const first = createBatch(acc, { label: 'Lô A' });
+    const second = createBatch(acc, { label: 'Lô B' });
+    await evaluateWorkflow(water('0000041'), acc, { forceLocalOnly: true });
+    attachToBatch(acc, first.id, { invoiceId: 'NUOC-0000041' });
+    assert.deepEqual(attachToBatch(acc, first.id, { invoiceId: 'NUOC-0000041' }), { position: 1, duplicate: true });
+    assert.throws(() => attachToBatch(acc, second.id, { invoiceId: 'NUOC-0000041' }), /lô khác/);
+    assert.throws(() => attachToBatch(ktt, first.id, { invoiceId: 'NUOC-0000041' }), /người tạo lô/);
+    const own = createBatch(acc, { label: 'Lô có hóa đơn KTT tự nhập' });
+    await evaluateWorkflow(water('0000042'), ktt, { forceLocalOnly: true });
+    attachToBatch(acc, own.id, { invoiceId: 'NUOC-0000042' });
+    assert.throws(() => signOffBatch(own.id, ktt, 'KTT tự chốt hóa đơn mình nhập'), /chính anh\/chị nhập/);
+    assert.equal(signOffBatch(own.id, cfo, 'CFO chốt thay, khác người nhập').postedInvoices, 1);
+  });
+});
+
