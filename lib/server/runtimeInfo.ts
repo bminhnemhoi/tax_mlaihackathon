@@ -1,4 +1,4 @@
-import { SHOPAIKEY_GEMINI_API_CONFIG } from '@/lib/constants';
+import { SHOPAIKEY_GEMINI_API_CONFIG, devLlmConfig } from '@/lib/constants';
 import { VISION_PROMPT_SHA256, VISION_TIMEOUT_MS, QGEN_TIMEOUT_MS } from '@/services/geminiService';
 import { GROUNDING_BUDGET_MS, GROUNDING_MAX_CALLS } from '@/services/officialSupplierLookupService';
 import { aiBudgetConfig } from './aiBudget';
@@ -7,7 +7,9 @@ import { aiBudgetConfig } from './aiBudget';
 export function aiRuntimeInfo() {
   return {
     decisionPathLlmCalls: 0,
-    visionAgent: `agent:vision@${SHOPAIKEY_GEMINI_API_CONFIG.MODEL}#${VISION_PROMPT_SHA256.slice(0, 12)}`,
+    visionAgent: `agent:vision@${devLlmConfig()?.model ?? SHOPAIKEY_GEMINI_API_CONFIG.MODEL}#${VISION_PROMPT_SHA256.slice(0, 12)}`,
+    // Chỉ tên máy chủ của LLM demo khi công tắc bật — không bao giờ lộ key.
+    visionProvider: devLlmConfig() ? `dev-llm:${devLlmConfig()!.host}` : 'shopaikey',
     visionTimeoutMs: VISION_TIMEOUT_MS,
     ingestionMaxLlmCalls: 1 + GROUNDING_MAX_CALLS,
     groundingBudgetMs: GROUNDING_BUDGET_MS,
