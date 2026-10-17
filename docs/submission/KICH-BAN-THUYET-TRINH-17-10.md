@@ -3,7 +3,7 @@
 > **Người đọc:** thành viên đội cầm lên sân khấu nói. **Người nghe:** Ban giám khảo.
 > **Deck:** 11 slide dựng bằng `scripts/slides/build_deck.py` (hàm `build()`), thứ tự: 1 Bìa · 2 Hiện trạng · 3 Nỗi đau · 4 Phương pháp · 5 Kiến trúc + Câu hỏi 2 · 6 Giải pháp 1 · 7 Giải pháp 2 · 8 Giải pháp 3 · 9 Bảo mật (Câu hỏi 1) · 10 Riêng tư và pháp lý · 11 Video demo.
 > **Cách đọc kịch bản:** đoạn trong khung trích dẫn (`>`) là lời nói nguyên văn. Chữ nhỏ trong <sub>[ngoặc vuông]</sub> là nguồn trong repo để đội tự kiểm, **không đọc to**.
-> **Tổng thời lượng:** khoảng 8 phút nói + 1 phút video. Tốc độ tính theo khoảng 200 tiếng mỗi phút (nói rõ, không vội).
+> **Tổng thời lượng:** khoảng 8 phút nói + video 1 phút 24 giây. Tốc độ tính theo khoảng 200 tiếng mỗi phút (nói rõ, không vội).
 
 ## Bảng thời lượng
 
@@ -19,8 +19,8 @@
 | 8 | Giải pháp 3: Tổng quan, Lịch sử của tôi | 0:30 | Minh |
 | 9 | Bảo mật, trả lời Câu hỏi 1 | 0:55 | Khánh |
 | 10 | Riêng tư và pháp lý | 0:50 | Khánh |
-| 11 | Video demo (giới thiệu 0:15 + câu kết 0:15) | 0:30 + 1:00 video | Minh |
-| | **Cộng** | **khoảng 8:00 + 1:00 video** | |
+| 11 | Video demo (giới thiệu 0:15 + câu kết 0:15) | 0:30 + 1:24 video | Minh |
+| | **Cộng** | **khoảng 8:00 + 1:24 video** | |
 
 Thời lượng đo bằng cách đếm số tiếng trong lời nói của từng slide, chia cho 200 tiếng mỗi phút. Nói nhanh hơn một chút (khoảng 215 tiếng mỗi phút) thì tổng còn khoảng 7 phút 30 giây. Nếu bị cắt còn khoảng 6 phút: bỏ slide 2 và slide 8, slide 5 chỉ nói phần Câu hỏi 2, slide 10 chỉ nói đoạn "về thuế".
 
@@ -30,7 +30,7 @@ Thời lượng đo bằng cách đếm số tiếng trong lời nói của từ
 - Video và ảnh chụp được quay trên **bản build ở máy của đội**, dữ liệu là 25 file XML tổng hợp do đội tự tạo <sub>[data/demo-batch/README.md; scripts/demo/record_demo_voice.py]</sub>. Chỉ nói "đã có trên bản live" khi `/api/health` trên live cho thấy commit có tính năng lô.
 - **Không đọc to con số trên ảnh chụp màn hình** (số hóa đơn, phần trăm, tiền VAT trên ảnh). Đó là số của một phiên demo, không phải kết quả đo.
 - **Không nói số liệu người dùng.** Buổi thử người dùng 16/10 không cho số liệu định lượng <sub>[docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md mục 2]</sub>.
-- Trước khi trình bày, đọc mục **"Cần sửa trên slide"** ở cuối file: có 3 chỗ trên slide đang lệch mã.
+- Mục **"Cần sửa trên slide"** ở cuối file: các chỗ lệch mã đã sửa (xem hai ghi chú cập nhật đầu mục); danh sách gốc giữ lại để đối chiếu. Còn mở: xác nhận số slide với Ban tổ chức (C3).
 
 ---
 
@@ -46,7 +46,7 @@ Thời lượng đo bằng cách đếm số tiếng trong lời nói của từ
 >
 > Cả bài gói trong một câu: máy quyết từng hóa đơn, người chốt cả lô. Quy tắc ra quyết định. AI chỉ đọc chứng từ. Người có thẩm quyền ký chốt.
 >
-> Em đi qua vấn đề, cách làm, ba phần giải pháp, bảo mật, pháp lý, rồi mời xem video một phút.
+> Em đi qua vấn đề, cách làm, ba phần giải pháp, bảo mật, pháp lý, rồi mời xem video khoảng một phút rưỡi.
 
 **Chốt ý:** Máy quyết từng hóa đơn, người chốt cả lô.
 
@@ -171,7 +171,7 @@ Thời lượng đo bằng cách đếm số tiếng trong lời nói của từ
 
 **Ghi chú cho người nói (không đọc):**
 - Thứ tự cố định quan trọng vì có quy tắc cộng dồn trong ngày: hai hóa đơn tiền mặt cùng người bán, cùng ngày, mỗi tờ 3,3 triệu thì cộng lại vượt 5 triệu; chia nhỏ để lách ngưỡng vẫn bị bắt <sub>[components/workspace/BatchesView.tsx `runBatch` bước 2; services/securityProbeService.ts phép thử D3]</sub>.
-- Chống trùng: cùng mã băm file trong cùng lô thì trả lại mục cũ; hóa đơn đã nằm ở lô khác thì bị chặn <sub>[services/batchService.ts `attachToBatch`]</sub>. Hóa đơn khác file nhưng trùng số với hóa đơn đã nhận thì máy dừng ở quy tắc trùng hóa đơn <sub>[lib/riskTaxonomy.ts `RULE_DUPLICATE_INVOICE`]</sub>.
+- Chống trùng: file trùng nội dung trong cùng lượt tải bị bỏ trước khi máy kiểm; cùng mã băm file trong cùng lô thì trả lại mục cũ; hóa đơn đã nằm ở lô khác thì bị chặn <sub>[components/workspace/BatchesView.tsx `runBatch`; services/batchService.ts `attachToBatch`]</sub>. Hóa đơn khác file nhưng trùng số với hóa đơn đã nhận thì máy dừng ở quy tắc trùng hóa đơn <sub>[lib/riskTaxonomy.ts `RULE_DUPLICATE_INVOICE`]</sub>.
 - Phiếu giải trình dùng chính các hàm của engine (ngưỡng theo ngày lập, thuế theo thuế suất, kỳ giảm 8%), nên phiếu không nói khác quyết định <sub>[lib/explainDecision.ts]</sub>.
 - Câu trên phiếu khi đạt: "Giống bài kiểm tra không sai câu nào…" <sub>[lib/explainDecision.ts]</sub>.
 
@@ -195,10 +195,11 @@ Thời lượng đo bằng cách đếm số tiếng trong lời nói của từ
 
 **Ghi chú cho người nói (không đọc):**
 - Góp ý "không để máy tự duyệt trong tài chính" là cách đội ghi trong mã; nguyên văn của Ban giám khảo không lưu trong repo <sub>[services/batchService.ts, chú thích đầu file]</sub>.
-- Điều kiện chốt lô: chỉ Kế toán trưởng hoặc CFO; người tạo lô không chốt; người đã nhập hóa đơn đã duyệt trong lô không chốt; có hóa đơn từ 200 triệu thì chỉ CFO; ghi lý do từ 8 ký tự; hóa đơn còn chờ người quyết **không** được ghi sổ <sub>[services/batchService.ts `signOffBlockers`, `signOffBatch`; services/policyEngine.ts `kttApprovalLimit`]</sub>.
-- Duyệt nhóm: chỉ Kế toán trưởng hoặc CFO; tối thiểu 2, tối đa 50 hóa đơn cùng câu hỏi; mỗi tờ đi qua đúng `answerHandoff`, tờ nào bị chặn không làm hỏng tờ khác <sub>[services/batchService.ts `answerGroup`]</sub>.
+- Điều kiện chốt lô: chỉ Kế toán trưởng hoặc CFO; người tạo lô không chốt; người đã nhập hóa đơn đã duyệt trong lô không chốt; có hóa đơn từ 200 triệu thì chỉ CFO; ghi lý do từ 8 ký tự; ghi sổ đánh dấu theo từng hóa đơn; hóa đơn còn chờ hay tạm giữ lúc chốt **không** được ghi sổ, nếu duyệt sau thì phải "chốt bổ sung" trên cùng lô, cùng luật <sub>[services/batchService.ts `signOffBlockers`, `signOffBatch`, `LEDGER_READY_SQL`; services/policyEngine.ts `kttApprovalLimit`]</sub>. Tải XML/CSV sổ cái và đẩy chứng từ chỉ Kế toán trưởng/CFO (quyền `ledger.export`) <sub>[app/api/ledger/export/route.ts; app/api/ledger/sync/route.ts]</sub>.
+- Duyệt nhóm: chỉ Kế toán trưởng hoặc CFO; tối thiểu 2, tối đa 50 hóa đơn có câu hỏi cùng nội dung và cùng hệ quả đáp án; câu xác nhận giá trị riêng của từng tờ (số tiền, MST, ngày đọc từ ảnh; ảnh mờ; số liệu lệch) không bao giờ gộp; thẻ nhóm liệt kê từng hóa đơn; mỗi tờ đi qua đúng `answerHandoff` với phiên bản người duyệt đã thấy (hồ sơ vừa đổi thì 409), tờ nào bị chặn không làm hỏng tờ khác <sub>[services/batchService.ts `questionKey`, `answerGroup`]</sub>.
 - Chữ trên slide "example.com@evil.net": mẹo viết địa chỉ trông giống tên miền công ty, nhưng đuôi thật là evil.net. Mã lấy tên miền sau dấu @ cuối cùng nên mẹo này bị chặn <sub>[services/staffDirectory.ts `emailAuthenticated`]</sub>.
-- Zalo nhận diện bằng Zalo user id trong danh bạ, không có SPF/DKIM <sub>[services/staffDirectory.ts `identifySender`]</sub>. Ảnh/PDF đến qua kênh hiện được lưu và xếp hàng chờ đọc, chỉ file XML được kiểm ngay <sub>[services/channels/channelService.ts `ingestFile`]</sub>.
+- Zalo nhận diện bằng Zalo user id trong danh bạ, không có SPF/DKIM <sub>[services/staffDirectory.ts `identifySender`]</sub>. Ảnh/PDF đến qua kênh được **lưu nhưng chưa tự đọc** (trạng thái `QUEUED`, nhãn "Ảnh/PDF đã lưu — chưa tự đọc"); muốn đọc thì tải ảnh lên ở màn Lô hóa đơn hoặc Tiếp nhận. Chỉ file XML được kiểm ngay <sub>[services/channels/channelService.ts `ingestFile`]</sub>.
+- Chỉ Kế toán viên (người nhập) bấm lấy thư; Kế toán trưởng/CFO xác nhận người gửi lạ, sau đó file được xử lý dưới tên Kế toán viên đã lấy thư, nên người xác nhận vẫn duyệt độc lập. Mỗi thư tối đa 5 đính kèm, mỗi lượt tối đa 50 file (10 file từ người gửi chưa xác thực) <sub>[services/channels/channelService.ts; lib/capabilities.ts `channel.pull`]</sub>.
 - Chế độ mô phỏng bật trong phiên demo khi máy chủ **không** đặt biến `TAX_REFEREE_ALLOW_REAL_CHANNELS_IN_DEMO=1`; tin gửi đi được ghi trạng thái "Mô phỏng — không gửi thật" <sub>[services/channels/demoMock.ts `demoChannelsActive`, `demoNotifier`]</sub>. Không nói Gmail/Zalo "đang chạy thật" nếu máy demo chưa đặt biến kênh thật.
 
 **Chốt ý:** Máy làm nhanh, người giữ chữ ký, và không ai lọt vào bằng tên giả.
@@ -268,7 +269,7 @@ Thời lượng đo bằng cách đếm số tiếng trong lời nói của từ
 
 **Lời nói:**
 
-> Dữ liệu đi đâu. File XML máy tự đọc, không gửi cho AI. Riêng tên và mã số thuế người bán, khi chưa có trong danh bạ, có thể được tra cứu, và chỉ nhận kết quả từ trang .gov.vn. Ảnh thì AI chỉ trả về 14 ô nhìn thấy. Không muốn ảnh rời máy chủ thì tắt AI, chỉ nhận XML và nhập tay.
+> Dữ liệu đi đâu. File XML máy tự đọc, không gửi cho AI. Riêng tên và mã số thuế người bán có thể được gửi đi tra cứu: qua dịch vụ tra cứu bên thứ ba, và qua công cụ tìm kiếm chỉ nhận kết quả từ trang .gov.vn. Ảnh thì AI chỉ trả về 14 ô nhìn thấy. Không muốn ảnh rời máy chủ thì tắt AI, chỉ nhận XML và nhập tay.
 >
 > Về thuế, máy chọn luật theo ngày lập hóa đơn. Cùng hóa đơn 6 triệu trả tiền mặt: lập ngày 30 tháng 6 năm 2025 thì theo Thông tư 219, ngưỡng 20 triệu, chưa cần chuyển khoản. Lập từ 1 tháng 7 thì theo Luật 48 và Nghị định 181, ngưỡng 5 triệu, phải chuyển khoản.
 >
@@ -279,7 +280,7 @@ Thời lượng đo bằng cách đếm số tiếng trong lời nói của từ
 - Ví dụ thứ hai nếu được hỏi: hóa đơn laptop thuế suất 8% lập tháng 3/2025 thì sai, vì đợt giảm thuế khi đó loại hàng công nghệ thông tin; lập từ 01/7/2025 thì đúng, vì Nghị quyết 204/2025 và Nghị định 174/2025 cho nhóm này được giảm <sub>[lib/legalBasis.ts `VAT8_EXCLUDED_BEFORE_NQ204`, `vat8ExcludedPhrases`]</sub>.
 - Từ 01/7/2026, văn bản về hóa đơn điện tử đổi sang Nghị định 254/2026/NĐ-CP và Thông tư 91/2026/TT-BTC; máy cũng chọn theo ngày. Chỉ nói số hiệu, không nói số điều ở nhiều nội dung chưa đối chiếu <sub>[lib/legalBasis.ts `invoiceFrameworkAt`]</sub>.
 - Tài chính: "không để máy tự duyệt trong tài chính" được xử lý bằng chốt lô có bất kiêm nhiệm và hạn mức CFO (slide 7), cộng hậu kiểm ngẫu nhiên (slide 4) <sub>[services/batchService.ts; services/postAuditService.ts]</sub>.
-- Tra cứu tên, mã số thuế người bán đi qua công cụ tìm kiếm của nhà cung cấp AI và chỉ nhận nguồn `*.gov.vn`. Vì vậy **không nói** "XML hoàn toàn không qua AI" <sub>[services/officialSupplierLookupService.ts; docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md mục 5]</sub>.
+- Tra cứu bên bán khi tải chứng từ: MST có thể được gửi tới dịch vụ tra cứu bên thứ ba (`api.vietqr.io`, không cần khóa; Xinvoice và doanhnghiep.vn nếu cấu hình khóa) và tên/MST tới công cụ tìm kiếm của nhà cung cấp AI, công cụ này chỉ nhận nguồn `*.gov.vn`. Vì vậy **không nói** "XML hoàn toàn không qua AI" hay "chỉ tra trên .gov.vn" <sub>[services/taxLookupService.ts `lookupByTaxCode`; services/supplierIdentityResolver.ts; services/officialSupplierLookupService.ts; docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md mục 5]</sub>. Nếu bật `QGEN_AI=1` (tắt mặc định), dữ liệu hóa đơn được gửi AI để diễn đạt câu hỏi <sub>[app/privacy/page.tsx]</sub>.
 - Danh sách 14 ô AI được trả về: số hóa đơn, ngày lập, mã số thuế, tên và địa chỉ người bán, mã số thuế và tên người mua, tên hàng, tổng tiền, tiền hàng, thuế suất, tiền thuế, hình thức thanh toán, ảnh có mờ không <sub>[services/geminiService.ts `VISION_ALLOWED_KEYS`]</sub>.
 - Mã số thuế 12 số của cá nhân, hộ kinh doanh là dữ liệu gắn với một người cụ thể; trang `/privacy` ghi rõ việc này và ghi luôn "điều chúng tôi chưa làm" (chưa có hợp đồng xử lý dữ liệu, khóa ký nhật ký còn cùng máy chủ, chưa tự xóa theo hạn lưu trữ) <sub>[app/privacy/page.tsx]</sub>.
 
@@ -287,19 +288,19 @@ Thời lượng đo bằng cách đếm số tiếng trong lời nói của từ
 
 ---
 
-## Slide 11 — Video demo 1 phút
+## Slide 11 — Video demo (1 phút 24 giây)
 
-**Thời lượng:** 15 giây giới thiệu + 1 phút video + 15 giây kết · **Người nói:** Minh
+**Thời lượng:** 15 giây giới thiệu + 1 phút 24 giây video + 15 giây kết · **Người nói:** Minh
 
 **Hành động:** Chuyển lời: Khánh nói "Mời Minh giới thiệu video". Bấm vào khung video để phát. Nếu video nhúng không chạy trong 5 giây, mở file dự phòng `docs/submission/video/Tax-Referee-demo-1-phut.mp4`. Không mở bản live để thay thế nếu live chưa có tính năng lô. Sau video, nói câu kết (xem mục "Câu kết 15 giây").
 
 **Lời nói (trước video):**
 
-> Mời Ban giám khảo xem Tax Referee chạy trong một phút: tải cả lô, xem phiếu giải trình, Kế toán trưởng trả lời một lần cho cả nhóm, chốt lô, màn hình Tổng quan, Lịch sử của tôi, rồi hóa đơn đến từ Gmail và Zalo ở chế độ mô phỏng.
+> Mời Ban giám khảo xem Tax Referee chạy trong khoảng một phút rưỡi: tải cả lô, xem phiếu giải trình, Kế toán trưởng trả lời một lần cho cả nhóm, chốt lô, màn hình Tổng quan, Lịch sử của tôi, rồi hóa đơn đến từ Gmail và Zalo ở chế độ mô phỏng.
 
 **Ghi chú cho người nói (không đọc):**
 - Video quay trên bản build ở máy của đội, dữ liệu tổng hợp, giọng đọc máy <sub>[scripts/demo/record_demo_voice.py]</sub>.
-- Video dài khoảng 1 phút 24 giây. Câu về riêng tư trong video đã sửa thành "Hóa đơn điện tử do máy đọc, và AI không quyết định hóa đơn nào". Nếu giám khảo hỏi sâu, trả lời theo slide 10 (tên, mã số thuế người bán có thể được tra cứu).
+- Video dài khoảng 1 phút 24 giây. Câu về riêng tư trong video đã sửa thành "Hóa đơn điện tử do máy đọc, và AI không quyết định hóa đơn nào". Nếu giám khảo hỏi sâu, trả lời theo slide 10 (tên, mã số thuế người bán có thể được gửi tới dịch vụ tra cứu bên thứ ba và công cụ tìm kiếm giới hạn .gov.vn).
 
 **Chốt ý:** Xem máy làm, người chốt, trong khoảng một phút rưỡi.
 
@@ -361,15 +362,18 @@ Dùng khi được yêu cầu giới thiệu nhanh, hoặc nói ngay sau lời c
 | Ca chờ quá 24 giờ được đánh dấu | lib/workflowPresentation.ts `caseDeadline` |
 | Duyệt nhóm 2 đến 50 hóa đơn cùng câu hỏi; lý do từ 8 ký tự | services/batchService.ts `answerGroup`, `signOffBatch` |
 | File qua kênh tối đa 15 MB | services/channels/channelService.ts `MAX_FILE_BYTES` |
+| Mỗi thư tối đa 5 đính kèm; mỗi lượt tối đa 50 file, 10 file từ người gửi chưa xác thực | services/channels/channelService.ts `MAX_ATTACHMENTS_PER_MAIL`, `MAX_FILES_PER_PULL`, `MAX_UNVERIFIED_FILES_PER_PULL` |
 | Bộ demo 25 file XML tổng hợp | data/demo-batch/README.md |
 
-**Không nói:** số liệu buổi thử người dùng; "tuân thủ" OWASP/NIST/ISO; "parser đã sandbox"; "XML hoàn toàn không qua AI"; con số trên ảnh chụp màn hình như thể là kết quả đo <sub>[docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md mục 5]</sub>.
+**Không nói:** số liệu buổi thử người dùng; "tuân thủ" OWASP/NIST/ISO; "parser đã sandbox"; "XML hoàn toàn không qua AI"; "tra cứu MST chỉ trên .gov.vn"; "ảnh gửi qua Zalo/Gmail được AI đọc tự động"; con số trên ảnh chụp màn hình như thể là kết quả đo <sub>[docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md mục 5]</sub>.
 
 ---
 
 ## Cần sửa trên slide
 
 > **Cập nhật 17/10 sau khi rà:** đã sửa trong mã và deck: A1 (sổ sách/xuất chứng từ không lấy hóa đơn trong lô chưa chốt, chỉ KTT/CFO được xuất; slide 1 và 7 đổi chữ cho khớp), A2 (chụp lại ảnh Hộp thư vào với Gmail/Zalo mô phỏng), A3, B4–B8 (đổi chữ theo gợi ý; sơ đồ ghi "Gmail: danh bạ + SPF/DKIM · Zalo: user id"), C1 (trang /privacy và lời đọc video bỏ câu tuyệt đối), C2 (kênh mô phỏng đã commit). Slide 10 đổi tiêu đề thành "Nội dung XML không gửi AI" và "Quyết định không cần AI". Còn lại: C3 (xác nhận số slide với Ban tổ chức), C4 (không bắt buộc). Danh sách gốc giữ bên dưới để đối chiếu.
+
+> **Cập nhật lần 2 (trước khi mở PR vào repo đội):** tải XML/CSV sổ cái (`GET /api/ledger/export`) trước đó chưa kiểm vai trò, nay chỉ Kế toán trưởng/CFO (quyền `ledger.export`); xem trước danh sách (`GET /api/ledger/sync`) vẫn mở cho người đã đăng nhập. Sổ ghi theo từng hóa đơn khi chốt (`batch_items.posted_at`); hóa đơn duyệt sau khi chốt phải "chốt bổ sung". Slide 10 sửa câu tra cứu MST: có dịch vụ tra cứu bên thứ ba, không chỉ .gov.vn. Gợi ý ở C1 bên dưới đã được thay bằng câu đúng.
 
 Đối chiếu từng câu trên deck (`scripts/slides/build_deck.py`) và ảnh xem trước với mã trên nhánh `feat/batch-control-v2`. Kịch bản ở trên đã tránh nói sai các chỗ này.
 
@@ -389,7 +393,7 @@ Dùng khi được yêu cầu giới thiệu nhanh, hoặc nói ngay sau lời c
 
 ### C. Ngoài slide nhưng sẽ được chiếu hoặc nói
 
-1. **Video và trang `/privacy` nói tuyệt đối hơn mức được phép.** Giọng đọc cuối video: "Hóa đơn điện tử không bao giờ đi qua AI" <sub>[scripts/demo/record_demo_voice.py `LINES['privacy']`]</sub>; câu mở trang `/privacy`: "Hóa đơn điện tử (XML) không bao giờ đi qua AI" <sub>[app/privacy/page.tsx]</sub>. Tài liệu bàn giao cấm nói "XML hoàn toàn không qua AI", vì tên, mã số thuế người bán có thể đi tra cứu qua công cụ tìm kiếm của nhà cung cấp AI <sub>[docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md mục 5; services/officialSupplierLookupService.ts]</sub>. Slide 10 đã ghi đúng. Gợi ý cho video và trang: "Nội dung hóa đơn điện tử không gửi cho AI; riêng tên, mã số thuế người bán có thể được tra cứu trên nguồn .gov.vn."
+1. **Video và trang `/privacy` nói tuyệt đối hơn mức được phép.** Giọng đọc cuối video: "Hóa đơn điện tử không bao giờ đi qua AI" <sub>[scripts/demo/record_demo_voice.py `LINES['privacy']`]</sub>; câu mở trang `/privacy`: "Hóa đơn điện tử (XML) không bao giờ đi qua AI" <sub>[app/privacy/page.tsx]</sub>. Tài liệu bàn giao cấm nói "XML hoàn toàn không qua AI", vì tên, mã số thuế người bán có thể đi tra cứu qua công cụ tìm kiếm của nhà cung cấp AI <sub>[docs/handoff/BAN-GIAO-DEMO-DAY-17-10.md mục 5; services/officialSupplierLookupService.ts]</sub>. Slide 10 đã ghi đúng. Gợi ý cho video và trang: "Nội dung hóa đơn điện tử không gửi cho AI để đọc; riêng tên, mã số thuế người bán có thể được gửi tới dịch vụ tra cứu bên thứ ba và công cụ tìm kiếm giới hạn nguồn .gov.vn."
 2. **Chế độ kênh mô phỏng chưa có trong lịch sử git.** Theo `git status` lúc bắt đầu phiên làm việc này, `services/channels/demoMock.ts` và `services/channels/demoMockData.ts` chưa được theo dõi (`??`); `channelService.ts`, `notifier.ts`, `ChannelsView.tsx` đang sửa dở. Slide 7 và video dựa vào chế độ này. Cần commit và mở PR trước khi nói tính năng "đã có"; và chỉ nói "có trên live" sau khi PR đã merge và `/api/health` xác nhận commit.
 3. **Số slide và thể lệ.** `CLAUDE.md` ghi luật cứng "Thể lệ: đúng 5 slide", còn deck vòng cải tiến có 11 slide. Cần xác nhận với Ban tổ chức rằng vòng cải tiến cho phép nhiều hơn 5 slide. Nếu không, dùng bộ 5 slide và đưa phần còn lại vào phụ lục hoặc demo.
 4. **Gợi ý thêm cho slide 10 (không bắt buộc).** Ô "Thuế" còn trống phía dưới. Có thể thêm hai dòng đều có trong mã: "Ngưỡng tiền mặt: 20 triệu → 5 triệu" và "Từ 01/7/2026: hóa đơn điện tử theo NĐ 254/2026, TT 91/2026" <sub>[data/regulatoryRegistry.ts; lib/legalBasis.ts `invoiceFrameworkAt`]</sub>.

@@ -5,7 +5,9 @@ Bảng dưới đây ghi script nào được `npm test` chạy, script nào ch�
 | Thư mục | Nội dung |
 |---|---|
 | `qa/` | Bộ kiểm thử hồi quy, công cụ chấm điểm và đánh giá, fixture dùng chung |
-| `ops/` | Vận hành: đồng bộ văn bản pháp luật, reset hoặc dọn dữ liệu demo, nạp mẫu, nạp `.env.local` cho script CLI |
+| `ops/` | Vận hành: đồng bộ văn bản pháp luật, reset hoặc dọn dữ liệu demo, nạp mẫu, nạp `.env.local` cho script CLI, kiểm bản live (`check-live.py`), kiểm kênh Gmail/Zalo thật (`channels-check.ts`) |
+| `demo/` | Demo vòng cải tiến 17/10: chạy server local có lô dựng sẵn (`start-local-demo.sh`), sinh bộ 25 hóa đơn XML tổng hợp (`generate_demo_invoices.py` → `data/demo-batch/`), quay video demo và chụp ảnh màn hình (`record_demo.py`, `record_demo_voice.py`) |
+| `slides/` | Dựng deck vòng cải tiến 17/10 bằng python-pptx (`build_deck.py` → `docs/submission/`) |
 | `ocr/` | OCR cục bộ: Apple Vision trên macOS (`apple_vision_ocr.py`) và worker OCR chạy trong container (`local-ocr/`) |
 | `benchmarks/` | Đo tốc độ và độ chính xác OCR/VLM; chạy một lần, không thuộc `npm test` |
 
@@ -15,7 +17,7 @@ Bảng dưới đây ghi script nào được `npm test` chạy, script nào ch�
 
 | Bộ | File | Lệnh npm chạy riêng |
 |---|---|---|
-| `unit` | `tests/unit/*.test.ts` (node:test, `minChecks` 110) | `npm run test:unit` |
+| `unit` | `tests/unit/*.test.ts` (node:test; ngưỡng `minChecks` xem `qa/run-all.ts`) | `npm run test:unit` |
 | `manifest` | `qa/test-regression-manifest.ts` | `test:manifest` |
 | `referee-core` | `qa/test-referee-core.ts` | `test:referee-core` |
 | `redteam` | `qa/test-redteam.ts` (72 ca trong `data/verification/redteam/cases.json`) | — |
@@ -54,6 +56,11 @@ Module dùng chung, không chạy riêng: `qa/qa-fixtures.ts` (tạo fixture tr�
 | `typecheck:referee` | (không có file script) `tsc -p tsconfig.referee-qa.json` | Typecheck riêng các script chấm |
 | `legal:sync` | `ops/sync-legal-updates.ts` | Lấy văn bản pháp luật mới từ nguồn cập nhật, in danh sách ứng viên chờ duyệt |
 | `demo:reset` | `ops/reset-demo-data.ts` | Xóa hóa đơn, đánh giá và chứng từ trong database theo cấu hình hiện tại (`TAX_REFEREE_DB_PATH`/`TAX_REFEREE_DATA_DIR`) |
+| `referee:snapshot` | `qa/referee-snapshot.ts --write` | Ghi lại ảnh chụp quyết định baseline `data/verification/decision-snapshot.json`; chỉ chạy khi chủ ý đổi hành vi engine |
+| `referee:diff` | `qa/referee-snapshot.ts` | Chạy lại engine trên mọi fixture (mỗi ca một DB `:memory:`, không gọi mạng), so với baseline, liệt kê từng ca đổi; thoát mã 1 nếu có ca đổi |
+| `live:check` | `ops/check-live.py` | Kiểm bản live sau deploy: `/api/health`, Verify 9/9, phép thử `/trust`; `--expect-commit <sha>` |
+| `channels:check` | `ops/channels-check.ts` | Kiểm kết nối Gmail IMAP/SMTP và Zalo Bot thật, in chat id Zalo gần đây, `--send-test` gửi thử; không in token. Cách nạp biến ghi ở đầu file |
+| `demo:local` | `demo/start-local-demo.sh` | Chạy bản build standalone ở `127.0.0.1:3060` với `TAX_REFEREE_DEMO_PRESET_BATCHES=1` và thư mục dữ liệu tạm; `-- --build` để build trước. Chỉ dùng trên máy local |
 
 ## 3. Chạy trực tiếp, có tài liệu hoặc mã khác nhắc tới
 

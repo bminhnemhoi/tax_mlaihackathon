@@ -12,15 +12,16 @@ export default function PrivacyPage() {
   const rows: Array<[string, string, string]> = [
     ['Hóa đơn XML (hóa đơn điện tử)', 'Đọc ngay trên máy chủ bằng quy tắc cố định. Không gửi cho AI.', 'Máy chủ của doanh nghiệp'],
     ['Ảnh chụp, PDF scan', visionOn ? `Gửi cho AI đọc ảnh (${dev ? `máy chủ demo ${dev.host}` : 'Gemini qua nhà cung cấp trung gian'}). AI chỉ được trả về 14 trường nhìn thấy trên hóa đơn; trường khác bị loại.` : 'Đang tắt AI: ảnh không được gửi đi đâu, kế toán nhập tay.', visionOn ? 'Bên thứ ba, có thể ở nước ngoài' : 'Không gửi đi'],
-    ['Tên, MST bên bán', 'Có thể được tra cứu trên nguồn *.gov.vn có trích dẫn khi chưa có trong danh bạ.', 'Nguồn công khai của Nhà nước'],
-    ['Email, Zalo của người gửi', 'Chỉ dùng để biết ai gửi và báo lại kết quả cho chính người đó.', 'Máy chủ của doanh nghiệp'],
+    ['Tên, MST bên bán', 'Khi chưa có kết quả tra cứu lưu sẵn, MST có thể được gửi tới dịch vụ tra cứu bên thứ ba (VietQR; Xinvoice nếu doanh nghiệp cấu hình khóa), tên tới doanhnghiep.vn nếu cấu hình khóa, và tên/MST tới công cụ tìm kiếm của nhà cung cấp AI — công cụ này chỉ nhận kết quả từ nguồn *.gov.vn có trích dẫn.', 'Bên thứ ba và nguồn công khai của Nhà nước'],
+    ['Email, Zalo của người gửi', 'Chỉ dùng để biết ai gửi; người gửi qua email nhận lại kết quả hóa đơn của mình, người gửi qua Zalo chỉ nhận tin báo đã nhận.', 'Máy chủ của doanh nghiệp'],
+    ['Dữ liệu hóa đơn khi bật AI diễn đạt câu hỏi', 'Tắt mặc định. Chỉ khi doanh nghiệp bật QGEN_AI=1, các trường của hóa đơn được gửi cho AI để diễn đạt lại câu hỏi chuyển tiếp; câu AI viết bị loại nếu thêm số liệu hoặc đổi người nhận, phương án.', 'Bên thứ ba, chỉ khi bật'],
     ['Quyết định, câu trả lời, chốt lô', 'Ghi vào nhật ký chỉ ghi thêm, nối chuỗi băm có HMAC — sửa một dòng là bị phát hiện.', 'Máy chủ của doanh nghiệp'],
   ];
   return <main className="mx-auto max-w-3xl space-y-8 px-4 py-10 text-slate-900">
     <header className="space-y-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tax Referee · Riêng tư</p>
       <h1 className="text-3xl font-semibold">Dữ liệu của bạn đi đâu</h1>
-      <p className="text-slate-600">Nói ngắn gọn: <strong>máy quyết định bằng quy tắc, không bằng AI</strong>. AI chỉ được nhìn ảnh để đọc chữ, và chỉ khi doanh nghiệp bật. Nội dung hóa đơn điện tử (XML) do máy đọc, không gửi cho AI; riêng tên và mã số thuế người bán có thể được gửi đi tra cứu trên nguồn .gov.vn qua công cụ tìm kiếm của nhà cung cấp AI.</p>
+      <p className="text-slate-600">Nói ngắn gọn: <strong>máy quyết định bằng quy tắc, không bằng AI</strong>. AI chỉ được nhìn ảnh để đọc chữ, và chỉ khi doanh nghiệp bật (AI diễn đạt câu hỏi tắt mặc định, xem bảng dưới). Nội dung hóa đơn điện tử (XML) do máy đọc, không gửi cho AI để đọc; riêng tên và mã số thuế người bán có thể được gửi đi tra cứu: tới dịch vụ tra cứu bên thứ ba (như VietQR) và tới công cụ tìm kiếm của nhà cung cấp AI, chỉ nhận kết quả từ nguồn .gov.vn.</p>
     </header>
 
     <section className="space-y-3">
@@ -38,15 +39,15 @@ export default function PrivacyPage() {
       <h2 className="text-xl font-semibold">Ai được xem gì</h2>
       <ul className="list-disc space-y-1 pl-5 text-sm">
         <li>Mỗi người thấy <strong>lịch sử của chính mình</strong> (hóa đơn đã gửi, việc đã làm).</li>
-        <li>Kế toán trưởng và CFO thấy tổng quan của doanh nghiệp; CFO mới duyệt được khoản từ 200 triệu.</li>
-        <li>Người gửi hóa đơn qua email/Zalo chỉ nhận lại kết quả hóa đơn của mình.</li>
+        <li>Kế toán trưởng và CFO thấy tổng quan của doanh nghiệp và địa chỉ đầy đủ của người gửi (Kế toán viên chỉ thấy địa chỉ đã che); CFO mới duyệt được khoản từ 200 triệu.</li>
+        <li>Người gửi hóa đơn qua email chỉ nhận kết quả hóa đơn của mình; người gửi qua Zalo chỉ nhận tin báo đã nhận.</li>
         <li>Bản demo: mỗi phiên một cơ sở dữ liệu riêng, phiên này không đọc được dữ liệu phiên khác.</li>
       </ul>
     </section>
 
     <section className="space-y-2">
       <h2 className="text-xl font-semibold">Chế độ không AI</h2>
-      <p className="text-sm">Doanh nghiệp không muốn ảnh rời máy chủ thì không cấu hình khóa AI: hệ thống chỉ nhận XML và nhập tay, mọi quy tắc và câu hỏi vẫn chạy đủ.</p>
+      <p className="text-sm">Doanh nghiệp không muốn ảnh rời máy chủ thì không cấu hình khóa AI: hệ thống chỉ nhận XML và nhập tay, mọi quy tắc và câu hỏi vẫn chạy đủ. Tra cứu MST qua dịch vụ bên thứ ba (VietQR) không dùng AI và vẫn chạy.</p>
     </section>
 
     <section className="space-y-2">

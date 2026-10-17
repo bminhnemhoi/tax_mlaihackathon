@@ -259,7 +259,7 @@ def build(screens: Path, out: Path, video: Path | None = None, diagram: Path | N
 Chào ban giám khảo. Chúng em là đội Fprinciples, sản phẩm là Tax Referee, trọng tài cho thuế giá trị gia tăng đầu vào
 trên hóa đơn điện tử. Cả bài gói trong một câu: máy quyết từng hóa đơn, người chốt cả lô. Quy tắc ra quyết định,
 AI chỉ làm việc đọc chứng từ. Em sẽ kể hiện trạng, nỗi đau, cách làm, kiến trúc, ba phần giải pháp, bảo mật,
-riêng tư, rồi mời xem video demo một phút.""")
+riêng tư, rồi mời xem video demo khoảng một phút rưỡi.""")
     text(s, 0.6, 0.6, 8.8, 0.3, "TAX REFEREE · ĐỀ A — THE ESCALATION REFEREE · VÒNG CẢI TIẾN 17/10",
          size=11, bold=True, color=LIME)
     text(s, 0.6, 1.0, 8.8, 1.45, [P("Máy quyết từng hóa đơn."), P(R("Người chốt cả lô.", color=LIME))],
@@ -398,10 +398,10 @@ căn cứ văn bản nào theo ngày lập, và kết quả cuối là đã duy�
     # 7 ─ Giải pháp 2: máy quyết, người chốt, duyệt nhóm, kênh
     s = d.slide(kicker="GIẢI PHÁP 2", title="Máy quyết, người chốt, biết ai gửi", notes="""
 Phần giải pháp thứ hai. Máy quyết từng hóa đơn, nhưng chốt lô là việc của người: kế toán trưởng hoặc giám đốc tài chính
-ký thì mới ghi sổ, và kế toán trưởng không được chốt lô có hóa đơn do chính mình nhập. Câu hỏi giống nhau được gom lại,
-người có thẩm quyền trả lời một lần kiểu 1A, 2B cho cả nhóm. Hóa đơn đến qua Gmail hay Zalo thì hệ thống so với danh bạ
-và kiểm SPF, DKIM để biết ai gửi; kiểu giả danh bằng địa chỉ như example.com@evil.net bị chặn. Trong phiên demo của
-người lạ, kênh Gmail và Zalo thật không chạy.""")
+ký thì mới ghi sổ, và kế toán trưởng không được chốt lô có hóa đơn do chính mình nhập. Câu hỏi cùng nội dung, cùng hệ quả
+được gom lại, người có thẩm quyền trả lời một lần kiểu 1A, 2B cho cả nhóm; câu xác nhận số liệu riêng của từng tờ thì không gom. Hóa đơn đến qua Gmail hay Zalo thì hệ thống so với danh bạ
+và kiểm SPF, DKIM để biết ai gửi; kiểu giả danh bằng địa chỉ như example.com@evil.net bị chặn. Chỉ kế toán viên lấy thư; người gửi lạ
+phải được kế toán trưởng hoặc giám đốc tài chính xác nhận. Trong phiên demo của người lạ, kênh Gmail và Zalo thật không chạy.""")
     rows = [("Máy quyết, người chốt", "Lô chỉ vào sổ sau khi KTT/CFO chốt; chỉ KTT/CFO được xuất chứng từ. KTT không chốt lô có hóa đơn do chính mình nhập."),
             ("Duyệt nhóm 1A, 2B", "Câu hỏi giống nhau gom lại, trả lời một lần cho cả nhóm, đúng người đúng việc."),
             ("Gmail, Zalo biết ai gửi", "Gmail: danh bạ + SPF/DKIM. Zalo: đúng user id. Giả danh kiểu example.com@evil.net bị chặn.")]
@@ -457,15 +457,15 @@ trong container riêng.""")
 
     # 10 ─ Riêng tư và nghị định
     s = d.slide(kicker="RIÊNG TƯ VÀ PHÁP LÝ", title="Dữ liệu đi đâu, luật nào áp dụng", notes="""
-Về riêng tư. Nội dung file XML do máy đọc tất định, không gửi cho AI; riêng tên và mã số thuế người bán có thể được tra
-trên nguồn .gov.vn khi chưa có trong danh bạ. Ảnh chụp thì AI chỉ được trả về mười bốn trường nhìn thấy, khai thêm là bị
+Về riêng tư. Nội dung file XML do máy đọc tất định, không gửi cho AI; riêng tên và mã số thuế người bán có thể được gửi đi
+tra cứu qua dịch vụ tra cứu bên thứ ba và công cụ tìm kiếm giới hạn nguồn .gov.vn. Ảnh chụp thì AI chỉ được trả về mười bốn trường nhìn thấy, khai thêm là bị
 loại. Đường quyết định không gọi AI, nên có thể chạy chế độ không AI: chỉ nhận XML và nhập tay. Mỗi phiên một cơ sở dữ liệu
 riêng, nhật ký chỉ ghi thêm. Về luật dữ liệu cá nhân, chúng em đối chiếu Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15 và
 Nghị định 356/2025/NĐ-CP qua nguồn thứ cấp, nên không trích số điều. Lên production phải có hợp đồng xử lý dữ liệu với
 nhà cung cấp AI, hoặc chạy chế độ chỉ XML. Về thuế, căn cứ được chọn theo ngày lập hóa đơn: hóa đơn trước 1 tháng 7 năm
 2025 dùng Thông tư 219/2013; từ ngày đó dùng Luật Thuế giá trị gia tăng 48/2024 và Nghị định 181/2025.""")
     text(s, 0.5, 1.2, 4.3, 0.3, "Dữ liệu đi đâu", size=15, bold=True, color=NAVY)
-    priv = [("Nội dung XML không gửi AI", "Máy đọc tất định. Riêng tên, MST người bán có thể tra trên nguồn .gov.vn."),
+    priv = [("Nội dung XML không gửi AI", "Máy đọc tất định. Tên, MST người bán có thể tra qua bên thứ ba và .gov.vn."),
             ("Ảnh: AI chỉ trả 14 trường", "Trường thấy trên chứng từ. Khai thêm là bị loại."),
             ("Quyết định không cần AI", "Đường quyết định không gọi AI, nên chạy được chỉ với XML và nhập tay."),
             ("Mỗi phiên tách riêng", "Một cơ sở dữ liệu riêng mỗi phiên, nhật ký chỉ ghi thêm.")]
@@ -487,7 +487,7 @@ nhà cung cấp AI, hoặc chạy chế độ chỉ XML. Về thuế, căn cứ 
 
     # 11 ─ Video demo
     s = d.slide(dark=True, kicker="DEMO", title="Xem Tax Referee chạy trong 1 phút", notes="""
-Mời ban giám khảo xem video demo một phút: tạo lô, xem phiếu giải trình, trả lời nhóm câu hỏi, chốt lô, màn hình tổng quan,
+Mời ban giám khảo xem video demo khoảng một phút rưỡi: tạo lô, xem phiếu giải trình, trả lời nhóm câu hỏi, chốt lô, màn hình tổng quan,
 lịch sử của tôi, rồi hóa đơn đến từ Gmail và Zalo. Nếu video không chạy, mở bản đang chạy ở địa chỉ dưới màn hình.
 Cảm ơn ban giám khảo, chúng em sẵn sàng nhận câu hỏi.""")
     vw, vh = 6.66, 3.75
