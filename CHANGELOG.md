@@ -4,6 +4,9 @@
 
 ## [Chưa phát hành]
 
+### Thêm
+- Nối chatbot Zalo (Goblin) vào Tax Referee: web tự làm mới khi có hóa đơn mới từ bot (hỏi `/api/inbox` mỗi 4 giây khi tab hiện), công tắc `TAX_REFEREE_ALLOW_WORKSPACE_RESET` cho nút "Xóa hết hóa đơn" ở workspace nội bộ (mặc định tắt, có test), bộ nối `integrations/goblin-relay/` (bộ nhận, cầu nối đọc ảnh, script chạy/kiểm tra). Xem [docs/integrations/zalo-goblin-relay.md](docs/integrations/zalo-goblin-relay.md).
+
 ### Tài liệu
 - README viết lại: mục lục, kiến trúc (Mermaid), bảng bảo mật 4 trụ, cấu hình, API, giới hạn.
 - Thêm `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CHANGELOG.md`, `THIRD_PARTY_NOTICES.md`, mẫu issue/PR, mục lục tài liệu [`docs/README.md`](docs/README.md).

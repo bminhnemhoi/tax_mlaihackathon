@@ -15,6 +15,7 @@ Mục lục toàn bộ tài liệu, xếp theo người đọc. Tổng quan dự
 ## Kiến trúc và bảo mật
 
 - [Kiến trúc và lộ trình từ demo lên production](architecture/demo-to-production.md) — 7 lớp, đánh đổi, cái gì vỡ khi mở rộng, lộ trình D0/30/90 ngày, SLO, ánh xạ VNG Cloud.
+- [Nối chatbot Zalo (Goblin) vào Tax Referee](integrations/zalo-goblin-relay.md) — luồng ảnh/PDF/XML từ Zalo vào hộp thẩm định, cầu nối đọc ảnh, quyết định, cách dựng lại, sự cố thường gặp.
 - [Mô hình mối đe dọa và bảo mật hệ có agent AI](security/threat-model.md) — tài sản, ranh giới tin cậy, 4 trụ, STRIDE, lỗi tự phát hiện → bản sửa → test.
 - [Bảng đối chiếu SOP và quy tắc thực thi](referee-core-rule-matrix.md) — mỗi quy tắc SOP ứng với mã nào. Ảnh chụp ngày 12/10, chưa có quy tắc thêm sau đó; bảng hiện hành ở trang `/sop`.
 - [Đối chiếu danh tính nhà cung cấp](supplier-identity-resolution.md) — luồng tra cứu, trạng thái VERIFIED/CONFLICT/NOT_FOUND, cấu hình nguồn.
