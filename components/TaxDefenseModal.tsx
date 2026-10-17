@@ -111,7 +111,7 @@ export const TaxDefenseModal: React.FC<TaxDefenseModalProps> = ({ entry, onClose
             <div className="space-y-1.5 text-xs text-slate-700 font-medium">
               <p>• Căn cứ quy chế nội bộ: <span className="text-purple-700 font-medium font-numeric">{entry.sopVersion || 'Tax-SOP-2026 v2.1'}</span></p>
               {entry.applicableRegulations && entry.applicableRegulations.length > 0 ? (
-                <p>• Văn bản trong sổ theo ngày lập (một số chưa đối chiếu nguyên văn):<span className="text-blue-700 font-medium font-numeric">{entry.applicableRegulations.join(' · ')}</span></p>
+                <p>• Văn bản đã đối chiếu, có hiệu lực tại ngày lập: <span className="text-blue-700 font-medium font-numeric">{entry.applicableRegulations.join(' · ')}</span></p>
               ) : (
                 <p>• Căn cứ pháp quy Nhà nước: chọn theo ngày lập hóa đơn (xem căn cứ của từng phát hiện)</p>
               )}

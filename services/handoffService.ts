@@ -1,11 +1,12 @@
 import type { EscalatedDecision, InvoiceInput, RefereeHandoff, RefereeDecision, RuleFinding } from '@/lib/schemas';
 import {ruleContract} from '@/data/policyContract';
-import {buyerTaxCodeBasis,cashPaymentBasis,closedSellerBasis,sameDayCashBasis,seriesYearBasis,taxAuthorityCodeBasis} from '@/lib/legalBasis';
+import {buyerTaxCodeBasis,cashPaymentBasis,closedSellerBasis,sameDayCashBasis,seriesYearBasis,signingBasis,taxAuthorityCodeBasis} from '@/lib/legalBasis';
 
 /** Quy tắc đã có căn cứ cấp điều/khoản được đối chiếu nguyên văn (lib/legalBasis), chọn theo ngày lập hóa đơn. */
 const ARTICLE_BASIS:Record<string,(invoiceDate:string)=>string>={
   STATUTORY_LAW_48_CASH_PAYMENT:cashPaymentBasis,STATUTORY_SAME_DAY_CASH_5M:sameDayCashBasis,RULE_BUYER_TAX_CODE_MISMATCH:buyerTaxCodeBasis,
   RULE_MCCQT_INVALID:taxAuthorityCodeBasis,RULE_SERIES_YEAR_MISMATCH:seriesYearBasis,STATUTORY_DECREE_254_CLOSED_SELLER:closedSellerBasis,
+  RULE_SIGNING_DELAY:signingBasis,
 };
 import {composeQuestion,issueItem,type FieldAsk,type QuestionItem} from './questionBuilder';
 const labels:Record<string,string>={invoiceNumber:'Số hóa đơn',invoiceDate:'Ngày lập',supplierName:'Nhà cung cấp',supplierTaxCode:'MST bên bán',itemName:'Hàng hóa / dịch vụ',totalAmount:'Tổng thanh toán',preTaxAmount:'Tiền trước thuế',taxAmount:'Tiền thuế',taxRate:'Thuế suất',buyerTaxCode:'MST bên mua',invoiceSeries:'Ký hiệu',taxAuthorityCode:'Mã CQT',signingDate:'Ngày ký',isAdjustment:'Điều chỉnh/thay thế',isImageBlurry:'Ảnh chưa rõ',isStaffReimbursed:'Hoàn ứng nhân viên',items:'Chi tiết dòng hàng',paymentMethod:'Thanh toán',sellerStatus:'Trạng thái bên bán',hasBankSlip:'Chứng từ thanh toán',hasItemManifest:'Bảng kê',sellerSuspensionDate:'Ngày đóng MST',originalInvoiceRef:'Hóa đơn gốc'};
