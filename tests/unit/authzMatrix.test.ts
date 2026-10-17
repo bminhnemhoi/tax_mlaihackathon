@@ -11,6 +11,11 @@ import { CAPABILITIES, HUMAN_ROLES, can, type Principal } from '../../lib/capabi
 import { allowedActions, answerHandoff, applyWorkflowAction, evaluateWorkflow, readRecord, reviewPostAudit } from '../../services/workflowService';
 import { setAutomationPaused } from '../../services/automationControl';
 import { answerGroup, attachToBatch, createBatch, signOffBatch } from '../../services/batchService';
+import { addStaff, assignSender, listChannelMessages, pullChannel } from '../../services/channels/channelService';
+import type { GmailClient, InboundMail } from '../../services/channels/gmailChannel';
+
+/** Client Gmail giả: không gọi mạng. */
+const fakeGmail = (mails: InboundMail[]): GmailClient => ({ fetchUnseen: async () => mails, markSeen: async () => undefined, close: async () => undefined });
 import { createPolicyDraft, publishPolicy, rollbackPolicy } from '../../services/policyService';
 
 const base = { invoiceDate: '2026-10-05', supplierTaxCode: '0312345678', supplierName: 'Công ty TNHH Minh An', taxRate: 10 };
@@ -39,6 +44,11 @@ const SCENARIOS: Record<string, (u: Users, actor: AppUser) => Promise<boolean>> 
     for (const k of [1, 2]) { seq += 1; const n = String(9_500_000 + seq); const inv = { ...base, id: `AZG-${n}`, invoiceNumber: n, supplierTaxCode: `031955${String(seq).padStart(4, '0')}`, itemName: 'Tiếp khách đối tác - rượu vang', preTaxAmount: 3_000_000, taxAmount: 300_000, totalAmount: 3_300_000, paymentMethod: 'BANK_TRANSFER' as const };
       void k; await evaluateWorkflow(inv, u.ACCOUNTANT, { forceLocalOnly: true }); attachToBatch(u.ACCOUNTANT, lot.id, { invoiceId: inv.id }); ids.push(inv.id); }
     return attempt(async () => { const r = await answerGroup(lot.id, actor, { invoiceIds: ids, answers: { '1': 'A', '2': 'A' }, reason: 'Tiếp khách theo quy chế, có bảng kê' }); if (!r.every(x => x.ok)) throw new Error('bị chặn'); }); },
+  'channel.pull': async (_u, actor) => attempt(() => pullChannel(actor, 'GMAIL', { gmail: fakeGmail([]) })),
+  'staff.edit': async (_u, actor) => attempt(() => addStaff(actor, { fullName: 'Người thử quyền', email: `thu-quyen-${actor.role.toLowerCase()}@example.com` })),
+  // File PDF từ người lạ chờ xác nhận người gửi; người thử gắn cho một nhân viên trong danh bạ.
+  'channel.assignSender': async (u, actor) => { await pullChannel(u.ACCOUNTANT, 'GMAIL', { gmail: fakeGmail([{ uid: 1, messageId: `<authz-${actor.role}@example.net>`, from: 'la@example.net', attachments: [{ fileName: 'hd.pdf', mime: 'application/pdf', content: Buffer.from('%PDF-1.4 thu quyen') }] }]) });
+    const message = listChannelMessages().find(m => m.status === 'NEEDS_SENDER_REVIEW')!; return attempt(() => assignSender(actor, message.id, 'STAFF-KD')); },
   'invoice.submit': async (_u, actor) => attempt(() => evaluateWorkflow(routine(), actor, { forceLocalOnly: true })),
   'invoice.confirmFields': async (u, actor) => { const inv = routine(); await evaluateWorkflow(inv, u.ACCOUNTANT, { forceLocalOnly: true });
     return attempt(() => evaluateWorkflow(inv, actor, { forceLocalOnly: true, expectedRevision: readRecord(inv.id).revision, confirmations: [{ field: 'totalAmount', evidence: 'Đối chiếu hóa đơn gốc' }] })); },
