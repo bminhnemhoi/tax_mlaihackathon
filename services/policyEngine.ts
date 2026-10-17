@@ -1,7 +1,7 @@
 import { ActionOption, InvoiceInput, InvoiceLineItem, LineItemAnalysis, MacroState, RefereeDecision, RuleFinding, RuleKind, SystemPolicyConfig } from '@/lib/schemas';
 import { MACRO_DEFAULTS } from '@/lib/constants';
 import { getApplicableRegulations, isUnverifiedDocument } from '@/data/regulatoryRegistry';
-import { expectedHeaderTax } from '@/lib/invoiceMath';
+import { headerTaxMatches } from '@/lib/invoiceMath';
 import { checkDuplicateInvoice } from '@/services/duplicateDetector';
 import { findPrecedentForInvoice } from '@/services/precedentService';
 import { getSupplier } from '@/services/supplierService';
@@ -22,20 +22,23 @@ const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HI�
   'THUÊ NHÀ HÀNG'];
 /** Ô tô tải thông thường không chịu TTĐB; pick-up cabin kép và ô tô tải VAN (từ hai hàng ghế) chịu TTĐB nên vẫn bị loại khỏi 8%. */
 const TRUCK_NOT_EXCLUDED=['XE Ô TÔ TẢI','Ô TÔ TẢI','XE O TO TAI','O TO TAI'];
-const TTDB_TRUCK=['PICK-UP','PICKUP','PICK UP','CABIN KÉP','TẢI VAN','Ô TÔ VAN','XE VAN','BÁN TẢI'];
+const TTDB_TRUCK=['PICKUP','PICK UP','CABIN KÉP','CA BIN KÉP','DOUBLE CAB','TẢI VAN','Ô TÔ VAN','XE VAN','BÁN TẢI'];
 /** Xe chịu TTĐB gọi theo tên thông dụng, không có chữ "ô tô" (VD "xe bán tải cabin kép"): bị loại khỏi 8% ở mọi kỳ. "XE VAN" chỉ tắt miễn trừ vì không dấu trùng "xe vận". */
-const TTDB_TRUCK_EXCLUDED=['BÁN TẢI','PICK-UP','PICKUP','PICK UP','CABIN KÉP','TẢI VAN','Ô TÔ VAN'];
+const TTDB_TRUCK_EXCLUDED=['BÁN TẢI','PICKUP','PICK UP','CABIN KÉP','CA BIN KÉP','DOUBLE CAB','TẢI VAN','Ô TÔ VAN'];
 /** Văn phòng phẩm gõ không dấu ("bia ho so") — dạng bỏ dấu của "BIA" không được coi là đồ uống có cồn. */
-const BENIGN_UNACCENTED=['BIA HO SO','BIA NHUA','BIA CUNG','BIA KEP','BIA SO','BIA TRINH KY','BIA LO','BIA ACCO','BIA CATALOGUE'];
+// Chỉ cụm không mơ hồ: "bia so 1", "bia lo 24 chai", "bia cung cap…" vẫn là bia.
+const BENIGN_UNACCENTED=['BIA HO SO','BIA NHUA','BIA KEP','BIA TRINH KY','BIA ACCO','BIA CATALOGUE','BIA SO MI'];
 const stripBenign=(textUpper:string)=>BENIGN_UNACCENTED.reduce((acc,phrase)=>containsWord(acc,phrase)?acc.split(phrase).join(' '):acc,textUpper);
 /**
  * So khớp nguyên cụm từ với danh mục loại trừ 8% CỦA KỲ LẬP HÓA ĐƠN (lib/legalBasis): từ 01/7/2025, NQ 204/2025 cho xăng,
  * nhiên liệu dầu, than, hóa chất, CNTT được giảm 8%; viễn thông, kim loại, hàng chịu TTĐB (trừ xăng) vẫn bị loại.
  */
 function isVat8Excluded(textUpper:string,categories:string[],invoiceDate:string):boolean {
-  const benign=TTDB_TRUCK.some(k=>matchesKeyword(textUpper,k))?VAT8_NOT_EXCLUDED:[...VAT8_NOT_EXCLUDED,...TRUCK_NOT_EXCLUDED];
+  // Bỏ dấu câu trước khi nhận diện xe chịu TTĐB: "(VAN)", "ca-bin kép", "pick-up" vẫn được nhận ra.
+  const words=textUpper.replace(/[^\p{L}\p{N}]+/gu,' ');
+  const benign=TTDB_TRUCK.some(k=>matchesKeyword(words,k))?VAT8_NOT_EXCLUDED:[...VAT8_NOT_EXCLUDED,...TRUCK_NOT_EXCLUDED];
   const text=benign.reduce((acc,phrase)=>acc.split(phrase).join(' '),stripBenign(textUpper));
-  if(TTDB_TRUCK_EXCLUDED.some(k=>matchesKeyword(text,k)))return true;
+  if(TTDB_TRUCK_EXCLUDED.some(k=>matchesKeyword(words,k)))return true;
   return vat8ExcludedPhrases(invoiceDate,categories).some(phrase=>matchesKeyword(text,phrase));
 }
 /** Chi tiếp khách/đồ uống có cồn/giải trí (SOP: cần làm rõ mục đích). So khớp nguyên từ để "BAVIA" hay "BÌA" không bị nhầm với "BIA". */
@@ -698,7 +701,7 @@ function evaluateInvoiceLocallyInternal(
   const normalizedItemName = inv.itemName.normalize('NFC').toLocaleUpperCase('vi-VN');
   const isExcludedItem = isVat8Excluded(normalizedItemName, excludedCategories, inv.invoiceDate);
   // Có dòng hàng nhiều thuế suất thì xét theo từng dòng; tên chung ở đầu hóa đơn chỉ quyết định khi mọi dòng cùng 8%.
-  const headerDecidesVat8 = (inv.items ?? []).every(line => line.taxRate === 8);
+  const headerDecidesVat8 = new Set((inv.items ?? []).map(line => line.taxRate)).size < 2;
   if ((isExcludedItem && inv.taxRate === 8 && headerDecidesVat8) || lineItemResult.hasExcludedVat8Item) {
     const flagMsg = lineItemResult.hasExcludedVat8Item
       ? 'Dòng hàng có thuế suất 8% trong danh mục loại trừ đang cấu hình; cần đối chiếu ngành hàng và nguồn quy định'
@@ -1185,10 +1188,9 @@ function getDataQualityIssue(inv: InvoiceInput,config?:Partial<SystemPolicyConfi
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== inv.invoiceDate) return 'Ngày hóa đơn không hợp lệ hoặc không thể đối chiếu văn bản có hiệu lực.';
   // Ngày lập muộn hơn hôm nay quá 6 tháng gần như chắc chắn là nhập sai năm: không tự duyệt trên ngày đó.
   if (date.getTime() - Date.now() > 183 * 24 * 60 * 60 * 1000) return `Ngày lập ${inv.invoiceDate} muộn hơn hôm nay hơn 6 tháng — có thể nhập sai năm; cần xác nhận ngày trên chứng từ.`;
-  // Hóa đơn nhiều thuế suất hợp lệ: thuế kỳ vọng là tổng thuế từng dòng (lib/invoiceMath), không phải tiền hàng × thuế suất đầu hóa đơn.
-  const expectedTax = expectedHeaderTax(inv);
+  // Hóa đơn nhiều thuế suất hợp lệ: thuế kỳ vọng theo nhóm thuế suất hoặc tổng thuế từng dòng (lib/invoiceMath), không phải tiền hàng × thuế suất đầu hóa đơn.
   const expectedTotal = inv.preTaxAmount + inv.taxAmount;
-  if (Math.abs(inv.taxAmount - expectedTax) > AMOUNT_TOLERANCE || Math.abs(inv.totalAmount - expectedTotal) > AMOUNT_TOLERANCE) {
+  if (!headerTaxMatches(inv) || Math.abs(inv.totalAmount - expectedTotal) > AMOUNT_TOLERANCE) {
     return 'Các số tiền trên hóa đơn không nhất quán với tiền trước thuế và thuế suất; cần xác nhận lại chứng từ gốc.';
   }
   if(inv.totalAmount<0 && !inv.isAdjustment)return 'Giá trị âm chưa được xác định là hóa đơn điều chỉnh.';

@@ -37,6 +37,11 @@ test('hóa đơn nhiều thuế suất hợp lệ (8% + 10%) tự duyệt; thu�
     assert.equal(evaluate(multi).status, 'ROUTINE', JSON.stringify(rules(evaluate(multi))));
     // Đầu hóa đơn ghi 8%: dòng cước internet chịu 10% nên không phải "áp sai 8%".
     assert.equal(evaluate({ ...multi, id: 'J-MR8', taxRate: 8 }).status, 'ROUTINE', JSON.stringify(rules(evaluate({ ...multi, id: 'J-MR8', taxRate: 8 }))));
+    // 30 dòng làm tròn thuế từng dòng: lệch cách làm tròn theo nhóm quá 10₫ nhưng khớp tổng thuế các dòng.
+    const many: NonNullable<InvoiceInput['items']> = [...Array.from({ length: 30 }, (_, i) => ({ lineNumber: i + 1, itemName: `Văn phòng phẩm ${i + 1}`, quantity: 1, unitPrice: 1_006, amount: 1_006, taxRate: 8 as const, taxAmount: 80 })),
+      { lineNumber: 31, itemName: 'Giấy in', quantity: 1, unitPrice: 100_000, amount: 100_000, taxRate: 10 as const, taxAmount: 10_000 }];
+    const manyInv: InvoiceInput = { ...base, id: 'J-MR30', itemName: 'Văn phòng phẩm', preTaxAmount: 130_180, taxRate: 10, taxAmount: 12_400, totalAmount: 142_580, items: many };
+    assert.equal(evaluate(manyInv).status, 'ROUTINE', JSON.stringify(rules(evaluate(manyInv))));
     const wrong = evaluate({ ...multi, id: 'J-MRX', taxAmount: 265_000, totalAmount: 3_265_000 });
     assert.ok(rules(wrong).includes('RULE_DATA_QUALITY'));
     assert.match(handoffOf(wrong)?.question ?? '', /tổng thuế các dòng hàng/);
@@ -64,6 +69,12 @@ test('ô tô tải 8% không bị coi là hàng chịu TTĐB; ô tô con, pick-u
     assert.ok(car('J-T2', 'Xe ô tô con Toyota Vios').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));
     assert.ok(car('J-T3', 'Xe ô tô tải pick-up cabin kép Ford Ranger').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));
     assert.ok(car('J-T6', 'Xe bán tải Ford Ranger cabin kép').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'), 'xe chịu TTĐB gọi tên thông dụng, không có chữ ô tô');
+    for (const name of ['Ô tô tải (VAN) Kia', 'Xe ô tô tải ca-bin kép Toyota Hilux', 'Xe ô tô tải ca bin kép Ford Ranger', 'Xe ô tô tải double cab Ford Ranger'])
+      assert.ok(car(`J-TV-${name}`, name).includes('STATUTORY_RES_204_VAT_8_EXCLUDED'), `${name}: hàng chịu TTĐB, như trên main`);
+    assert.ok(car('J-TB', 'bia so 1 thung 24 lon').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'), 'bia không dấu vẫn là bia');
+    // Một dòng hàng: tên chung ở đầu hóa đơn vẫn quyết định.
+    assert.ok(rules(evaluate({ ...base, id: 'J-H1', itemName: 'Cước di động tháng 9', taxRate: 8, preTaxAmount: 50_000, taxAmount: 4_000, totalAmount: 54_000,
+      items: [{ lineNumber: 1, itemName: 'Dịch vụ tháng 9', quantity: 1, unitPrice: 50_000, amount: 50_000, taxRate: 10, taxAmount: 5_000 }] })).includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));
     assert.ok(!car('J-T7', 'xe o to tai van chuyen hang').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'), 'không dấu "tải vận" không phải xe VAN');
     assert.ok(car('J-T8', 'Tiền thuê nhà làm văn phòng tháng 10').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));
     assert.ok(!car('J-T9', 'Tiền thuê nhà hàng tổ chức tiệc tất niên').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));

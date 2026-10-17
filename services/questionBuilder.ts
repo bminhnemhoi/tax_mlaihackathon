@@ -1,7 +1,7 @@
 import type { ActionOption, InvoiceInput, RiskGroup, RuleFinding, SystemPolicyConfig } from '@/lib/schemas';
 import { RISK_GROUP_LABELS, groupOf } from '@/lib/riskTaxonomy';
 import { vat8Basis } from '@/lib/legalBasis';
-import { expectedHeaderTax, multiRateLineTax } from '@/lib/invoiceMath';
+import { expectedHeaderTax, headerTaxMatches, multiRateLineTax } from '@/lib/invoiceMath';
 
 /**
  * Câu hỏi chuyển tiếp "trả lời trong một câu": mỗi ý nêu lý do bằng số liệu cụ thể và hai đáp án có hệ quả rõ
@@ -46,7 +46,7 @@ export function concreteIssue(finding: Pick<RuleFinding, 'ruleId' | 'flaggedReas
     case 'RULE_DATA_QUALITY': {
       const expectedTax = expectedHeaderTax(inv);
       const expectedTotal = inv.preTaxAmount + inv.taxAmount;
-      if (Math.abs(inv.taxAmount - expectedTax) > TOLERANCE) {
+      if (!headerTaxMatches(inv)) {
         const basis = multiRateLineTax(inv) !== null ? 'tổng thuế các dòng hàng' : `${inv.taxRate}% × ${vnd(inv.preTaxAmount)}`;
         // Tổng in khớp với số thuế tính lại ⇒ chỉ ô thuế bị đọc/nhập sai, sửa được. Ngược lại hóa đơn tự nhất quán với số thuế đang in:
         // không tự ghi số thuế không có trên hóa đơn — người xử lý nhập số đúng theo chứng từ gốc.
@@ -280,7 +280,7 @@ export function composeQuestion(inv: InvoiceInput, role: 'CFO' | 'Kế toán tr�
 function issueEffects(finding: Pick<RuleFinding, 'ruleId' | 'options'>, inv: InvoiceInput): [AnswerEffect, AnswerEffect] {
   if (finding.ruleId === 'RULE_DATA_QUALITY') {
     const expectedTax = expectedHeaderTax(inv);
-    if (Math.abs(inv.taxAmount - expectedTax) > TOLERANCE)
+    if (!headerTaxMatches(inv))
       return [Math.abs(inv.totalAmount - (inv.preTaxAmount + expectedTax)) <= TOLERANCE ? set({ taxAmount: expectedTax }, ['taxAmount']) : NEED('taxAmount'), REQUEST];
     if (Math.abs(inv.totalAmount - (inv.preTaxAmount + inv.taxAmount)) > TOLERANCE) return [set({ totalAmount: inv.preTaxAmount + inv.taxAmount }, ['totalAmount']), REQUEST];
   }

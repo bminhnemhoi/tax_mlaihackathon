@@ -25,6 +25,18 @@ export function multiRateLineTax(inv: TaxInputs): number | null {
  * Tiền thuế kỳ vọng ở phần tổng của hóa đơn: hóa đơn nhiều thuế suất hợp lệ thì bằng tổng thuế theo nhóm thuế suất, còn lại là
  * tiền hàng × thuế suất. Nguồn duy nhất cho engine (RULE_DATA_QUALITY), câu hỏi chuyển tiếp và hệ quả đáp án.
  */
+/**
+ * Thuế in ở phần tổng có khớp không: khớp thuế kỳ vọng, hoặc — với hóa đơn nhiều thuế suất mà mỗi dòng tự khớp — khớp tổng
+ * thuế từng dòng (hóa đơn nhiều dòng làm tròn từng dòng có thể lệch cách làm tròn theo nhóm quá 10₫).
+ */
+export function headerTaxMatches(inv: TaxInputs & Pick<InvoiceInput, 'taxAmount'>): boolean {
+  if (Math.abs(inv.taxAmount - expectedHeaderTax(inv)) <= AMOUNT_TOLERANCE_VND) return true;
+  const lines = inv.items ?? [];
+  if (multiRateLineTax(inv) === null) return false;
+  const linesConsistent = lines.every(line => Math.abs(line.taxAmount - Math.round(line.amount * line.taxRate / 100)) <= AMOUNT_TOLERANCE_VND);
+  return linesConsistent && Math.abs(inv.taxAmount - lines.reduce((sum, line) => sum + line.taxAmount, 0)) <= AMOUNT_TOLERANCE_VND;
+}
+
 export function expectedHeaderTax(inv: TaxInputs): number {
   return multiRateLineTax(inv) ?? Math.round(inv.preTaxAmount * inv.taxRate / 100);
 }
