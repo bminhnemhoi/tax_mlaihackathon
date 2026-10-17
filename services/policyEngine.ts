@@ -17,10 +17,14 @@ import {buyerTaxCodeBasis,cashPaymentBasis,closedSellerBasis,inSentence,invoiceF
 /** Cụm từ chứa từ khóa loại trừ nhưng là hàng hóa thông thường (VD "mũ bảo hiểm" không phải dịch vụ bảo hiểm). */
 const VAT8_NOT_EXCLUDED=['MŨ BẢO HIỂM','NÓN BẢO HIỂM','KÍNH BẢO HIỂM','GĂNG TAY BẢO HIỂM',
   // Dịch vụ liên quan ô tô không phải hàng chịu thuế TTĐB (chỉ bản thân chiếc xe mới chịu TTĐB).
-  'THUÊ XE Ô TÔ','THUÊ Ô TÔ','SỬA CHỮA Ô TÔ','SỬA CHỮA XE Ô TÔ','BẢO DƯỠNG Ô TÔ','BẢO DƯỠNG XE Ô TÔ','RỬA XE Ô TÔ','GỬI XE Ô TÔ','VẬN CHUYỂN BẰNG Ô TÔ','PHỤ TÙNG Ô TÔ','LỐP Ô TÔ'];
+  'THUÊ XE Ô TÔ','THUÊ Ô TÔ','SỬA CHỮA Ô TÔ','SỬA CHỮA XE Ô TÔ','BẢO DƯỠNG Ô TÔ','BẢO DƯỠNG XE Ô TÔ','RỬA XE Ô TÔ','GỬI XE Ô TÔ','VẬN CHUYỂN BẰNG Ô TÔ','PHỤ TÙNG Ô TÔ','LỐP Ô TÔ',
+  // Thuê nhà hàng (dịch vụ ăn uống/hội nghị) không phải kinh doanh bất động sản.
+  'THUÊ NHÀ HÀNG'];
 /** Ô tô tải thông thường không chịu TTĐB; pick-up cabin kép và ô tô tải VAN (từ hai hàng ghế) chịu TTĐB nên vẫn bị loại khỏi 8%. */
 const TRUCK_NOT_EXCLUDED=['XE Ô TÔ TẢI','Ô TÔ TẢI','XE O TO TAI','O TO TAI'];
-const TTDB_TRUCK=['PICK-UP','PICKUP','PICK UP','CABIN KÉP','TẢI VAN','Ô TÔ VAN','XE VAN'];
+const TTDB_TRUCK=['PICK-UP','PICKUP','PICK UP','CABIN KÉP','TẢI VAN','Ô TÔ VAN','XE VAN','BÁN TẢI'];
+/** Xe chịu TTĐB gọi theo tên thông dụng, không có chữ "ô tô" (VD "xe bán tải cabin kép"): bị loại khỏi 8% ở mọi kỳ. "XE VAN" chỉ tắt miễn trừ vì không dấu trùng "xe vận". */
+const TTDB_TRUCK_EXCLUDED=['BÁN TẢI','PICK-UP','PICKUP','PICK UP','CABIN KÉP','TẢI VAN','Ô TÔ VAN'];
 /** Văn phòng phẩm gõ không dấu ("bia ho so") — dạng bỏ dấu của "BIA" không được coi là đồ uống có cồn. */
 const BENIGN_UNACCENTED=['BIA HO SO','BIA NHUA','BIA CUNG','BIA KEP','BIA SO','BIA TRINH KY','BIA LO','BIA ACCO','BIA CATALOGUE'];
 const stripBenign=(textUpper:string)=>BENIGN_UNACCENTED.reduce((acc,phrase)=>containsWord(acc,phrase)?acc.split(phrase).join(' '):acc,textUpper);
@@ -31,6 +35,7 @@ const stripBenign=(textUpper:string)=>BENIGN_UNACCENTED.reduce((acc,phrase)=>con
 function isVat8Excluded(textUpper:string,categories:string[],invoiceDate:string):boolean {
   const benign=TTDB_TRUCK.some(k=>matchesKeyword(textUpper,k))?VAT8_NOT_EXCLUDED:[...VAT8_NOT_EXCLUDED,...TRUCK_NOT_EXCLUDED];
   const text=benign.reduce((acc,phrase)=>acc.split(phrase).join(' '),stripBenign(textUpper));
+  if(TTDB_TRUCK_EXCLUDED.some(k=>matchesKeyword(text,k)))return true;
   return vat8ExcludedPhrases(invoiceDate,categories).some(phrase=>matchesKeyword(text,phrase));
 }
 /** Chi tiếp khách/đồ uống có cồn/giải trí (SOP: cần làm rõ mục đích). So khớp nguyên từ để "BAVIA" hay "BÌA" không bị nhầm với "BIA". */
@@ -65,7 +70,8 @@ const stripMarks=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').r
  */
 // Từ mà bỏ dấu sẽ trùng từ thông dụng khác (PHẠT/phát, BIẾU/biểu): chỉ khớp khi có dấu; dạng không dấu dùng cụm rõ nghĩa (TIỀN PHẠT…).
 // "TẶNG KHÁCH" bỏ dấu trùng "tăng khách" (VD "chiến dịch tăng khách hàng").
-const AMBIGUOUS_WITHOUT_MARKS=new Set(['PHẠT','BIẾU','TẶNG KHÁCH','TẶNG ĐỐI TÁC']);
+// "TẢI VAN"/"Ô TÔ VAN"/"BÁN TẢI" bỏ dấu trùng "tải vận", "bán tai…".
+const AMBIGUOUS_WITHOUT_MARKS=new Set(['PHẠT','BIẾU','TẶNG KHÁCH','TẶNG ĐỐI TÁC','TẢI VAN','Ô TÔ VAN','BÁN TẢI']);
 export function matchesKeyword(textUpper:string,keyword:string):boolean {
   if(containsWord(textUpper,keyword))return true;
   if(AMBIGUOUS_WITHOUT_MARKS.has(keyword))return false;

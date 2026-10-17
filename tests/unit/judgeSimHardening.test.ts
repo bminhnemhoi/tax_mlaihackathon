@@ -63,6 +63,10 @@ test('ô tô tải 8% không bị coi là hàng chịu TTĐB; ô tô con, pick-u
     assert.ok(!car('J-T1', 'Xe ô tô tải Hyundai 1,5 tấn').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));
     assert.ok(car('J-T2', 'Xe ô tô con Toyota Vios').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));
     assert.ok(car('J-T3', 'Xe ô tô tải pick-up cabin kép Ford Ranger').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));
+    assert.ok(car('J-T6', 'Xe bán tải Ford Ranger cabin kép').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'), 'xe chịu TTĐB gọi tên thông dụng, không có chữ ô tô');
+    assert.ok(!car('J-T7', 'xe o to tai van chuyen hang').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'), 'không dấu "tải vận" không phải xe VAN');
+    assert.ok(car('J-T8', 'Tiền thuê nhà làm văn phòng tháng 10').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));
+    assert.ok(!car('J-T9', 'Tiền thuê nhà hàng tổ chức tiệc tất niên').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));
     assert.ok(car('J-T4', 'Thuê văn phòng tháng 10/2026').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'), 'thuê văn phòng = kinh doanh bất động sản');
     assert.ok(!car('J-T5', 'Thuê nhà hàng tổ chức hội nghị khách hàng').includes('STATUTORY_RES_204_VAT_8_EXCLUDED'));
   });

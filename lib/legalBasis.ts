@@ -30,7 +30,7 @@ export const VAT8_EXCLUDED_ALWAYS = ['CƯỚC INTERNET', 'DỊCH VỤ INTERNET',
   'THÉP', 'SẮT THÉP', 'ỐNG ĐỒNG', 'DÂY ĐỒNG', 'ĐỒNG THAU', 'NHÔM', 'INOX', 'BIA', 'RƯỢU', 'THUỐC LÁ', 'Ô TÔ', 'QUẶNG',
   // Kinh doanh bất động sản bị loại ở mọi kỳ giảm thuế; tên hàng thực tế ghi "thuê văn phòng" chứ hiếm khi ghi "bất động sản".
   // Không thêm "THUÊ NHÀ" vì khớp cả "thuê nhà hàng".
-  'THUÊ VĂN PHÒNG', 'THUÊ MẶT BẰNG', 'THUÊ NHÀ XƯỞNG'];
+  'THUÊ VĂN PHÒNG', 'THUÊ MẶT BẰNG', 'THUÊ NHÀ XƯỞNG', 'TIỀN THUÊ NHÀ', 'THUÊ NHÀ LÀM', 'CHO THUÊ NHÀ', 'THUÊ ĐẤT'];
 
 /**
  * Bị loại trước 01/7/2025 (NQ 43/2022 … NQ 174/2024: CNTT, than cốc, dầu mỏ tinh chế, hóa chất, mọi hàng chịu TTĐB) nhưng
