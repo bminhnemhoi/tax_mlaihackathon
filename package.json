@@ -43,6 +43,7 @@
     "demo:reset": "tsx scripts/ops/reset-demo-data.ts",
     "referee:snapshot": "tsx scripts/qa/referee-snapshot.ts --write",
     "referee:diff": "tsx scripts/qa/referee-snapshot.ts",
+    "channels:check": "tsx scripts/ops/channels-check.ts",
     "live:check": "python scripts/ops/check-live.py",
     "test": "tsx scripts/qa/run-all.ts",
     "test:unit": "node --import tsx --test tests/unit/*.test.ts",
