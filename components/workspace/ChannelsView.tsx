@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 
 export type WorkspaceViewUser = { id: string; email: string; displayName: string; role: 'ACCOUNTANT' | 'CHIEF_ACCOUNTANT' | 'CFO' };
 type ChannelName = 'GMAIL' | 'ZALO';
-type ChannelState = { configured: boolean; lastPullAt: string | null; counts: Record<string, number> };
+type ChannelState = { configured: boolean; simulated?: boolean; lastPullAt: string | null; counts: Record<string, number> };
 type Message = {
   id: string; channel: ChannelName; senderAddress: string | null; senderName: string | null; senderStaffName: string | null;
   senderKind: 'VERIFIED' | 'SPOOF_SUSPECT' | 'UNKNOWN'; senderStaffId: string | null; fileName: string | null; receivedAt: string; status: string; batchId: string | null; note: string | null;
@@ -23,7 +23,7 @@ const STATUS_LABEL: Record<string, { text: string; variant: 'success' | 'warning
   ERROR: { text: 'Không đọc được file', variant: 'destructive' },
   NEW: { text: 'Đang xử lý', variant: 'secondary' },
 };
-const NOTICE_LABEL: Record<string, string> = { SENT: 'Đã gửi', FAILED: 'Gửi lỗi', SKIPPED_NOT_CONFIGURED: 'Chưa cấu hình kênh gửi' };
+const NOTICE_LABEL: Record<string, string> = { SENT: 'Đã gửi', FAILED: 'Gửi lỗi', SKIPPED_NOT_CONFIGURED: 'Chưa cấu hình kênh gửi', SIMULATED: 'Mô phỏng — không gửi thật' };
 const CHANNEL_NAME: Record<ChannelName, string> = { GMAIL: 'Gmail', ZALO: 'Zalo' };
 const time = (iso: string | null) => (iso ? new Date(iso).toLocaleString('vi-VN') : 'chưa lấy lần nào');
 
@@ -111,10 +111,11 @@ export function ChannelsView({ user }: { user: WorkspaceViewUser }): ReactElemen
             <div key={channel} className="rounded-xl border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-base font-semibold">{CHANNEL_NAME[channel]}</h3>
-                <Badge variant={state?.configured ? 'success' : 'secondary'}>{state?.configured ? 'Đã kết nối' : 'Chưa cấu hình'}</Badge>
+                <Badge variant={state?.simulated ? 'info' : state?.configured ? 'success' : 'secondary'}>{state?.simulated ? 'Mô phỏng · dữ liệu mẫu' : state?.configured ? 'Đã kết nối' : 'Chưa cấu hình'}</Badge>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">Lần lấy gần nhất: {time(state?.lastPullAt ?? null)}</p>
-              <Button className="mt-3 w-full sm:w-auto" disabled={!state?.configured || busy !== null} onClick={() => void pull(channel)}>
+              {state?.simulated ? <p className="mt-1 text-xs text-muted-foreground">Phiên demo: {channel === 'GMAIL' ? 'hộp thư' : 'bot Zalo'} giả với hóa đơn mẫu, chạy đúng quy trình nhận diện người gửi và kiểm như kênh thật; không gọi mạng, không gửi tin thật.</p> : null}
+              <Button className="mt-3 w-full sm:w-auto" disabled={!(state?.configured || state?.simulated) || busy !== null} onClick={() => void pull(channel)}>
                 {busy === channel ? 'Đang lấy…' : `Lấy hóa đơn từ ${CHANNEL_NAME[channel]}`}
               </Button>
             </div>

@@ -139,7 +139,16 @@ test('chống mạo danh bằng local-part (example.com@evil.net) và kênh th�
   assert.equal(emailAuthenticated('duclong.ktt@example.com', 'mx.google.com; spf=pass smtp.mailfrom=noreply@mail.example.com'), true);
   await runIsolated(async () => {
     const user = switchRole('ACCOUNTANT')!.user;
-    await assert.rejects(pullChannel(user, 'GMAIL'), /chỉ dùng trong workspace nội bộ/);
+    // Phiên demo không bật kênh thật ⇒ kênh MÔ PHỎNG: không gọi Gmail thật, vẫn chạy đúng nhận diện người gửi và chống mạo danh.
+    const gmail = await pullChannel(user, 'GMAIL');
+    assert.equal(gmail.simulated, true);
+    assert.ok(gmail.counts.PROCESSED >= 2 && gmail.counts.NEEDS_SENDER_REVIEW === 2, JSON.stringify(gmail.counts));
+    const kinds = listChannelMessages().filter(m => m.channel === 'GMAIL').map(m => m.senderKind).sort();
+    assert.ok(kinds.includes('SPOOF_SUSPECT') && kinds.includes('UNKNOWN'), kinds.join());
+    assert.ok(listNotifications().length > 0 && listNotifications().every(n => n.status === 'SIMULATED' || n.status === 'SKIPPED_NOT_CONFIGURED'));
+    const zalo = await pullChannel(user, 'ZALO');
+    assert.deepEqual([zalo.simulated, zalo.counts.QUEUED, zalo.counts.NEEDS_SENDER_REVIEW], [true, 1, 1]);
+    assert.equal((await pullChannel(user, 'GMAIL')).files, 0, 'kéo lại hộp thư mô phỏng không tạo bản trùng');
   });
 });
 

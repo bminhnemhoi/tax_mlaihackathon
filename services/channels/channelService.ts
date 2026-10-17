@@ -4,7 +4,6 @@
  * thì hóa đơn mới được đọc và kiểm; người lạ hoặc email không xác thực ⇒ chờ kế toán xác nhận người gửi.
  * XML đọc tất định (không AI); PDF/ảnh xếp hàng chờ bộ đọc lô.
  */
-import { isSandbox } from '@/lib/server/db';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,6 +18,7 @@ import { getStaff, identifySender, seedStaffDirectory, type SenderIdentity, type
 import { createImapGmailClient, gmailConfigured, type GmailClient } from './gmailChannel';
 import { createHttpZaloClient, isAllowedZaloFileUrl, zaloConfigured, type ZaloClient } from './zaloChannel';
 import { notify, type NotifyTransport } from './notifier';
+import { demoChannelsActive, demoGmailClient, demoNotifier, demoZaloClient, prepareDemoDirectory } from './demoMock';
 
 export type ChannelName = 'GMAIL' | 'ZALO';
 export type ChannelMessageStatus = 'PROCESSED' | 'QUEUED' | 'NEEDS_SENDER_REVIEW' | 'REJECTED' | 'ERROR';
@@ -38,6 +38,8 @@ export interface ProcessedOutcome { invoiceId: string; workflowStatus: string; t
 export interface PullResult {
   channel: ChannelName; messages: number; files: number; duplicates: number; batchId: string | null;
   counts: Record<ChannelMessageStatus, number>; outcomes: ProcessedOutcome[];
+  /** true = kênh mô phỏng của phiên demo (dữ liệu mẫu, không gọi Gmail/Zalo thật). */
+  simulated: boolean;
 }
 export interface ChannelDeps { gmail?: GmailClient; zalo?: ZaloClient; notifier?: NotifyTransport }
 
@@ -121,14 +123,16 @@ function requireRole(user: AppUser, roles: string[], message: string): void {
 }
 
 /** Kéo hóa đơn từ một kênh: một lô cho mỗi lượt kéo (chỉ tạo khi có hóa đơn được xử lý). */
-export async function pullChannel(user: AppUser, channel: ChannelName, deps: ChannelDeps = {}): Promise<PullResult> {
+export async function pullChannel(user: AppUser, channel: ChannelName, injected: ChannelDeps = {}): Promise<PullResult> {
   requireRole(user, STAFF_ROLES, 'Chỉ nhân viên kế toán được lấy hóa đơn từ kênh.');
-  // Hộp thư thật của đội không được kéo vào phiên demo của người lạ. Demo trên máy của đội: đặt TAX_REFEREE_ALLOW_REAL_CHANNELS_IN_DEMO=1.
-  if (isSandbox() && !deps.gmail && !deps.zalo && process.env.TAX_REFEREE_ALLOW_REAL_CHANNELS_IN_DEMO !== '1')
-    throw new WorkflowError('Kênh Gmail/Zalo thật chỉ dùng trong workspace nội bộ hoặc khi chủ máy bật chế độ demo kênh thật.', 403);
+  // Hộp thư thật của đội không được kéo vào phiên demo của người lạ: phiên demo dùng kênh MÔ PHỎNG (dữ liệu mẫu, không gọi mạng).
+  // Demo kênh thật trên máy của đội: đặt TAX_REFEREE_ALLOW_REAL_CHANNELS_IN_DEMO=1.
+  const simulated = !injected.gmail && !injected.zalo && demoChannelsActive();
   seedStaffDirectory();
-  const result: PullResult = { channel, messages: 0, files: 0, duplicates: 0, batchId: null, counts: emptyCounts(), outcomes: [] };
-  const ensureBatch = () => result.batchId ??= createBatch(user, { label: `Lô ${channel === 'GMAIL' ? 'Gmail' : 'Zalo'} ${new Date().toLocaleString('vi-VN')}`, source: channel }).id;
+  if (simulated) prepareDemoDirectory();
+  const deps: ChannelDeps = simulated ? { gmail: demoGmailClient(), zalo: demoZaloClient(), notifier: demoNotifier() } : injected;
+  const result: PullResult = { channel, messages: 0, files: 0, duplicates: 0, batchId: null, counts: emptyCounts(), outcomes: [], simulated };
+  const ensureBatch = () => result.batchId ??= createBatch(user, { label: `Lô ${channel === 'GMAIL' ? 'Gmail' : 'Zalo'}${simulated ? ' (mô phỏng)' : ''} ${new Date().toLocaleString('vi-VN')}`, source: channel }).id;
   const zaloReplies = new Map<string, number>();
   if (channel === 'ZALO') {
     if (!deps.zalo && !zaloConfigured()) throw new WorkflowError('Zalo chưa cấu hình (thiếu ZALO_BOT_TOKEN).', 409);
@@ -151,7 +155,7 @@ export async function pullChannel(user: AppUser, channel: ChannelName, deps: Cha
       await ingestFile(user, channel, file, ensureBatch, result);
       if (identity.verified && identity.staff) zaloReplies.set(update.chatId, (zaloReplies.get(update.chatId) ?? 0) + 1);
     }
-    appendAuditEvent({ eventType: 'CHANNEL_PULLED', entityId: `channel:${channel}`, actorId: user.id, payload: { messages: result.messages, files: result.files, duplicates: result.duplicates, counts: result.counts, batchId: result.batchId } });
+    appendAuditEvent({ eventType: 'CHANNEL_PULLED', entityId: `channel:${channel}`, actorId: user.id, payload: { messages: result.messages, files: result.files, duplicates: result.duplicates, counts: result.counts, batchId: result.batchId, simulated } });
     for (const [chatId, n] of zaloReplies) await notify({ kind: 'SENDER_RECEIPT', text: `Tax Referee đã nhận ${n} ảnh hóa đơn của anh/chị. Kế toán sẽ đọc và báo kết quả.`, to: { zaloChatId: chatId } }, deps.notifier);
     return result;
   }
@@ -174,7 +178,7 @@ export async function pullChannel(user: AppUser, channel: ChannelName, deps: Cha
     }
     await client.markSeen(seen);
   } finally { await client.close(); }
-  appendAuditEvent({ eventType: 'CHANNEL_PULLED', entityId: `channel:${channel}`, actorId: user.id, payload: { messages: result.messages, files: result.files, duplicates: result.duplicates, counts: result.counts, batchId: result.batchId } });
+  appendAuditEvent({ eventType: 'CHANNEL_PULLED', entityId: `channel:${channel}`, actorId: user.id, payload: { messages: result.messages, files: result.files, duplicates: result.duplicates, counts: result.counts, batchId: result.batchId, simulated } });
   await sendPullNotifications(result, deps.notifier);
   return result;
 }
@@ -221,12 +225,12 @@ export function listChannelMessages(limit = 100): ChannelMessageView[] {
   });
 }
 
-export function channelStatus(): Record<ChannelName, { configured: boolean; lastPullAt: string | null; counts: Record<string, number> }> {
+export function channelStatus(): Record<ChannelName, { configured: boolean; simulated: boolean; lastPullAt: string | null; counts: Record<string, number> }> {
   const db = getDatabase();
   const one = (channel: ChannelName, configured: boolean) => {
     const last = db.prepare('SELECT created_at FROM audit_events WHERE entity_id=? AND event_type=? ORDER BY rowid DESC LIMIT 1').get(`channel:${channel}`, 'CHANNEL_PULLED') as { created_at: string } | undefined;
     const counts = Object.fromEntries((db.prepare('SELECT status, COUNT(*) n FROM channel_messages WHERE channel=? GROUP BY status').all(channel) as Array<{ status: string; n: number }>).map(r => [r.status, r.n]));
-    return { configured, lastPullAt: last?.created_at ?? null, counts };
+    return { configured, simulated: demoChannelsActive(), lastPullAt: last?.created_at ?? null, counts };
   };
   return { GMAIL: one('GMAIL', gmailConfigured()), ZALO: one('ZALO', Boolean(process.env.ZALO_BOT_TOKEN)) };
 }

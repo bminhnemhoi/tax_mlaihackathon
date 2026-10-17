@@ -8,10 +8,12 @@ import { getDatabase, jsonNow } from '@/lib/server/db';
 import { gmailConfigured } from './gmailChannel';
 import { zaloConfigured, ZALO_API_BASE } from './zaloChannel';
 
-export type NotifyStatus = 'SENT' | 'FAILED' | 'SKIPPED_NOT_CONFIGURED';
+export type NotifyStatus = 'SENT' | 'FAILED' | 'SKIPPED_NOT_CONFIGURED' | 'SIMULATED';
 export interface NotifyInput { kind: string; text: string; subject?: string; invoiceId?: string | null; batchId?: string | null; to?: { email?: string | null; zaloChatId?: string | null } }
 export interface NotifyTransport {
   emailReady: boolean; zaloReady: boolean;
+  /** Bộ gửi mô phỏng (phiên demo): không gửi ra ngoài, ghi trạng thái SIMULATED. Có người nhận mặc định riêng. */
+  simulated?: boolean; defaultEmail?: string; defaultZaloChatId?: string;
   sendEmail(to: string, subject: string, text: string): Promise<void>;
   sendZalo(chatId: string, text: string): Promise<void>;
 }
@@ -55,19 +57,19 @@ function record(channel: 'EMAIL' | 'ZALO', recipient: string | null, input: Noti
 export async function notify(input: NotifyInput, transport: NotifyTransport = defaultTransport()): Promise<NotificationRecord[]> {
   const out: NotificationRecord[] = [];
   try {
-    const email = input.to ? input.to.email ?? null : process.env.GMAIL_NOTIFY_TO ?? null;
-    const zalo = input.to ? input.to.zaloChatId ?? null : process.env.ZALO_NOTIFY_CHAT_ID ?? null;
+    const email = input.to ? input.to.email ?? null : process.env.GMAIL_NOTIFY_TO ?? transport.defaultEmail ?? null;
+    const zalo = input.to ? input.to.zaloChatId ?? null : process.env.ZALO_NOTIFY_CHAT_ID ?? transport.defaultZaloChatId ?? null;
     if (!input.to || input.to.email !== undefined) {
       if (!transport.emailReady || !email) out.push(record('EMAIL', email, input, 'SKIPPED_NOT_CONFIGURED', null));
       else {
-        try { await transport.sendEmail(email, input.subject ?? 'Tax Referee — thông báo', input.text); out.push(record('EMAIL', email, input, 'SENT', null)); }
+        try { await transport.sendEmail(email, input.subject ?? 'Tax Referee — thông báo', input.text); out.push(record('EMAIL', email, input, transport.simulated ? 'SIMULATED' : 'SENT', null)); }
         catch (error) { out.push(record('EMAIL', email, input, 'FAILED', safeError(error))); }
       }
     }
     if (!input.to || input.to.zaloChatId !== undefined) {
       if (!transport.zaloReady || !zalo) out.push(record('ZALO', zalo, input, 'SKIPPED_NOT_CONFIGURED', null));
       else {
-        try { await transport.sendZalo(zalo, input.text); out.push(record('ZALO', zalo, input, 'SENT', null)); }
+        try { await transport.sendZalo(zalo, input.text); out.push(record('ZALO', zalo, input, transport.simulated ? 'SIMULATED' : 'SENT', null)); }
         catch (error) { out.push(record('ZALO', zalo, input, 'FAILED', safeError(error))); }
       }
     }
