@@ -350,13 +350,12 @@ export function parseXml(rawXml: string) {
     tag(xml, 'ThueSuat');
   const taxRate = parseTaxRateString(taxRateRaw);
 
-  const paymentMethodRaw = (tag(xml, 'HTTT') || tag(xml, 'PaymentMethod') || '')
+  const paymentMethodRaw = (tag(xml, 'HTTToan') || tag(xml, 'HTTT') || tag(xml, 'PaymentMethod') || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toUpperCase();
-  const paymentMethod = paymentMethodRaw.includes('TM') && !paymentMethodRaw.includes('CK')
-    ? 'CASH'
-    : paymentMethodRaw.includes('CK') || paymentMethodRaw.includes('CHUYEN KHOAN')
-    ? 'BANK_TRANSFER'
-    : undefined;
+  const saysCash = /\bTM\b|TIEN MAT|\bCASH\b/.test(paymentMethodRaw);
+  const saysBank = /\bCK\b|CHUYEN KHOAN|TRANSFER|NGAN HANG/.test(paymentMethodRaw);
+  // "TM/CK" (một trong hai) là chưa rõ: không đoán; hệ thống chỉ hỏi khi số tiền tới ngưỡng thanh toán.
+  const paymentMethod = saysCash && !saysBank ? 'CASH' : saysBank && !saysCash ? 'BANK_TRANSFER' : undefined;
 
   // 6. Trích xuất chi tiết dòng hàng <Item> hoặc <HHDVu> (IMP-08)
   const items: Array<{
