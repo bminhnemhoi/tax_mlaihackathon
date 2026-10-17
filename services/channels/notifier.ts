@@ -57,8 +57,9 @@ function record(channel: 'EMAIL' | 'ZALO', recipient: string | null, input: Noti
 export async function notify(input: NotifyInput, transport: NotifyTransport = defaultTransport()): Promise<NotificationRecord[]> {
   const out: NotificationRecord[] = [];
   try {
-    const email = input.to ? input.to.email ?? null : process.env.GMAIL_NOTIFY_TO ?? transport.defaultEmail ?? null;
-    const zalo = input.to ? input.to.zaloChatId ?? null : process.env.ZALO_NOTIFY_CHAT_ID ?? transport.defaultZaloChatId ?? null;
+    // Bộ gửi mô phỏng (phiên demo) KHÔNG đọc người nhận thật trong biến môi trường: địa chỉ của đội không lọt vào DB phiên của người lạ.
+    const email = input.to ? input.to.email ?? null : transport.simulated ? transport.defaultEmail ?? null : process.env.GMAIL_NOTIFY_TO ?? null;
+    const zalo = input.to ? input.to.zaloChatId ?? null : transport.simulated ? transport.defaultZaloChatId ?? null : process.env.ZALO_NOTIFY_CHAT_ID ?? null;
     if (!input.to || input.to.email !== undefined) {
       if (!transport.emailReady || !email) out.push(record('EMAIL', email, input, 'SKIPPED_NOT_CONFIGURED', null));
       else {
@@ -77,7 +78,8 @@ export async function notify(input: NotifyInput, transport: NotifyTransport = de
   return out;
 }
 
-export function listNotifications(limit = 50): Array<{ id: string; channel: string; recipient: string | null; kind: string; body: string; status: string; createdAt: string }> {
+export function listNotifications(limit = 50, conceal = false): Array<{ id: string; channel: string; recipient: string | null; kind: string; body: string; status: string; createdAt: string }> {
+  const hide = (value: string | null) => !conceal || !value ? value : value.lastIndexOf('@') > 0 ? `***${value.slice(value.lastIndexOf('@'))}` : `${value.slice(0, 3)}***`;
   return (getDatabase().prepare('SELECT id,channel,recipient,kind,body,status,created_at FROM outbound_notifications ORDER BY created_at DESC LIMIT ?').all(Math.min(Math.max(limit, 1), 200)) as Array<Record<string, unknown>>)
-    .map(r => ({ id: String(r.id), channel: String(r.channel), recipient: (r.recipient as string | null) ?? null, kind: String(r.kind), body: String(r.body), status: String(r.status), createdAt: String(r.created_at) }));
+    .map(r => ({ id: String(r.id), channel: String(r.channel), recipient: hide((r.recipient as string | null) ?? null), kind: String(r.kind), body: String(r.body), status: String(r.status), createdAt: String(r.created_at) }));
 }

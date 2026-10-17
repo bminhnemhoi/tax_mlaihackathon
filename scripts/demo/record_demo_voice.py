@@ -148,6 +148,9 @@ def main() -> None:
 
         step('dashboard', lambda: (page.goto(args.base + '/workspace/dashboard'), page.wait_for_timeout(1200)))
         step('history', lambda: (page.goto(args.base + '/workspace/history'), page.wait_for_timeout(800)))
+        # Chỉ Kế toán viên (người nhập) lấy thư; Kế toán trưởng/CFO xác nhận người gửi và duyệt.
+        page.select_option('#workspace-role', 'ACCOUNTANT')
+        page.wait_for_timeout(1200)
         page.goto(args.base + '/workspace/channels')
         page.wait_for_selector('text=Mô phỏng · dữ liệu mẫu', timeout=60_000)
 

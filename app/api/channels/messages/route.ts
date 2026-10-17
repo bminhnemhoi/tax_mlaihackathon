@@ -9,8 +9,9 @@ export const runtime = 'nodejs';
 
 async function handleGET(request: NextRequest) {
   try {
-    requireRequestUser(request);
-    return NextResponse.json({ messages: listChannelMessages(100) }, { headers: noStore });
+    const user = requireRequestUser(request);
+    // Kế toán viên thấy tên nhân viên đã nhận diện; địa chỉ email/Zalo id đầy đủ chỉ Kế toán trưởng/CFO thấy (như danh bạ).
+    return NextResponse.json({ messages: listChannelMessages(100, user) }, { headers: noStore });
   } catch (error) { return channelFail(error, 'Không tải được danh sách file đã nhận.'); }
 }
 export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }

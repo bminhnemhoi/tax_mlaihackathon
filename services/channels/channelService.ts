@@ -13,7 +13,7 @@ import { appendAuditEvent } from '@/lib/server/audit';
 import type { AppUser } from '@/lib/server/auth';
 import { assertValidXml, parseXml, sanitizeInvoice } from '@/lib/documentParser';
 import { evaluateWorkflow, WorkflowError } from '@/services/workflowService';
-import { attachToBatch, createBatch } from '@/services/batchService';
+import { attachToBatch, createBatch, vnStamp } from '@/services/batchService';
 import { getStaff, identifySender, seedStaffDirectory, type SenderIdentity, type StaffMember } from '@/services/staffDirectory';
 import { createImapGmailClient, gmailConfigured, type GmailClient } from './gmailChannel';
 import { createHttpZaloClient, isAllowedZaloFileUrl, zaloConfigured, type ZaloClient } from './zaloChannel';
@@ -25,8 +25,37 @@ export type ChannelMessageStatus = 'PROCESSED' | 'QUEUED' | 'NEEDS_SENDER_REVIEW
 export const ALLOWED_EXTENSIONS = ['.xml', '.pdf', '.png', '.jpg', '.jpeg', '.webp'];
 export const MAX_FILE_BYTES = 15 * 1024 * 1024;
 const PULL_LIMIT = 20;
-const STAFF_ROLES = ['ACCOUNTANT', 'CHIEF_ACCOUNTANT', 'CFO'];
+/** Trần mỗi lượt lấy: người ngoài công ty không làm cạn quota chứng từ chung bằng một loạt thư nhiều đính kèm. */
+export const MAX_ATTACHMENTS_PER_MAIL = 5;
+export const MAX_FILES_PER_PULL = 50;
+export const MAX_UNVERIFIED_FILES_PER_PULL = 10;
+/** Người lấy thư là người NHẬP hồ sơ; Kế toán trưởng/CFO giữ quyền duyệt (bất kiêm nhiệm). */
+const PULL_ROLES = ['ACCOUNTANT'];
 const MANAGER_ROLES = ['CHIEF_ACCOUNTANT', 'CFO'];
+const QUEUED_NOTE = 'Đã lưu ảnh/PDF gốc — bản này chưa tự đọc ảnh nhận qua kênh; tải ảnh ở màn Lô hóa đơn hoặc Tiếp nhận để đọc.';
+
+/** Phần vượt trần của một lượt lấy: chỉ ghi siêu dữ liệu, không lưu nội dung file. */
+function limitReason(accepted: { files: number; unverified: number }, verified: boolean, indexInMail?: number): string | undefined {
+  if (indexInMail !== undefined && indexInMail > MAX_ATTACHMENTS_PER_MAIL) return `Thư có hơn ${MAX_ATTACHMENTS_PER_MAIL} file đính kèm — chỉ nhận ${MAX_ATTACHMENTS_PER_MAIL} file đầu.`;
+  if (accepted.files >= MAX_FILES_PER_PULL) return `Quá ${MAX_FILES_PER_PULL} file trong một lượt lấy — không nhận, gửi lại sau.`;
+  if (!verified && accepted.unverified >= MAX_UNVERIFIED_FILES_PER_PULL) return `Quá ${MAX_UNVERIFIED_FILES_PER_PULL} file từ người gửi chưa xác thực trong một lượt — không nhận.`;
+  accepted.files += 1;
+  if (!verified) accepted.unverified += 1;
+  return undefined;
+}
+
+function userById(id: string | null | undefined): AppUser | null {
+  if (!id) return null;
+  const row = getDatabase().prepare('SELECT id, email, display_name, role FROM users WHERE id=?').get(id) as { id: string; email: string; display_name: string; role: AppUser['role'] } | undefined;
+  return row ? { id: row.id, email: row.email, displayName: row.display_name, role: row.role } : null;
+}
+
+/** Che địa chỉ liên hệ (chỉ giữ tên miền email) cho người không có quyền xem danh bạ đầy đủ. */
+export function maskContact(value: string | null): string | null {
+  if (!value) return value;
+  const at = value.lastIndexOf('@');
+  return at > 0 ? `***${value.slice(at)}` : `${value.slice(0, 3)}***`;
+}
 
 export interface InboundFile {
   externalId: string; senderAddress: string; senderName?: string; identity: SenderIdentity;
@@ -90,9 +119,9 @@ async function ingestFile(user: AppUser, channel: ChannelName, file: InboundFile
   let status: ChannelMessageStatus; let note = file.identity.reason; let storagePath: string | null = null;
   let batchId: string | null = null; let invoiceId: string | null = null;
   // Ghi dòng trước (khóa UNIQUE chặn hai lượt kéo song song xử lý cùng một file).
-  db.prepare(`INSERT INTO channel_messages (id, channel, external_id, sender_address, sender_name, sender_staff_id, sender_verified, subject, received_at, file_name, mime, size, sha256, storage_path, status, note, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'NEW', NULL, ?)`).run(id, channel, file.externalId.slice(0, 500), file.senderAddress.slice(0, 200), file.senderName?.slice(0, 200) ?? null,
-    staff?.id ?? null, staff ? 1 : 0, file.subject?.slice(0, 300) ?? null, file.receivedAt ?? jsonNow(), file.fileName.slice(0, 200), file.mime.slice(0, 100), file.content.byteLength, hash, jsonNow());
+  db.prepare(`INSERT INTO channel_messages (id, channel, external_id, sender_address, sender_name, sender_staff_id, sender_verified, subject, received_at, file_name, mime, size, sha256, storage_path, status, note, created_at, pulled_by_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'NEW', NULL, ?, ?)`).run(id, channel, file.externalId.slice(0, 500), file.senderAddress.slice(0, 200), file.senderName?.slice(0, 200) ?? null,
+    staff?.id ?? null, staff ? 1 : 0, file.subject?.slice(0, 300) ?? null, file.receivedAt ?? jsonNow(), file.fileName.slice(0, 200), file.mime.slice(0, 100), file.content.byteLength, hash, jsonNow(), user.id);
   try {
     if (file.rejectReason) { status = 'REJECTED'; note = file.rejectReason; }
     else if (file.content.byteLength > MAX_FILE_BYTES) { status = 'REJECTED'; note = 'File lớn hơn 15 MB — không nhận.'; }
@@ -100,13 +129,20 @@ async function ingestFile(user: AppUser, channel: ChannelName, file: InboundFile
       const artifact = storeArtifact(file.fileName, file.mime, file.content, hash);
       storagePath = artifact.storagePath;
       if (!staff) status = 'NEEDS_SENDER_REVIEW';
-      else if (sourceTypeOf(file.fileName) !== 'XML') { status = 'QUEUED'; note = 'PDF/ảnh: chờ đọc trong màn hình Lô hóa đơn.'; }
+      else if (sourceTypeOf(file.fileName) !== 'XML') { status = 'QUEUED'; note = QUEUED_NOTE; }
       else {
         const outcome = await evaluateXml(user, artifact, hash, file.content);
-        invoiceId = outcome.invoiceId; batchId = ensureBatch();
-        attachToBatch(user, batchId, { invoiceId, fileName: file.fileName, fileSha256: hash, sourceRef: `${channel}:${file.externalId}`.slice(0, 200), submitterStaffId: staff.id });
-        status = 'PROCESSED'; note = `Máy đã kiểm: ${outcome.workflowStatus}`;
-        result.outcomes.push({ ...outcome, staffId: staff.id, senderAddress: file.senderAddress, fileName: file.fileName });
+        invoiceId = outcome.invoiceId;
+        status = 'PROCESSED';
+        // Hóa đơn đã nằm trong một lô (gửi lại thư cũ, hai thư cùng file) ⇒ đánh dấu trùng, không tạo lô rỗng, không báo hai lần.
+        const already = db.prepare('SELECT batch_id FROM batch_items WHERE invoice_id=?').get(invoiceId) as { batch_id: string } | undefined;
+        if (already) { batchId = already.batch_id; note = `Trùng: hóa đơn đã nằm trong lô ${already.batch_id}.`; result.duplicates++; }
+        else {
+          batchId = ensureBatch();
+          const attached = attachToBatch(user, batchId, { invoiceId, fileName: file.fileName, fileSha256: hash, sourceRef: `${channel}:${file.externalId}`.slice(0, 200), submitterStaffId: staff.id });
+          if (attached.duplicate) { note = 'Trùng file đã nhận trong lô này.'; result.duplicates++; }
+          else { note = `Máy đã kiểm: ${outcome.workflowStatus}`; result.outcomes.push({ ...outcome, staffId: staff.id, senderAddress: file.senderAddress, fileName: file.fileName }); }
+        }
       }
     }
   } catch (error) {
@@ -114,6 +150,9 @@ async function ingestFile(user: AppUser, channel: ChannelName, file: InboundFile
     note = (error instanceof WorkflowError || error instanceof Error ? error.message : 'Không đọc được file').slice(0, 300);
   }
   db.prepare('UPDATE channel_messages SET status=?, note=?, storage_path=?, batch_id=?, invoice_id=? WHERE id=?').run(status, note?.slice(0, 300) ?? null, storagePath, batchId, invoiceId, id);
+  // Dấu vết người gửi trong nhật ký chống sửa (bảng channel_messages sửa được): mã nhân viên và đã xác thực hay chưa — không ghi địa chỉ.
+  appendAuditEvent({ eventType: 'CHANNEL_FILE_INGESTED', entityId: invoiceId ?? `channel-message:${id}`, actorId: user.id,
+    payload: { channel, status, senderStaffId: staff?.id ?? null, senderVerified: Boolean(staff), fileSha256: hash, batchId, actorRole: user.role } });
   result.counts[status]++;
   result.files++;
 }
@@ -124,7 +163,7 @@ function requireRole(user: AppUser, roles: string[], message: string): void {
 
 /** Kéo hóa đơn từ một kênh: một lô cho mỗi lượt kéo (chỉ tạo khi có hóa đơn được xử lý). */
 export async function pullChannel(user: AppUser, channel: ChannelName, injected: ChannelDeps = {}): Promise<PullResult> {
-  requireRole(user, STAFF_ROLES, 'Chỉ nhân viên kế toán được lấy hóa đơn từ kênh.');
+  requireRole(user, PULL_ROLES, 'Chỉ Kế toán viên (người nhập liệu) lấy hóa đơn từ kênh — Kế toán trưởng/CFO là người duyệt.');
   // Hộp thư thật của đội không được kéo vào phiên demo của người lạ: phiên demo dùng kênh MÔ PHỎNG (dữ liệu mẫu, không gọi mạng).
   // Demo kênh thật trên máy của đội: đặt TAX_REFEREE_ALLOW_REAL_CHANNELS_IN_DEMO=1.
   const simulated = !injected.gmail && !injected.zalo && demoChannelsActive();
@@ -132,7 +171,8 @@ export async function pullChannel(user: AppUser, channel: ChannelName, injected:
   if (simulated) prepareDemoDirectory();
   const deps: ChannelDeps = simulated ? { gmail: demoGmailClient(), zalo: demoZaloClient(), notifier: demoNotifier() } : injected;
   const result: PullResult = { channel, messages: 0, files: 0, duplicates: 0, batchId: null, counts: emptyCounts(), outcomes: [], simulated };
-  const ensureBatch = () => result.batchId ??= createBatch(user, { label: `Lô ${channel === 'GMAIL' ? 'Gmail' : 'Zalo'}${simulated ? ' (mô phỏng)' : ''} ${new Date().toLocaleString('vi-VN')}`, source: channel }).id;
+  const ensureBatch = () => result.batchId ??= createBatch(user, { label: `Lô ${channel === 'GMAIL' ? 'Gmail' : 'Zalo'}${simulated ? ' (mô phỏng)' : ''} ${vnStamp()}`, source: channel }).id;
+  const accepted = { files: 0, unverified: 0 };
   const zaloReplies = new Map<string, number>();
   if (channel === 'ZALO') {
     if (!deps.zalo && !zaloConfigured()) throw new WorkflowError('Zalo chưa cấu hình (thiếu ZALO_BOT_TOKEN).', 409);
@@ -144,7 +184,9 @@ export async function pullChannel(user: AppUser, channel: ChannelName, injected:
       const base = { externalId: update.messageId, senderAddress: update.fromId, senderName: update.fromName, identity, subject: update.caption, receivedAt: update.date };
       if (getDatabase().prepare('SELECT 1 FROM channel_messages WHERE channel=? AND external_id=?').get(channel, update.messageId)) { result.duplicates++; continue; }
       let file: InboundFile;
+      const overLimit = isAllowedZaloFileUrl(update.photoUrl) ? limitReason(accepted, Boolean(identity.verified && identity.staff)) : undefined;
       if (!isAllowedZaloFileUrl(update.photoUrl)) file = { ...base, fileName: `zalo-${update.messageId}.jpg`, mime: 'image/jpeg', content: Buffer.alloc(0), rejectReason: 'Liên kết ảnh không thuộc máy chủ Zalo — không tải (chống SSRF).' };
+      else if (overLimit) file = { ...base, fileName: `zalo-${update.messageId}.jpg`, mime: 'image/jpeg', content: Buffer.alloc(0), rejectReason: overLimit };
       else {
         try {
           const downloaded = await client.download(update.photoUrl!);
@@ -167,11 +209,15 @@ export async function pullChannel(user: AppUser, channel: ChannelName, injected:
     const seen: number[] = [];
     for (const mail of mails) {
       const identity = identifySender({ email: mail.from, authenticationResults: mail.authenticationResults });
+      let inMail = 0;
       for (const [index, attachment] of mail.attachments.entries()) {
         if (!isAllowedFile(attachment.fileName)) continue;
+        inMail += 1;
+        const overLimit = limitReason(accepted, Boolean(identity.verified && identity.staff), inMail);
         await ingestFile(user, channel, {
           externalId: `${mail.messageId}#${index}`, senderAddress: mail.from, senderName: mail.fromName, identity,
-          subject: mail.subject, receivedAt: mail.receivedAt, fileName: attachment.fileName, mime: attachment.mime, content: attachment.content,
+          subject: mail.subject, receivedAt: mail.receivedAt, fileName: attachment.fileName, mime: attachment.mime,
+          content: overLimit ? Buffer.alloc(0) : attachment.content, rejectReason: overLimit,
         }, ensureBatch, result);
       }
       seen.push(mail.uid);
@@ -207,7 +253,8 @@ export interface ChannelMessageView {
   size: number | null; status: string; batchId: string | null; invoiceId: string | null; note: string | null;
 }
 
-export function listChannelMessages(limit = 100): ChannelMessageView[] {
+export function listChannelMessages(limit = 100, viewer?: AppUser | null): ChannelMessageView[] {
+  const conceal = viewer?.role === 'ACCOUNTANT';
   const db = getDatabase();
   const rows = db.prepare(`SELECT m.*, s.full_name staff_name FROM channel_messages m LEFT JOIN staff_directory s ON s.id=m.sender_staff_id ORDER BY m.created_at DESC LIMIT ?`).all(Math.min(Math.max(limit, 1), 200)) as Array<Record<string, unknown>>;
   return rows.map(r => {
@@ -216,7 +263,7 @@ export function listChannelMessages(limit = 100): ChannelMessageView[] {
     const matchesStaff = !verified && r.channel === 'GMAIL' && address
       ? Boolean(db.prepare('SELECT 1 FROM staff_directory WHERE lower(email)=? AND active=1').get(address.toLowerCase())) : false;
     return {
-      id: String(r.id), channel: r.channel as ChannelName, senderAddress: address, senderName: (r.sender_name as string | null) ?? null,
+      id: String(r.id), channel: r.channel as ChannelName, senderAddress: conceal ? maskContact(address) : address, senderName: (r.sender_name as string | null) ?? null,
       senderStaffId: (r.sender_staff_id as string | null) ?? null, senderStaffName: (r.staff_name as string | null) ?? null, senderVerified: verified,
       senderKind: verified ? 'VERIFIED' : matchesStaff ? 'SPOOF_SUSPECT' : 'UNKNOWN', subject: (r.subject as string | null) ?? null,
       receivedAt: String(r.received_at), fileName: (r.file_name as string | null) ?? null, size: (r.size as number | null) ?? null, status: String(r.status),
@@ -252,7 +299,10 @@ export function addStaff(user: AppUser, input: { fullName: string; department?: 
   return getStaff(id)!;
 }
 
-/** KTT/CFO xác nhận người gửi lạ là một nhân viên, rồi xử lý file đó (XML) như hồ sơ nhân viên đã xác thực. */
+/**
+ * KTT/CFO xác nhận người gửi lạ là một nhân viên, rồi xử lý file đó (XML) như hồ sơ nhân viên đã xác thực. Hồ sơ và lô được tạo dưới tên
+ * Kế toán viên đã lấy thư (người nhập), không phải người xác nhận — người xác nhận vẫn giữ quyền trả lời câu hỏi và chốt lô.
+ */
 export async function assignSender(user: AppUser, messageId: string, staffId: string): Promise<ChannelMessageView> {
   requireRole(user, MANAGER_ROLES, 'Chỉ Kế toán trưởng hoặc CFO được xác nhận người gửi.');
   const db = getDatabase();
@@ -266,19 +316,25 @@ export async function assignSender(user: AppUser, messageId: string, staffId: st
   const content = fs.readFileSync(storagePath);
   const hash = String(message.sha256);
   const fileName = String(message.file_name ?? 'tep');
+  const entrant = userById(message.pulled_by_user_id as string | null) ?? user;
   let status: ChannelMessageStatus = 'QUEUED'; let note = `Người gửi do ${user.role} xác nhận là ${staff.fullName}.`;
   let batchId: string | null = null; let invoiceId: string | null = null;
   if (sourceTypeOf(fileName) === 'XML') {
     try {
       const artifact = storeArtifact(fileName, String(message.mime ?? ''), content, hash);
-      const outcome = await evaluateXml(user, artifact, hash, content);
+      const outcome = await evaluateXml(entrant, artifact, hash, content);
       invoiceId = outcome.invoiceId;
-      batchId = createBatch(user, { label: `Lô ${message.channel === 'ZALO' ? 'Zalo' : 'Gmail'} — xác nhận người gửi`, source: message.channel as ChannelName }).id;
-      attachToBatch(user, batchId, { invoiceId, fileName, fileSha256: hash, sourceRef: `${message.channel}:${message.external_id}`.slice(0, 200), submitterStaffId: staff.id });
-      status = 'PROCESSED'; note += ` Máy đã kiểm: ${outcome.workflowStatus}`;
+      const already = db.prepare('SELECT batch_id FROM batch_items WHERE invoice_id=?').get(invoiceId) as { batch_id: string } | undefined;
+      if (already) { batchId = already.batch_id; note += ` Trùng: hóa đơn đã nằm trong lô ${already.batch_id}.`; }
+      else {
+        batchId = createBatch(entrant, { label: `Lô ${message.channel === 'ZALO' ? 'Zalo' : 'Gmail'} — xác nhận người gửi ${vnStamp()}`, source: message.channel as ChannelName }).id;
+        attachToBatch(entrant, batchId, { invoiceId, fileName, fileSha256: hash, sourceRef: `${message.channel}:${message.external_id}`.slice(0, 200), submitterStaffId: staff.id });
+        note += ` Máy đã kiểm: ${outcome.workflowStatus}`;
+      }
+      status = 'PROCESSED';
     } catch (error) { status = 'ERROR'; note = (error instanceof Error ? error.message : 'Không đọc được file').slice(0, 300); }
-  }
+  } else note += ` ${QUEUED_NOTE}`;
   db.prepare('UPDATE channel_messages SET sender_staff_id=?, status=?, note=?, batch_id=?, invoice_id=? WHERE id=?').run(staff.id, status, note.slice(0, 300), batchId, invoiceId, messageId);
-  appendAuditEvent({ eventType: 'CHANNEL_SENDER_ASSIGNED', entityId: `channel-message:${messageId}`, actorId: user.id, payload: { staffId: staff.id, status, actorRole: user.role } });
+  appendAuditEvent({ eventType: 'CHANNEL_SENDER_ASSIGNED', entityId: invoiceId ?? `channel-message:${messageId}`, actorId: user.id, payload: { staffId: staff.id, status, actorRole: user.role, processedAs: entrant.id, batchId } });
   return listChannelMessages(200).find(m => m.id === messageId)!;
 }

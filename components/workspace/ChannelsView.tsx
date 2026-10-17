@@ -17,9 +17,9 @@ type Notice = { id: string; channel: string; recipient: string | null; kind: str
 
 const STATUS_LABEL: Record<string, { text: string; variant: 'success' | 'warning' | 'info' | 'destructive' | 'secondary' }> = {
   PROCESSED: { text: 'Máy đã kiểm, đã vào lô', variant: 'success' },
-  QUEUED: { text: 'PDF/ảnh — chờ đọc ở Lô hóa đơn', variant: 'info' },
+  QUEUED: { text: 'Ảnh/PDF đã lưu — chưa tự đọc', variant: 'info' },
   NEEDS_SENDER_REVIEW: { text: 'Chờ xác nhận người gửi', variant: 'warning' },
-  REJECTED: { text: 'Không nhận (quá 15 MB)', variant: 'destructive' },
+  REJECTED: { text: 'Không nhận (xem lý do)', variant: 'destructive' },
   ERROR: { text: 'Không đọc được file', variant: 'destructive' },
   NEW: { text: 'Đang xử lý', variant: 'secondary' },
 };
@@ -79,11 +79,12 @@ export function ChannelsView({ user }: { user: WorkspaceViewUser }): ReactElemen
   useEffect(() => {
     if (!autoPoll) return;
     const timer = window.setInterval(() => {
+      if (user.role !== 'ACCOUNTANT') return;
       if (channels?.GMAIL.configured) void pull('GMAIL', true);
       if (channels?.ZALO.configured) void pull('ZALO', true);
     }, 60_000);
     return () => window.clearInterval(timer);
-  }, [autoPoll, channels, pull]);
+  }, [autoPoll, channels, pull, user.role]);
 
   async function assign(id: string) {
     const staffId = assignTo[id];
@@ -115,7 +116,8 @@ export function ChannelsView({ user }: { user: WorkspaceViewUser }): ReactElemen
               </div>
               <p className="mt-1 text-xs text-muted-foreground">Lần lấy gần nhất: {time(state?.lastPullAt ?? null)}</p>
               {state?.simulated ? <p className="mt-1 text-xs text-muted-foreground">Phiên demo: {channel === 'GMAIL' ? 'hộp thư' : 'bot Zalo'} giả với hóa đơn mẫu, chạy đúng quy trình nhận diện người gửi và kiểm như kênh thật; không gọi mạng, không gửi tin thật.</p> : null}
-              <Button className="mt-3 w-full sm:w-auto" disabled={!(state?.configured || state?.simulated) || busy !== null} onClick={() => void pull(channel)}>
+              {user.role !== 'ACCOUNTANT' && <p className="mt-1 text-xs text-muted-foreground">Kế toán viên (người nhập) lấy thư; Kế toán trưởng/CFO xác nhận người gửi và duyệt.</p>}
+              <Button className="mt-3 w-full sm:w-auto" disabled={user.role !== 'ACCOUNTANT' || !(state?.configured || state?.simulated) || busy !== null} onClick={() => void pull(channel)}>
                 {busy === channel ? 'Đang lấy…' : `Lấy hóa đơn từ ${CHANNEL_NAME[channel]}`}
               </Button>
             </div>

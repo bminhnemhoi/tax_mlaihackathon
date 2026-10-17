@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { getDatabase, runIsolated } from '../../lib/server/db';
 import { switchRole } from '../../lib/server/auth';
-import { listChannelMessages, pullChannel } from '../../services/channels/channelService';
+import { assignSender, listChannelMessages, MAX_ATTACHMENTS_PER_MAIL, MAX_UNVERIFIED_FILES_PER_PULL, pullChannel } from '../../services/channels/channelService';
 import { topAuthenticationResults, type GmailClient, type InboundMail } from '../../services/channels/gmailChannel';
 import { listNotifications, notify } from '../../services/channels/notifier';
 import { isAllowedZaloFileUrl, parseZaloUpdates, type ZaloClient } from '../../services/channels/zaloChannel';
@@ -95,7 +95,7 @@ test('Thông báo: thiếu cấu hình ⇒ ghi SKIPPED_NOT_CONFIGURED, kênh g�
 
 test('Zalo: ảnh từ máy chủ ngoài danh sách cho phép bị từ chối, không tải; ảnh của nhân viên đã đăng ký vào hàng chờ', async () => {
   await runIsolated(async () => {
-    const user = switchRole('CHIEF_ACCOUNTANT')!.user;
+    const user = switchRole('ACCOUNTANT')!.user;
     seedStaffDirectory(); getDatabase().prepare("UPDATE staff_directory SET zalo_user_id='zalo-kd-1' WHERE id='STAFF-KD'").run();
     const downloaded: string[] = [];
     const zalo: ZaloClient = {
@@ -152,3 +152,58 @@ test('chống mạo danh bằng local-part (example.com@evil.net) và kênh th�
   });
 });
 
+test('chống mạo danh: local-part trong ngoặc kép chứa "smtp.mailfrom=…" hoặc ";dkim=pass…" không qua được — chỉ đọc thuộc tính ngoài comment', () => {
+  assert.equal(emailAuthenticated('duclong.ktt@example.com', 'mx.google.com; spf=pass (google.com: domain of "x smtp.mailfrom=duclong.ktt@example.com y"@evil.net designates 203.0.113.5 as permitted sender) smtp.mailfrom="x smtp.mailfrom=duclong.ktt@example.com y"@evil.net'), false);
+  assert.equal(emailAuthenticated('duclong.ktt@example.com', 'mx.google.com; spf=pass smtp.mailfrom="a;dkim=pass header.d=example.com b"@evil.net'), false);
+  assert.equal(emailAuthenticated('duclong.ktt@example.com', 'mx.google.com; dkim=pass (good (nested) comment) header.i=@example.com header.s=s1'), true);
+});
+
+test('kênh: chỉ Kế toán viên lấy thư; giới hạn file mỗi thư và file của người lạ mỗi lượt; file trùng trong cùng lượt tính một lần; nhật ký ghi người gửi', async () => {
+  await runIsolated(async () => {
+    const ktt = switchRole('CHIEF_ACCOUNTANT')!.user;
+    await assert.rejects(pullChannel(ktt, 'GMAIL', { gmail: fakeGmail([]) }), /Chỉ Kế toán viên/);
+    const user = switchRole('ACCOUNTANT')!.user;
+    const stranger = (uid: number, files: number): InboundMail => ({ uid, messageId: `<la-${uid}@evil.example.net>`, from: 'la@evil.example.net', authenticationResults: 'mx.google.com; spf=pass smtp.mailfrom=la@evil.example.net',
+      attachments: Array.from({ length: files }, (_, k) => ({ fileName: `la-${uid}-${k}.xml`, mime: 'application/xml', content: Buffer.from(`<x>${uid}-${k}</x>`) })) });
+    const flood = await pullChannel(user, 'GMAIL', { gmail: fakeGmail([stranger(1, 8), stranger(2, 5), stranger(3, 5)]) });
+    assert.equal(flood.counts.NEEDS_SENDER_REVIEW, MAX_UNVERIFIED_FILES_PER_PULL);
+    assert.equal(flood.counts.REJECTED, (8 - MAX_ATTACHMENTS_PER_MAIL) + (MAX_ATTACHMENTS_PER_MAIL * 3 - MAX_UNVERIFIED_FILES_PER_PULL));
+    assert.ok((getDatabase().prepare('SELECT COUNT(*) n FROM document_artifacts').get() as { n: number }).n <= MAX_UNVERIFIED_FILES_PER_PULL, 'phần vượt trần không được lưu nội dung');
+    const twice = await pullChannel(user, 'GMAIL', { gmail: fakeGmail([mail({ uid: 21, messageId: '<a@example.com>' }), mail({ uid: 22, messageId: '<b@example.com>' })]) });
+    assert.equal(twice.outcomes.length, 1, 'hai thư cùng file chỉ báo một hóa đơn');
+    assert.equal(twice.duplicates, 1);
+    assert.equal((getDatabase().prepare('SELECT COUNT(*) n FROM batch_items WHERE batch_id=?').get(twice.batchId) as { n: number }).n, 1);
+    const ingested = getDatabase().prepare("SELECT payload_json FROM audit_events WHERE event_type='CHANNEL_FILE_INGESTED' AND payload_json LIKE '%STAFF-KD%'").all();
+    assert.ok(ingested.length >= 1, 'nhật ký chống sửa ghi mã nhân viên gửi');
+    // Kế toán viên chỉ thấy địa chỉ đã che; KTT thấy đủ.
+    assert.ok(listChannelMessages(100, user).every(m => !m.senderAddress || !/^[^*].*@/.test(m.senderAddress)));
+    assert.ok(listChannelMessages(100, ktt).some(m => m.senderAddress === 'minhanh.kd@example.com'));
+  });
+});
+
+test('xác nhận người gửi: file được xử lý dưới tên Kế toán viên đã lấy thư — người xác nhận (CFO) vẫn giữ quyền duyệt, không tự khóa mình', async () => {
+  await runIsolated(async () => {
+    const acc = switchRole('ACCOUNTANT')!.user;
+    await pullChannel(acc, 'GMAIL', { gmail: fakeGmail([mail({ from: 'ncc-moi@example.org', authenticationResults: 'mx.google.com; spf=pass smtp.mailfrom=ncc-moi@example.org' })]) });
+    const waiting = listChannelMessages(100).find(m => m.status === 'NEEDS_SENDER_REVIEW')!;
+    const cfo = switchRole('CFO')!.user;
+    const done = await assignSender(cfo, waiting.id, 'STAFF-KD');
+    assert.equal(done.status, 'PROCESSED');
+    const row = getDatabase().prepare('SELECT created_by_user_id FROM invoices WHERE id=?').get(done.invoiceId) as { created_by_user_id: string };
+    assert.equal(row.created_by_user_id, acc.id, 'người nhập là Kế toán viên đã lấy thư');
+    assert.equal((getDatabase().prepare('SELECT created_by_user_id c FROM batches WHERE id=?').get(done.batchId) as { c: string }).c, acc.id);
+  });
+});
+
+test('mô phỏng: bộ gửi tin của phiên demo không bao giờ ghi người nhận thật trong biến môi trường', async () => {
+  const saved = process.env.GMAIL_NOTIFY_TO;
+  process.env.GMAIL_NOTIFY_TO = 'that-cua-doi@congty.vn';
+  try {
+    await runIsolated(async () => {
+      const user = switchRole('ACCOUNTANT')!.user;
+      await pullChannel(user, 'GMAIL');
+      assert.ok(listNotifications().length > 0);
+      assert.ok(listNotifications().every(n => n.recipient !== 'that-cua-doi@congty.vn'), JSON.stringify(listNotifications().map(n => n.recipient)));
+    });
+  } finally { if (saved === undefined) delete process.env.GMAIL_NOTIFY_TO; else process.env.GMAIL_NOTIFY_TO = saved; }
+});

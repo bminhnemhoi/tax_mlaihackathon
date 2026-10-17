@@ -9,8 +9,8 @@ export const runtime = 'nodejs';
 
 async function handleGET(request: NextRequest) {
   try {
-    requireRequestUser(request);
-    return NextResponse.json({ notifications: listNotifications(50) }, { headers: noStore });
+    const user = requireRequestUser(request);
+    return NextResponse.json({ notifications: listNotifications(50, user.role === 'ACCOUNTANT') }, { headers: noStore });
   } catch (error) { return channelFail(error, 'Không tải được danh sách tin đã gửi.'); }
 }
 export async function GET(...args: Parameters<typeof handleGET>) { return withRequestDatabase(args[0], () => handleGET(...args)); }

@@ -87,7 +87,11 @@ export function emailAuthenticated(fromAddress: string, authenticationResults: s
     const host = value.replace(/[<>"']/g, '').split('@').pop()!.trim().replace(/\.$/, '');
     return host === domain || host.endsWith(`.${domain}`);
   };
-  for (const clause of authenticationResults.toLowerCase().split(';').map(c => c.trim())) {
+  // RFC 8601: bỏ quoted-string (local-part có ngoặc kép do người gửi đặt, có thể chứa "smtp.mailfrom=…" hay ';' giả) rồi bỏ
+  // comment "(…)" lồng nhau TRƯỚC khi tách mệnh đề — chỉ đọc thuộc tính nằm ngoài comment. Địa chỉ có quoted-string thành "q"@miền-thật.
+  let header = authenticationResults.toLowerCase().replace(/"(?:[^"\\]|\\.)*"/g, '"q"');
+  for (let previous = ''; previous !== header;) { previous = header; header = header.replace(/\((?:[^()\\]|\\.)*\)/g, ' '); }
+  for (const clause of header.split(';').map(c => c.trim())) {
     const prop = (name: string) => new RegExp(`(?:^|\\s)${name.replace('.', '\\.')}=([^\\s;]+)`).exec(clause)?.[1];
     if (/^dkim=pass\b/.test(clause) && owns(prop('header.d') ?? prop('header.i'))) return true;
     if (/^spf=pass\b/.test(clause) && owns(prop('smtp.mailfrom'))) return true;
