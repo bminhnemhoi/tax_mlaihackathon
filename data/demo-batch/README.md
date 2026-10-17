@@ -16,5 +16,8 @@ Kết quả đã chạy qua đúng đường xử lý lô (đọc XML → làm s
 | Không đọc được | 1 | `not-an-invoice.xml` (báo giá, không làm hỏng cả lô) |
 | Trùng | 1 | `24-trung-van-phong-pham.xml` giống hệt `01`: lô tự nhận ra theo mã băm, không tạo bản trùng |
 
+> Trên giao diện Lô hóa đơn, bước đọc chứng từ còn tra cứu danh tính bên bán; với MST mẫu không có trong sổ, một vài tờ
+> thường quy có thể bị hỏi thêm để xác minh (lần quay demo 17/10: 8 tờ máy đề xuất duyệt thay vì 10). Hành vi này là có chủ ý: không chắc thì hỏi.
+
 `manifest.json` ghi kịch bản, kết quả kỳ vọng và người gửi mẫu (email `@example.com`, tên miền dự phòng) của từng file —
 dùng khi demo kênh Gmail: mỗi thành viên gửi file của mình từ email đã khai trong danh bạ người gửi.

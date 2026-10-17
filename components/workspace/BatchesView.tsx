@@ -67,6 +67,8 @@ export function BatchesView({ user }: { user: WorkspaceViewUser }): ReactElement
           const data = await res.json() as { error?: string; invoice?: Record<string, unknown>; documentType?: string; artifactId?: string; sourceHash?: string; uncertainFields?: string[] };
           if (!res.ok || data.documentType === 'NOT_INVOICE' || !data.invoice) throw new Error(data.error || 'Không phải hóa đơn hoặc không đọc được');
           const invoice = Object.fromEntries(Object.entries(data.invoice).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+          // File đọc được nhưng không có số hóa đơn lẫn số tiền (VD báo giá) thì không phải hóa đơn: không đưa vào máy kiểm.
+          if (!invoice.invoiceNumber && !invoice.totalAmount) throw new Error('Không phải hóa đơn (không có số hóa đơn, số tiền)');
           parsed.push({ index, sha, invoice: { ...invoice, sourceArtifactId: data.artifactId, sourceHash: data.sourceHash }, uncertain: data.uncertainFields || [] });
           mark(index, 'đã đọc');
         } catch (error) {
