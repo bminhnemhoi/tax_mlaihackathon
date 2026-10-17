@@ -41,6 +41,15 @@ const BOOLEAN_FIELDS=['hasBankSlip','hasItemManifest','isImageBlurry','isAdjustm
 /** Giám khảo có thể gõ số dạng chuỗi ("1.000.000", "1000000", "10%"): chuyển khi không mơ hồ, còn lại bỏ trống để hệ thống hỏi. */
 export function coerceFieldValue(field:string,value:unknown):unknown {
   if(typeof value!=='string')return value;
+  if(value.trim()==='')return undefined;
+  if(field==='paymentMethod'){
+    const t=value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').toUpperCase();
+    return t==='CASH'||t==='TIEN MAT'||t==='TM'?'CASH':t==='BANK_TRANSFER'||t==='CHUYEN KHOAN'||t==='CK'||t==='BANK TRANSFER'?'BANK_TRANSFER':undefined;
+  }
+  if(field==='sellerStatus'){
+    const t=value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').toUpperCase();
+    return ['ACTIVE','SUSPENDED','CLOSED','UNKNOWN'].includes(t)?t:t==='DANG HOAT DONG'?'ACTIVE':t==='TAM NGUNG'||t==='TAM NGUNG HOAT DONG'?'SUSPENDED':t==='DA DONG MST'||t==='NGUNG HOAT DONG'?'CLOSED':undefined;
+  }
   if((NUMERIC_FIELDS as readonly string[]).includes(field)){
     const text=value.replace(/₫|đ|vnd|%/gi,'').replace(/\s+/g,'').trim();
     if(/^-?\d+$/.test(text))return Number(text);
