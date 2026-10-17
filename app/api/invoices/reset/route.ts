@@ -12,7 +12,9 @@ export const dynamic = 'force-dynamic';
 async function handlePOST(request: NextRequest) {
   try {
     const user = requireRequestUser(request);
-    if (!isSandbox()) return NextResponse.json({ error: 'Reset chỉ dành cho sandbox demo.' }, { status: 403 });
+    // Chỉ sandbox demo, trừ khi máy này bật rõ công tắc (chỉ đặt trong .env.local của máy demo, không bao giờ trên production).
+    const workspaceResetEnabled = process.env.TAX_REFEREE_ALLOW_WORKSPACE_RESET === '1';
+    if (!isSandbox() && !workspaceResetEnabled) return NextResponse.json({ error: 'Reset chỉ dành cho sandbox demo.' }, { status: 403 });
     const db = getDatabase();
 
     const artifacts = db.prepare('SELECT storage_path FROM document_artifacts').all() as Array<{ storage_path: string }>;
@@ -51,7 +53,7 @@ async function handlePOST(request: NextRequest) {
     const wasPaused = automationState().paused;
     db.exec("DELETE FROM system_controls WHERE key='AUTO_APPROVE'");
     // Nhật ký audit được giữ nguyên; bản thân thao tác reset cũng là một sự kiện có người thực hiện.
-    appendAuditEvent({ eventType: 'SANDBOX_RESET', entityId: 'sandbox', actorId: user.id, payload: { role: user.role, deletedInvoices: invoiceCount, deletedArtifacts: artifacts.length, automationReset: wasPaused ? 'PAUSED→RUNNING' : 'RUNNING' } });
+    appendAuditEvent({ eventType: 'SANDBOX_RESET', entityId: 'sandbox', actorId: user.id, payload: { role: user.role, deletedInvoices: invoiceCount, deletedArtifacts: artifacts.length, mode: isSandbox() ? 'sandbox' : 'workspace', automationReset: wasPaused ? 'PAUSED→RUNNING' : 'RUNNING' } });
 
     for (const artifact of artifacts) {
       if (fs.existsSync(artifact.storage_path)) {
