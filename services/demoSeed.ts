@@ -1,3 +1,4 @@
+import { seedStaffDirectory } from './staffDirectory';
 import { getDatabase } from '@/lib/server/db';
 import type { AppUser, AppRole } from '@/lib/server/auth';
 import type { RefereeDecision } from '@/lib/schemas';
@@ -24,6 +25,7 @@ export const DEMO_SAMPLE_CASES = [
  */
 export async function seedDemoCases(): Promise<RefereeDecision[]> {
   const db = getDatabase();
+  seedStaffDirectory();
   if ((db.prepare('SELECT COUNT(*) n FROM invoices').get() as { n: number }).n > 0) return [];
   const row = db.prepare("SELECT id, email, display_name, role FROM users WHERE role = 'ACCOUNTANT' LIMIT 1").get() as { id: string; email: string; display_name: string; role: AppRole } | undefined;
   if (!row) return [];
