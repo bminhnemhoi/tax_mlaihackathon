@@ -101,7 +101,10 @@ function questionKey(decision: RefereeDecision): string | undefined {
   if (decision.status !== 'ESCALATED') return undefined;
   const items = decision.handoff?.questionSpec?.items;
   if (!items?.length) return undefined;
-  return items.map(item => item.ruleIds.join('+')).join(' | ');
+  // Ý "xác minh dữ liệu nguồn" hỏi những dữ kiện khác nhau (ủy nhiệm chi, bảng kê, trạng thái MST…): phải cùng nội dung câu hỏi
+  // mới được gộp. Bỏ số tiền, số hóa đơn và phần trong ngoặc kép để các tờ cùng loại câu hỏi vẫn gộp được.
+  const shape = (text: string) => text.replace(/“[^”]*”/g, '').replace(/[\d.,]+\s?₫?/g, '#').replace(/\s+/g, ' ').trim();
+  return items.map(item => item.ruleIds.includes('RULE_SOURCE_REVIEW') ? `${item.ruleIds.join('+')}:${shape(item.text)}` : item.ruleIds.join('+')).join(' | ');
 }
 
 export function getBatch(batchId: string, user: AppUser): {
@@ -140,7 +143,7 @@ export function getBatch(batchId: string, user: AppUser): {
         const key = questionKey(d);
         if (key) {
           view.questionKey = key;
-          const group = groups.get(key) ?? { key, label: key.split(' | ').map(part => part.split('+').map(id => ruleContract(id).label).join(' + ')).join(' · '), invoiceIds: [], requiresCFO: false, sampleQuestion: d.handoff?.question ?? '', questionItems: (d.handoff?.questionSpec?.items ?? []).map(item => ({ n: item.n, text: item.text, answers: item.answers })) };
+          const group = groups.get(key) ?? { key, label: key.split(' | ').map(part => part.split(':')[0].split('+').map(id => ruleContract(id).label).join(' + ') + (part.includes(':') ? ` (${part.slice(part.indexOf(':') + 1).slice(0, 60)})` : '')).join(' · '), invoiceIds: [], requiresCFO: false, sampleQuestion: d.handoff?.question ?? '', questionItems: (d.handoff?.questionSpec?.items ?? []).map(item => ({ n: item.n, text: item.text, answers: item.answers })) };
           group.invoiceIds.push(invoiceId);
           group.requiresCFO = group.requiresCFO || d.requiresCFO;
           groups.set(key, group);
