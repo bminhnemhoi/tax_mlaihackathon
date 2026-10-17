@@ -116,7 +116,7 @@ Nguồn nào là bản preprint chưa bình duyệt, hoặc chỉ đọc đượ
 
 ## 5. Mảng 3 — Document AI và tuân thủ hóa đơn/thuế
 
-### 5.1. Phát hiện pháp lý (đội đã tự đối chiếu ngày 15/10/2026)
+### 5.1. Phát hiện pháp lý (đội đã tự đối chiếu ngày 15/10 và 17/10/2026)
 
 | Nội dung | Kết quả đối chiếu | Đã sửa trong mã |
 |---|---|---|
@@ -124,7 +124,9 @@ Nguồn nào là bản preprint chưa bình duyệt, hoặc chỉ đọc đượ
 | Thời gian giảm thuế | Các kỳ: 02–12/2022, 07/2023–12/2026 (NQ 43/2022, 101/2023, 110/2023, 142/2024, 174/2024, 204/2025). Kỳ 01–06/2023 không giảm thuế. | Hóa đơn 8% tháng 3/2023 nay bị chặn; trước đây lọt. |
 | Hóa đơn điện tử | TT 32/2025/TT-BTC thay TT 78/2021 từ 01/6/2025. NĐ 254/2026/NĐ-CP thay NĐ 123/2020 và NĐ 70/2025 từ 01/7/2026, kèm TT 91/2026/TT-BTC thay TT 32/2025. | Căn cứ quy tắc mã CQT, ký hiệu, ngày ký, MST người mua chọn theo ngày lập. Với văn bản mới, mã chỉ ghi số hiệu, không ghi số điều, khi chưa đối chiếu nguyên văn. |
 | Mua nhiều lần trong ngày | Khoản 3 Điều 26 NĐ 181/2025/NĐ-CP: mỗi lần dưới 5 triệu nhưng tổng trong ngày từ 5 triệu thì chỉ được khấu trừ khi có chứng từ thanh toán không dùng tiền mặt. | Căn cứ quy tắc cụm tiền mặt sửa thành khoản 3 Điều 26 NĐ 181/2025, thay cho "khoản 2 Điều 14 Luật 48/2024" chưa kiểm chứng được. Hóa đơn trước 01/7/2025 viện dẫn TT 219/2013. |
-| Luật 48/2024 sửa bởi Luật 149/2025/QH15; NĐ 181/2025 sửa bởi NĐ 144/2026 | Có văn bản, nhưng chưa đối chiếu được điều khoản sửa đổi | Chưa đưa vào mã |
+| Căn cứ cấp điều/khoản (đối chiếu 17/10 trên vanban.chinhphu.vn) | Ngưỡng 5 triệu: điểm b khoản 2 Điều 14 Luật 48/2024 (nguyên tắc) + Điều 26 NĐ 181/2025; trước 01/7/2025: khoản 2, khoản 5 Điều 15 TT 219/2013 (20 triệu). Mã CQT: điểm a khoản 2 Điều 3 và khoản 10 Điều 10 NĐ 123/2020. Năm trong ký hiệu: điểm b khoản 1 Điều 4 TT 78/2021 → điểm b khoản 1 Điều 5 TT 32/2025 → Điều 4 và Phụ lục I TT 91/2026. MST người mua: điểm a khoản 2 Điều 14 Luật 48/2024 + khoản 5 Điều 10 NĐ 123/2020. | `lib/legalBasis.ts` chọn chuỗi theo ngày lập; sổ văn bản sửa 6 liên kết trỏ sai văn bản, bỏ trích dẫn không có trong văn bản gốc, gắn nhãn UNVERIFIED cho văn bản chưa đối chiếu. Không quyết định nào thay đổi: so trước/sau 180 ca (Verify 9, hồi quy 15, red team 72, phát triển 60, đầu dò quy tắc 20, mẫu demo 4). |
+| NĐ 181/2025 sửa bởi NĐ 144/2026 (hiệu lực 20/6/2026) | Có văn bản (docid 218020). Điều 4 bổ sung điểm g khoản 2 Điều 26: hàng trả chậm, trả góp sau khi điều chỉnh có chứng từ thanh toán không dùng tiền mặt thì kê khai, khấu trừ vào kỳ có chứng từ. Không sửa đoạn mở đầu và khoản 3 Điều 26 | Đã ghi vào sổ văn bản; engine chưa có hình thức thanh toán trả chậm theo hợp đồng (kế hoạch sau Demo Day) |
+| Luật 48/2024 sửa bởi Luật 90/2025/QH15 và Luật 149/2025/QH15 (theo phần căn cứ của NĐ 144/2026) | Có văn bản, chưa đối chiếu điều khoản sửa đổi | Chưa đưa vào mã |
 
 ### 5.2. Nghiên cứu Document AI
 

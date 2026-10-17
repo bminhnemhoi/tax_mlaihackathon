@@ -111,9 +111,9 @@ export const TaxDefenseModal: React.FC<TaxDefenseModalProps> = ({ entry, onClose
             <div className="space-y-1.5 text-xs text-slate-700 font-medium">
               <p>• Căn cứ quy chế nội bộ: <span className="text-purple-700 font-medium font-numeric">{entry.sopVersion || 'Tax-SOP-2026 v2.1'}</span></p>
               {entry.applicableRegulations && entry.applicableRegulations.length > 0 ? (
-                <p>• Văn bản pháp quy Nhà nước có hiệu lực: <span className="text-blue-700 font-medium font-numeric">{entry.applicableRegulations.join(' · ')}</span></p>
+                <p>• Văn bản đã đối chiếu, có hiệu lực tại ngày lập: <span className="text-blue-700 font-medium font-numeric">{entry.applicableRegulations.join(' · ')}</span></p>
               ) : (
-                <p>• Căn cứ pháp quy Nhà nước: Nghị định 123/2020/NĐ-CP, Nghị định 72/2024/NĐ-CP & Thông tư 219/2013/TT-BTC</p>
+                <p>• Căn cứ pháp quy Nhà nước: chọn theo ngày lập hóa đơn (xem căn cứ của từng phát hiện)</p>
               )}
               <p>• Audit hash: <span className="font-numeric text-slate-600">Được lưu vết bảo mật trong chuỗi kiểm toán hệ thống</span></p>
               <p>• Trạng thái ký số: <span className="text-amber-700 font-medium">Lưu vết xác thực điện tử nội bộ</span></p>

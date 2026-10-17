@@ -13,7 +13,7 @@ export function HandoffContext({decision,handoff,showIssues=true}:{decision?:Esc
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600"><span>Người nhận: {h.requiredRole==='CFO'?'CFO':'Kế toán trưởng'}</span>
       {h.evidenceRefs.filter(e=>e.kind==='ARTIFACT').map(e=><a key={e.ref} href={`/api/documents/artifacts/${encodeURIComponent(e.ref)}`} target="_blank" rel="noreferrer" className="font-medium underline">Mở chứng từ nguồn</a>)}</div>
     {h.evidenceRefs.some(e=>e.kind==='CONFIRMATION')&&<ul className="space-y-1 text-xs text-slate-600">{h.evidenceRefs.filter(e=>e.kind==='CONFIRMATION').map(e=><li key={e.ref}>{fieldLabels[e.ref] || e.ref}: {e.description}</li>)}</ul>}
-    {h.openIssues.some(i=>i.legalVerification!=='INTERNAL_POLICY')&&<p className="text-xs text-slate-500">Căn cứ pháp lý còn cần xác minh ở cấp điều khoản; quyết định trong ứng dụng dựa trên SOP.</p>}
+    {h.openIssues.some(i=>i.legalVerification!=='INTERNAL_POLICY')&&<p className="text-xs text-slate-500">Diễn giải điều khoản cần kế toán xác nhận; quyết định trong ứng dụng dựa trên SOP.</p>}
     {h.openIssues.filter(i=>i.sourceUrl).map(i=><a key={i.ruleId} href={i.sourceUrl} target="_blank" rel="noreferrer" className="mr-3 inline-block text-xs text-slate-600 underline">Nguồn · {i.sopClause}</a>)}
   </div>;
 }
