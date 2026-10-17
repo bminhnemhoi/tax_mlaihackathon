@@ -89,7 +89,7 @@ test('câu hỏi cụm tiền mặt cùng ngày nêu từng hóa đơn trong c�
     assert.match(handoffOf(decision)?.question ?? '', /HĐ 0000771 \(3\.240\.000\s?₫, tiền mặt\)/);
     assert.match(handoffOf(decision)?.question ?? '', /cộng lại 5\.000\.000\s?₫/);
     const vat8 = evaluate({ ...base, id: 'J-V8', itemName: 'Cước viễn thông di động tháng 9', taxRate: 8, taxAmount: 80_000, totalAmount: 1_080_000 });
-    assert.match(handoffOf(vat8)?.question ?? '', /Mặt hàng này có đúng thuộc nhóm không được giảm thuế không\?/);
+    assert.match(handoffOf(vat8)?.question ?? '', /Xử lý phần thuế đang áp 8% này ra sao\?/);
   });
 });
 
