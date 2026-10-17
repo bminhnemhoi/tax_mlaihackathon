@@ -115,7 +115,7 @@ export function DashboardView({ user }: { user: WorkspaceViewUser }): ReactEleme
 
       <Card title="Tiền thuế GTGT (VAT)">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Big label="Đã được khấu trừ" value={formatVND(d.vat.deducted)} tone="text-emerald-800" sub="Hóa đơn đã duyệt" />
+          <Big label="Đã được khấu trừ" value={formatVND(d.vat.deducted)} tone="text-emerald-800" sub="Đã duyệt và đã ghi sổ (hóa đơn trong lô: sau khi chốt)" />
           <Big label="Không được khấu trừ" value={formatVND(d.vat.excluded)} tone="text-red-800" sub="Bị từ chối hoặc bị loại một phần" />
           <Big label="Đang chờ quyết định" value={formatVND(d.vat.pending)} tone="text-amber-800" sub={`${o.waiting.count} hóa đơn chờ KTT/CFO`} />
           <Big label="Đang tạm giữ" value={formatVND(d.vat.onHold)} sub={`${o.onHold.count} hóa đơn chờ bổ sung / giữ thuế`} />
@@ -153,7 +153,7 @@ export function DashboardView({ user }: { user: WorkspaceViewUser }): ReactEleme
       <Card title="Lô hóa đơn" action={<Link href="/workspace/batches" className="text-sm underline underline-offset-4">Mở Lô hóa đơn</Link>}>
         {d.batches.total ? <div className="grid gap-3 sm:grid-cols-3">
           <Big label="Số lô" value={String(d.batches.total)} sub={`Đã chốt ${d.batches.signedOff} · chưa chốt ${d.batches.open}`} />
-          <Big label="Hóa đơn đã duyệt trong lô chưa chốt" value={`${d.batches.approvedInOpenBatches} hóa đơn`} tone={d.batches.approvedInOpenBatches ? 'text-amber-800' : ''} sub={`VAT ${formatVND(d.batches.approvedVatInOpenBatches)} chờ người ký chốt lô`} />
+          <Big label="Đã duyệt, chờ chốt lô" value={`${d.batches.approvedInOpenBatches} hóa đơn`} tone={d.batches.approvedInOpenBatches ? 'text-amber-800' : ''} sub={`VAT ${formatVND(d.batches.approvedVatInOpenBatches)} chờ người ký chốt lô`} />
           <Big label="Lô chưa chốt" value={String(d.batches.open)} sub={d.batches.open ? 'Cần ký chốt trước khi ghi sổ' : 'Tất cả lô đã chốt'} />
         </div> : <p className="text-sm text-muted-foreground">Chưa có lô nào.</p>}
       </Card>

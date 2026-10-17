@@ -9,7 +9,7 @@ import { getActivePolicy, getDatabase, runIsolated } from '../../lib/server/db';
 import { switchRole } from '../../lib/server/auth';
 import { listAuditEventsForEntity } from '../../lib/server/audit';
 import type { InvoiceInput } from '../../lib/schemas';
-import { answerGroup, attachToBatch, createBatch, getBatch, NOT_IN_OPEN_BATCH_SQL, signOffBatch } from '../../services/batchService';
+import { answerGroup, attachToBatch, createBatch, getBatch, LEDGER_READY_SQL, signOffBatch } from '../../services/batchService';
 import { evaluateInvoiceLocally } from '../../services/policyEngine';
 import { answerHandoff, evaluateWorkflow, readRecord } from '../../services/workflowService';
 
@@ -96,14 +96,14 @@ test('chốt lô: người tạo không tự chốt; lô có ca từ hạn mức
     assert.throws(() => signOffBatch(batch.id, cfo, 'Chốt lại lần hai cho chắc'), /đã được chốt/);
     assert.equal(listAuditEventsForEntity('NUOC-0000031').filter(e => e.eventType === 'INVOICE_POSTED_BY_BATCH').length, 1);
     const own = createBatch(ktt, { label: 'Lô KTT tự tạo' });
-    await evaluateWorkflow(water('0000033'), acc, { forceLocalOnly: true });
+    await evaluateWorkflow(water('0000033'), ktt, { forceLocalOnly: true });
     attachToBatch(ktt, own.id, { invoiceId: 'NUOC-0000033' });
     assert.throws(() => signOffBatch(own.id, ktt, 'Tự chốt lô của mình'), /bất kiêm nhiệm/);
     void getActivePolicy;
   });
 });
 
-test('một hóa đơn chỉ nằm trong một lô; chỉ người tạo lô được gắn; KTT không chốt lô có hóa đơn do chính mình nhập', async () => {
+test('một hóa đơn chỉ nằm trong một lô; chỉ người tạo lô được gắn; chỉ gắn hóa đơn do chính mình nhập (không kéo hóa đơn người khác ra khỏi sổ)', async () => {
   await runIsolated(async () => {
     const acc = switchRole('ACCOUNTANT')!.user;
     const ktt = switchRole('CHIEF_ACCOUNTANT')!.user;
@@ -115,26 +115,80 @@ test('một hóa đơn chỉ nằm trong một lô; chỉ người tạo lô đ�
     assert.deepEqual(attachToBatch(acc, first.id, { invoiceId: 'NUOC-0000041' }), { position: 1, duplicate: true });
     assert.throws(() => attachToBatch(acc, second.id, { invoiceId: 'NUOC-0000041' }), /lô khác/);
     assert.throws(() => attachToBatch(ktt, first.id, { invoiceId: 'NUOC-0000041' }), /người tạo lô/);
-    const own = createBatch(acc, { label: 'Lô có hóa đơn KTT tự nhập' });
+    const own = createBatch(acc, { label: 'Lô thử gắn hóa đơn của người khác' });
     await evaluateWorkflow(water('0000042'), ktt, { forceLocalOnly: true });
-    attachToBatch(acc, own.id, { invoiceId: 'NUOC-0000042' });
-    assert.throws(() => signOffBatch(own.id, ktt, 'KTT tự chốt hóa đơn mình nhập'), /chính anh\/chị nhập/);
-    assert.equal(signOffBatch(own.id, cfo, 'CFO chốt thay, khác người nhập').postedInvoices, 1);
+    assert.throws(() => attachToBatch(acc, own.id, { invoiceId: 'NUOC-0000042' }), /do chính anh\/chị nhập/);
+    assert.ok((getDatabase().prepare("SELECT COUNT(*) n FROM audit_events WHERE event_type='BATCH_ITEM_ATTACHED'").get() as { n: number }).n >= 1, 'mỗi lần gắn có sự kiện nhật ký');
+    void cfo;
   });
 });
 
 
-test('sổ sách chỉ lấy hóa đơn đã duyệt KHÔNG nằm trong lô chưa chốt: máy duyệt trong lô mở chưa được ghi sổ, chốt lô xong mới vào sổ', async () => {
+test('sổ sách chỉ lấy hóa đơn đã duyệt không thuộc lô hoặc đã được ghi sổ khi chốt: máy duyệt trong lô mở chưa được ghi sổ, chốt lô xong mới vào sổ', async () => {
   await runIsolated(async () => {
     const acc = switchRole('ACCOUNTANT')!.user;
     await evaluateWorkflow(water('0000051'), acc, { forceLocalOnly: true });
     await evaluateWorkflow(water('0000052'), acc, { forceLocalOnly: true });
     const batch = createBatch(acc, { label: 'Lô chờ chốt' });
     attachToBatch(acc, batch.id, { invoiceId: 'NUOC-0000052' });
-    const postable = () => (getDatabase().prepare(`SELECT i.id FROM invoices i WHERE i.status = 'APPROVED' AND ${NOT_IN_OPEN_BATCH_SQL} ORDER BY i.id`).all() as Array<{ id: string }>).map(r => r.id);
+    const postable = () => (getDatabase().prepare(`SELECT i.id FROM invoices i WHERE i.status = 'APPROVED' AND ${LEDGER_READY_SQL} ORDER BY i.id`).all() as Array<{ id: string }>).map(r => r.id);
     assert.equal(readRecord('NUOC-0000052').status, 'APPROVED', 'máy đề xuất duyệt');
     assert.deepEqual(postable(), ['NUOC-0000051'], 'hóa đơn trong lô chưa chốt chưa được ghi sổ');
     signOffBatch(batch.id, switchRole('CHIEF_ACCOUNTANT')!.user, 'Chốt lô sau khi xem phiếu giải trình');
     assert.deepEqual(postable(), ['NUOC-0000051', 'NUOC-0000052']);
+  });
+});
+
+const ready = () => (getDatabase().prepare(`SELECT i.id FROM invoices i WHERE i.status = 'APPROVED' AND ${LEDGER_READY_SQL} ORDER BY i.id`).all() as Array<{ id: string }>).map(r => r.id);
+
+test('chốt bổ sung: hóa đơn còn chờ lúc chốt, duyệt sau đó, KHÔNG tự vào sổ; KTT/CFO chốt bổ sung thì mới vào sổ; không còn gì thì báo đã chốt', async () => {
+  await runIsolated(async () => {
+    const acc = switchRole('ACCOUNTANT')!.user;
+    const batch = createBatch(acc, { label: 'Lô có hóa đơn còn chờ' });
+    for (const inv of [water('0000061'), wine('0000062')]) {
+      await evaluateWorkflow(inv, acc, { forceLocalOnly: true });
+      attachToBatch(acc, batch.id, { invoiceId: inv.id });
+    }
+    const ktt = switchRole('CHIEF_ACCOUNTANT')!.user;
+    const first = signOffBatch(batch.id, ktt, 'Chốt lô, còn một hóa đơn tiếp khách chờ');
+    assert.deepEqual([first.postedInvoices, first.stillWaiting, first.supplement], [1, 1, false]);
+    const rec = readRecord('RUOU-0000062');
+    const spec = JSON.parse(rec.decision_json!).handoff.questionSpec as { items: unknown[] };
+    await answerHandoff('RUOU-0000062', ktt, { answers: Object.fromEntries(spec.items.map((_, i) => [String(i + 1), 'A'])), reason: 'Tiếp khách đối tác theo quy chế, có bảng kê', revision: rec.revision, evaluationId: rec.evaluation_id });
+    assert.equal(readRecord('RUOU-0000062').status, 'APPROVED');
+    assert.deepEqual(ready(), ['NUOC-0000061'], 'duyệt sau khi chốt chưa được ghi sổ');
+    const view = getBatch(batch.id, ktt);
+    assert.equal(view.summary.awaitingPost, 1);
+    assert.equal(view.canSignOff, true);
+    const extra = signOffBatch(batch.id, ktt, 'Chốt bổ sung hóa đơn tiếp khách đã duyệt');
+    assert.deepEqual([extra.postedInvoices, extra.supplement], [1, true]);
+    assert.deepEqual(ready(), ['NUOC-0000061', 'RUOU-0000062']);
+    assert.throws(() => signOffBatch(batch.id, ktt, 'Chốt lại lần ba cho chắc'), /đã được chốt/);
+    assert.equal(listAuditEventsForEntity('RUOU-0000062').filter(e => e.eventType === 'INVOICE_POSTED_BY_BATCH').length, 1);
+  });
+});
+
+test('duyệt nhóm: câu xác nhận giá trị riêng từng tờ (ảnh mờ) không bao giờ được gộp; hồ sơ bị sửa sau khi người duyệt đã xem thì bị chặn', async () => {
+  await runIsolated(async () => {
+    const acc = switchRole('ACCOUNTANT')!.user;
+    const blurry = (n: string, amount: number): InvoiceInput => ({ ...water(n), id: `MO-${n}`, isImageBlurry: true, preTaxAmount: amount, taxRate: 8, taxAmount: amount * 8 / 100, totalAmount: amount + amount * 8 / 100 });
+    const batch = createBatch(acc, { label: 'Lô ảnh mờ và tiếp khách' });
+    for (const inv of [blurry('0000071', 1_000_000), blurry('0000072', 50_000_000), wine('0000073'), wine('0000074')]) {
+      await evaluateWorkflow(inv, acc, { forceLocalOnly: true });
+      attachToBatch(acc, batch.id, { invoiceId: inv.id });
+    }
+    const ktt = switchRole('CHIEF_ACCOUNTANT')!.user;
+    const view = getBatch(batch.id, ktt);
+    assert.ok(!view.groups.some(g => g.invoiceIds.some(id => id.startsWith('MO-'))), 'ảnh mờ có số tiền khác nhau không được trả lời chung');
+    await assert.rejects(answerGroup(batch.id, ktt, { invoiceIds: ['MO-0000071', 'MO-0000072'], answers: { '1': 'A' }, reason: 'Xác nhận chung số liệu ảnh mờ' }), /cùng câu hỏi/);
+    const wineGroup = view.groups.find(g => g.invoiceIds.includes('RUOU-0000073'))!;
+    assert.deepEqual(wineGroup.members.map(m => m.invoiceId).sort(), ['RUOU-0000073', 'RUOU-0000074']);
+    assert.ok(!wineGroup.label.includes('\u0001'));
+    // Phiên bản KTT đã thấy trên thẻ nhóm khác phiên bản hiện hành (hồ sơ vừa được sửa): đáp án không được áp lên bản mới.
+    const seen = wineGroup.members.map(m => m.invoiceId === 'RUOU-0000074' ? { ...m, revision: m.revision + 1 } : m);
+    const results = await answerGroup(batch.id, ktt, { invoiceIds: wineGroup.invoiceIds, answers: Object.fromEntries(wineGroup.questionItems.map(q => [String(q.n), 'A'])), reason: 'Tiếp khách đối tác theo quy chế, đã có bảng kê', members: seen });
+    assert.equal(results.find(r => r.invoiceId === 'RUOU-0000073')!.ok, true);
+    assert.equal(results.find(r => r.invoiceId === 'RUOU-0000074')!.ok, false, JSON.stringify(results));
+    assert.notEqual(readRecord('RUOU-0000074').status, 'APPROVED');
   });
 });

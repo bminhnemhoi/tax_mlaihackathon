@@ -11,9 +11,9 @@ type Check = { key: string; ok: boolean | null; label: string; detail: string };
 type Highlight = { ruleId: string; ruleLabel: string; groupLabel: string; fieldLabels: string[]; reason: string };
 type Explanation = { verdict: 'APPROVED' | 'STOPPED'; headline: string; plain: string; checks: Check[]; highlights: Highlight[]; vatAtStake: number; basisNote: string };
 type Item = { position: number; invoiceId: string | null; fileName: string | null; error: string | null; bucket: Bucket; bucketLabel: string; invoiceNumber?: string; supplierName?: string; totalAmount?: number; taxAmount?: number; requiresCFO?: boolean; submitter?: { name: string; department: string | null } | null; explanation?: Explanation };
-type Group = { key: string; label: string; invoiceIds: string[]; requiresCFO: boolean; questionItems: Array<{ n: number; text: string; answers: [string, string] }> };
+type Group = { key: string; label: string; invoiceIds: string[]; members: Array<{ invoiceId: string; invoiceNumber?: string; supplierName?: string; totalAmount?: number; revision: number; evaluationId: string | null }>; requiresCFO: boolean; questionItems: Array<{ n: number; text: string; answers: [string, string] }> };
 type BatchRow = { id: string; label: string; source: string; status: 'OPEN' | 'SIGNED_OFF'; createdAt: string; signedOffAt: string | null; signoffNote: string | null; items?: number; approved?: number; waiting?: number };
-type BatchDetail = { batch: BatchRow; items: Item[]; summary: Record<Bucket, number> & { total: number; vatApproved: number; vatPending: number }; groups: Group[]; canSignOff: boolean; signOffBlockers: string[] };
+type BatchDetail = { batch: BatchRow; items: Item[]; summary: Record<Bucket, number> & { total: number; vatApproved: number; vatPending: number; posted: number; awaitingPost: number; vatAwaitingPost: number }; groups: Group[]; canSignOff: boolean; signOffBlockers: string[] };
 type Progress = { name: string; state: 'đang đọc' | 'đã đọc' | 'đang kiểm' | 'xong' | 'lỗi' | 'trùng'; note?: string };
 
 const vnd = (n: number | undefined): string => `${new Intl.NumberFormat('vi-VN').format(Math.round(n ?? 0))}₫`;
@@ -80,8 +80,12 @@ export function BatchesView({ user }: { user: WorkspaceViewUser }): ReactElement
       const key = (p: typeof parsed[number]) => [String(p.invoice?.supplierTaxCode ?? '~'), String(p.invoice?.invoiceDate ?? '~'), String(p.invoice?.invoiceNumber ?? '~')].join('|');
       parsed.sort((a, b) => key(a).localeCompare(key(b)) || a.index - b.index);
       // Bước 3: máy kiểm từng tờ, gắn vào lô.
+      const seenSha = new Set<string>();
       for (const p of parsed) {
         const fileName = files[p.index].name;
+        // File trùng nội dung trong cùng lượt: không đưa qua máy kiểm lần hai (tránh tạo hóa đơn trùng nằm ngoài lô).
+        if (seenSha.has(p.sha)) { mark(p.index, 'trùng', 'cùng nội dung với file khác trong lô'); continue; }
+        seenSha.add(p.sha);
         if (p.error || !p.invoice) { await postJson(`/api/batches/${batch.id}/items`, { fileName, fileSha256: p.sha, error: p.error ?? 'Không đọc được' }); continue; }
         mark(p.index, 'đang kiểm');
         try {
@@ -150,7 +154,7 @@ function BatchDetailView({ detail, user, onChanged }: { detail: BatchDetail; use
       <ul className="divide-y">{g.rows.map(item => <ItemRow key={item.position} item={item} />)}</ul>
     </div>)}
 
-    {approver && batch.status === 'OPEN' && <SignOffPanel detail={detail} onDone={onChanged} />}
+    {approver && (batch.status === 'OPEN' || summary.awaitingPost > 0) && <SignOffPanel detail={detail} onDone={onChanged} />}
   </section>;
 }
 
@@ -190,7 +194,8 @@ function GroupAnswerCard({ batchId, group, user, onDone }: { batchId: string; gr
   async function submit(): Promise<void> {
     setBusy(true);
     try {
-      const { results } = await postJson<{ results: Array<{ invoiceId: string; ok: boolean; error?: string }> }>(`/api/batches/${batchId}/answer`, { invoiceIds: group.invoiceIds, answers, reason });
+      const members = group.members.map(m => ({ invoiceId: m.invoiceId, revision: m.revision, evaluationId: m.evaluationId }));
+      const { results } = await postJson<{ results: Array<{ invoiceId: string; ok: boolean; error?: string }> }>(`/api/batches/${batchId}/answer`, { invoiceIds: group.invoiceIds, answers, reason, members });
       const failed = results.filter(r => !r.ok);
       if (failed.length) toast.warning(`${results.length - failed.length}/${results.length} hóa đơn đã xử lý; ${failed.length} bị chặn: ${failed[0].error}`); else toast.success(`Đã trả lời chung cho ${results.length} hóa đơn.`);
       await onDone();
@@ -198,7 +203,8 @@ function GroupAnswerCard({ batchId, group, user, onDone }: { batchId: string; gr
   }
   return <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-3 text-sm">
     <p className="font-semibold">Trả lời chung {group.invoiceIds.length} hóa đơn cùng câu hỏi: {group.label}</p>
-    <p className="text-xs text-muted-foreground">Mỗi hóa đơn vẫn được kiểm quyền riêng và ghi nhật ký riêng. Hóa đơn nào không hợp lệ sẽ bị chặn, không ảnh hưởng hóa đơn khác.</p>
+    <p className="text-xs text-muted-foreground">Mỗi hóa đơn vẫn được kiểm quyền riêng và ghi nhật ký riêng. Hóa đơn nào không hợp lệ hoặc vừa bị sửa sẽ bị chặn, không ảnh hưởng hóa đơn khác.</p>
+    <ul className="space-y-0.5 text-xs" aria-label="Hóa đơn trong nhóm">{group.members.map(m => <li key={m.invoiceId}>HĐ {m.invoiceNumber ?? m.invoiceId} · {m.supplierName ?? ''}{m.totalAmount !== undefined ? ` · ${vnd(m.totalAmount)}` : ''}</li>)}</ul>
     {cfoOnly && <p className="text-xs font-medium text-rose-800">Nhóm này có hóa đơn cần CFO trả lời.</p>}
     {group.questionItems.map(q => <fieldset key={q.n} className="space-y-1"><legend className="text-xs">{q.n}. {q.text}</legend>
       <div className="flex flex-wrap gap-2">{(['A', 'B'] as const).map((letter, k) => <label key={letter} className={`cursor-pointer rounded border px-2 py-1 text-xs ${answers[String(q.n)] === letter ? 'border-slate-900 bg-white' : 'border-slate-300'}`}>
@@ -211,21 +217,23 @@ function GroupAnswerCard({ batchId, group, user, onDone }: { batchId: string; gr
 function SignOffPanel({ detail, onDone }: { detail: BatchDetail; onDone: () => Promise<void> }): ReactElement {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const eligible = detail.summary.MACHINE_APPROVED + detail.summary.HUMAN_APPROVED;
+  const eligible = detail.summary.awaitingPost;
+  const supplement = detail.batch.status === 'SIGNED_OFF';
+  const waiting = detail.summary.NEEDS_HUMAN + detail.summary.ON_HOLD;
   async function submit(): Promise<void> {
-    if (!window.confirm(`Chốt ${eligible} hóa đơn, ghi sổ VAT ${vnd(detail.summary.vatApproved)}. ${detail.summary.NEEDS_HUMAN} hóa đơn còn chờ sẽ KHÔNG được ghi sổ. Tiếp tục?`)) return;
+    if (!window.confirm(`${supplement ? 'Chốt bổ sung' : 'Chốt'} ${eligible} hóa đơn, ghi sổ VAT ${vnd(detail.summary.vatAwaitingPost)}. ${waiting} hóa đơn còn chờ hoặc tạm giữ KHÔNG được ghi sổ; nếu được duyệt sau thì cần chốt bổ sung. Tiếp tục?`)) return;
     setBusy(true);
-    try { const r = await postJson<{ postedInvoices: number }>(`/api/batches/${detail.batch.id}/signoff`, { note }); toast.success(`Đã chốt lô: ghi sổ ${r.postedInvoices} hóa đơn.`); await onDone(); }
+    try { const r = await postJson<{ postedInvoices: number }>(`/api/batches/${detail.batch.id}/signoff`, { note }); toast.success(`${supplement ? 'Đã chốt bổ sung' : 'Đã chốt lô'}: ghi sổ ${r.postedInvoices} hóa đơn.`); await onDone(); }
     catch (error) { toast.error(error instanceof Error ? error.message : 'Không chốt được lô.'); } finally { setBusy(false); }
   }
   return <div className="rounded-xl border bg-white p-4 space-y-2 text-sm">
-    <p className="font-semibold">Chốt lô (người ký trước khi ghi sổ)</p>
+    <p className="font-semibold">{supplement ? `Chốt bổ sung — ${eligible} hóa đơn được duyệt sau khi chốt lô` : 'Chốt lô (người ký trước khi ghi sổ)'}</p>
     {detail.signOffBlockers.length > 0
       ? <ul className="list-disc pl-5 text-xs text-rose-800">{detail.signOffBlockers.map(b => <li key={b}>{b}</li>)}</ul>
       : <>
-        <p className="text-xs text-muted-foreground">Máy đã kiểm từng hóa đơn và đề xuất. Anh/chị xem tổng hợp, mở vài phiếu giải trình bất kỳ rồi ký chốt. Hóa đơn còn chờ người quyết không bị ghi sổ.</p>
+        <p className="text-xs text-muted-foreground">Máy đã kiểm từng hóa đơn và đề xuất. Anh/chị xem tổng hợp, mở vài phiếu giải trình bất kỳ rồi ký chốt. Hóa đơn còn chờ người quyết hoặc tạm giữ không bị ghi sổ.</p>
         <input className="w-full rounded border px-2 py-1 text-xs" placeholder="Ghi chú khi chốt (ít nhất 8 ký tự)" value={note} onChange={e => setNote(e.target.value)} />
-        <Button size="sm" disabled={note.trim().length < 8 || busy} onClick={() => void submit()}>{busy ? 'Đang chốt…' : `Chốt ${eligible} hóa đơn`}</Button>
+        <Button size="sm" disabled={note.trim().length < 8 || busy} onClick={() => void submit()}>{busy ? 'Đang chốt…' : `${supplement ? 'Chốt bổ sung' : 'Chốt'} ${eligible} hóa đơn`}</Button>
       </>}
   </div>;
 }

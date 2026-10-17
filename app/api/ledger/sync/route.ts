@@ -2,7 +2,7 @@ import { RequestError, requestErrorResponse } from '@/lib/server/http';
 import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRequestUser } from '@/lib/server/auth';
-import { NOT_IN_OPEN_BATCH_SQL } from '@/services/batchService';
+import { LEDGER_READY_SQL } from '@/services/batchService';
 import { getDatabase } from '@/lib/server/db';
 import { InvoiceInput, RefereeDecision } from '@/lib/schemas';
 import { generateCanonicalVoucher } from '@/lib/accounting/ledgerMapper';
@@ -41,7 +41,7 @@ async function handleGET(request: NextRequest) {
         ORDER BY datetime(e2.created_at) DESC LIMIT 1
       )
       WHERE i.status = 'APPROVED'
-        AND ${NOT_IN_OPEN_BATCH_SQL}
+        AND ${LEDGER_READY_SQL}
       ORDER BY datetime(i.updated_at) DESC
       LIMIT 100
     `).all() as Array<Record<string, unknown>>;
@@ -105,7 +105,7 @@ async function handlePOST(request: NextRequest) {
         ORDER BY datetime(e2.created_at) DESC LIMIT 1
       )
       WHERE i.status = 'APPROVED'
-        AND ${NOT_IN_OPEN_BATCH_SQL}
+        AND ${LEDGER_READY_SQL}
       ORDER BY datetime(i.updated_at) DESC
     `).all() as Array<Record<string, unknown>>;
 

@@ -90,6 +90,7 @@ const ROUTE_GATES: Record<string, { file: string; gate: string }> = {
   'policy.draft': { file: 'app/api/policy/route.ts', gate: "['CHIEF_ACCOUNTANT', 'CFO'].includes(user.role)" },
   'precedent.manage': { file: 'app/api/precedents/route.ts', gate: "user.role !== 'CFO'" },
   'supplier.update': { file: 'app/api/suppliers/route.ts', gate: "user.role === 'ACCOUNTANT'" },
+  'ledger.export': { file: 'app/api/ledger/export/route.ts', gate: "['CHIEF_ACCOUNTANT', 'CFO'].includes(user.role)" },
 };
 
 test('mọi quyền của con người trong bảng đều có phép kiểm (hàm thật hoặc cổng route)', () => {

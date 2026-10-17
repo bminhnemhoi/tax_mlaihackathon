@@ -2,7 +2,7 @@ import { RequestError, requestErrorResponse } from '@/lib/server/http';
 import { withRequestDatabase } from '@/lib/server/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireRequestUser } from '@/lib/server/auth';
-import { NOT_IN_OPEN_BATCH_SQL } from '@/services/batchService';
+import { LEDGER_READY_SQL } from '@/services/batchService';
 import { getDatabase } from '@/lib/server/db';
 import { InvoiceInput, RefereeDecision } from '@/lib/schemas';
 import { generateCanonicalVoucher } from '@/lib/accounting/ledgerMapper';
@@ -21,7 +21,9 @@ function parseJson<T>(value: unknown, fallback: T): T {
 
 async function handleGET(request: NextRequest) {
   try {
-    requireRequestUser(request);
+    const user = requireRequestUser(request);
+    // Tải XML sổ cái / CSV bảng kê để nạp vào phần mềm kế toán là bước ghi sổ: chỉ Kế toán trưởng/CFO, không phải người nhập.
+    if (!['CHIEF_ACCOUNTANT', 'CFO'].includes(user.role)) throw new RequestError('Chỉ Kế toán trưởng hoặc CFO được xuất chứng từ sang phần mềm kế toán.', 403);
     const { searchParams } = new URL(request.url);
     const format = searchParams.get('format') || 'xml'; // 'xml' | 'csv' | 'json'
     const regime = (searchParams.get('regime') === 'CIRCULAR_133' ? 'CIRCULAR_133' : 'CIRCULAR_99_200') as 'CIRCULAR_99_200' | 'CIRCULAR_133';
@@ -39,7 +41,7 @@ async function handleGET(request: NextRequest) {
         ORDER BY datetime(e2.created_at) DESC LIMIT 1
       )
       WHERE i.status = 'APPROVED'
-        AND ${NOT_IN_OPEN_BATCH_SQL}
+        AND ${LEDGER_READY_SQL}
       ORDER BY datetime(i.updated_at) DESC
       LIMIT 200
     `).all() as Array<Record<string, unknown>>;

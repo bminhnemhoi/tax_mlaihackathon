@@ -139,6 +139,8 @@ export function getDashboard(user: AppUser, options: { period?: string | null } 
   const bucket = (): OutcomeBucket => ({ count: 0, pct: 0, vat: 0 });
   const outcomes = { machine: bucket(), human: bucket(), rejected: bucket(), waiting: bucket(), onHold: bucket(), processing: bucket() };
   const vat = { deducted: 0, excluded: 0, pending: 0, onHold: 0 };
+  // Hóa đơn đã duyệt nhưng còn nằm trong lô chưa được ghi sổ (lô mở, hoặc duyệt sau khi chốt — chờ chốt bổ sung): chưa tính là đã khấu trừ.
+  const unposted = new Set((db.prepare('SELECT invoice_id FROM batch_items WHERE invoice_id IS NOT NULL AND posted_at IS NULL').all() as Array<{ invoice_id: string }>).map(r => r.invoice_id));
   const recipient: 'CFO' | 'CHIEF_ACCOUNTANT' = user.role === 'CFO' ? 'CFO' : 'CHIEF_ACCOUNTANT';
   const myQueue = { count: 0, vat: 0, recipient };
   const ruleCounts = new Map<string, number>();
@@ -158,7 +160,8 @@ export function getDashboard(user: AppUser, options: { period?: string | null } 
     let outcome: keyof typeof outcomes;
     if (inv.status === 'APPROVED') {
       outcome = approvalSource(inv, evs, escalated.length > 0, latest?.status ?? null) === 'MACHINE' ? 'machine' : 'human';
-      vat.deducted += inv.approved; vat.excluded += Math.max(0, inv.taxAmount - inv.approved);
+      if (!unposted.has(inv.id)) vat.deducted += inv.approved;
+      vat.excluded += Math.max(0, inv.taxAmount - inv.approved);
     } else if (inv.status === 'REJECTED') { outcome = 'rejected'; vat.excluded += inv.taxAmount; }
     else if (WAITING.has(inv.status)) { outcome = 'waiting'; vat.pending += inv.taxAmount; }
     else if (HOLD.has(inv.status)) { outcome = 'onHold'; vat.onHold += inv.taxAmount; }
@@ -191,8 +194,7 @@ export function getDashboard(user: AppUser, options: { period?: string | null } 
   // Lô hóa đơn: chốt lô là bước người ký trước khi ghi sổ.
   const batchWhere = period ? 'WHERE substr(created_at,1,7)=?' : '';
   const batchRow = db.prepare(`SELECT COUNT(*) total, COALESCE(SUM(signed_off_at IS NOT NULL),0) signed FROM batches ${batchWhere}`).get(...args) as { total: number; signed: number };
-  const openBatchInvoices = new Set((db.prepare('SELECT DISTINCT bi.invoice_id FROM batch_items bi JOIN batches b ON b.id=bi.batch_id WHERE b.signed_off_at IS NULL AND bi.invoice_id IS NOT NULL').all() as Array<{ invoice_id: string }>).map(r => r.invoice_id));
-  const approvedOpen = invoices.filter(i => i.status === 'APPROVED' && openBatchInvoices.has(i.id));
+  const approvedOpen = invoices.filter(i => i.status === 'APPROVED' && unposted.has(i.id));
 
   // Kênh nguồn và người gửi: tin nhắn kênh (Gmail/Zalo) ưu tiên, rồi lô, còn lại là nhập trên web.
   const sourceOf = new Map<string, string>(), staffOf = new Map<string, string>();

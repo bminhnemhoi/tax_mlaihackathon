@@ -13,7 +13,7 @@ function fail(error: unknown, fallback: string): NextResponse {
   return requestErrorResponse(error, fallback);
 }
 const noStore = { 'Cache-Control': 'no-store' };
-const CreateSchema = z.object({ label: z.string().max(120).optional(), source: z.enum(['UPLOAD', 'GMAIL', 'ZALO', 'MANUAL']).optional() }).strict();
+const CreateSchema = z.object({ label: z.string().max(120).optional(), source: z.enum(['UPLOAD', 'MANUAL']).optional() }).strict();
 
 async function handleGET(request: NextRequest) {
   try { requireRequestUser(request); return NextResponse.json({ batches: listBatches(50) }, { headers: noStore }); }

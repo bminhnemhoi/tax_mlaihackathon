@@ -15,7 +15,7 @@ function fail(error: unknown, fallback: string): NextResponse {
 const noStore = { 'Cache-Control': 'no-store' };
 const ItemSchema = z.object({
   invoiceId: z.string().max(200).nullish(), fileName: z.string().max(200).nullish(), fileSha256: z.string().regex(/^[a-f0-9]{64}$/).nullish(),
-  sourceRef: z.string().max(200).nullish(), error: z.string().max(300).nullish(),
+  error: z.string().max(300).nullish(),
 }).strict();
 async function handlePOST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
