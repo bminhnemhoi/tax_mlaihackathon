@@ -15,8 +15,9 @@ const StaffSchema = z.object({
 
 async function handleGET(request: NextRequest) {
   try {
-    requireRequestUser(request); seedStaffDirectory();
-    return NextResponse.json({ staff: listStaff().map(s => ({ id: s.id, fullName: s.fullName, department: s.department, title: s.title, email: s.email, zaloUserId: s.zaloUserId })) }, { headers: noStore });
+    const user = requireRequestUser(request); seedStaffDirectory();
+    const full = user.role !== 'ACCOUNTANT';
+    return NextResponse.json({ staff: listStaff().map(s => ({ id: s.id, fullName: s.fullName, department: s.department, title: s.title, email: full ? s.email : null, zaloUserId: full ? s.zaloUserId : null })) }, { headers: noStore });
   } catch (error) { return channelFail(error, 'Không tải được danh bạ người gửi.'); }
 }
 async function handlePOST(request: NextRequest) {

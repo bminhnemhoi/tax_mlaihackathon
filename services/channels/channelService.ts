@@ -4,6 +4,7 @@
  * thì hóa đơn mới được đọc và kiểm; người lạ hoặc email không xác thực ⇒ chờ kế toán xác nhận người gửi.
  * XML đọc tất định (không AI); PDF/ảnh xếp hàng chờ bộ đọc lô.
  */
+import { isSandbox } from '@/lib/server/db';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -122,6 +123,9 @@ function requireRole(user: AppUser, roles: string[], message: string): void {
 /** Kéo hóa đơn từ một kênh: một lô cho mỗi lượt kéo (chỉ tạo khi có hóa đơn được xử lý). */
 export async function pullChannel(user: AppUser, channel: ChannelName, deps: ChannelDeps = {}): Promise<PullResult> {
   requireRole(user, STAFF_ROLES, 'Chỉ nhân viên kế toán được lấy hóa đơn từ kênh.');
+  // Hộp thư thật của đội không được kéo vào phiên demo của người lạ. Demo trên máy của đội: đặt TAX_REFEREE_ALLOW_REAL_CHANNELS_IN_DEMO=1.
+  if (isSandbox() && !deps.gmail && !deps.zalo && process.env.TAX_REFEREE_ALLOW_REAL_CHANNELS_IN_DEMO !== '1')
+    throw new WorkflowError('Kênh Gmail/Zalo thật chỉ dùng trong workspace nội bộ hoặc khi chủ máy bật chế độ demo kênh thật.', 403);
   seedStaffDirectory();
   const result: PullResult = { channel, messages: 0, files: 0, duplicates: 0, batchId: null, counts: emptyCounts(), outcomes: [] };
   const ensureBatch = () => result.batchId ??= createBatch(user, { label: `Lô ${channel === 'GMAIL' ? 'Gmail' : 'Zalo'} ${new Date().toLocaleString('vi-VN')}`, source: channel }).id;
